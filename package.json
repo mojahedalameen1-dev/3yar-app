@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
+    "@supabase/supabase-js": "^2.91.1",
     "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
     "dayjs": "^1.11.10",

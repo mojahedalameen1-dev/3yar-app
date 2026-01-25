@@ -1,12 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { supabase } from '../lib/supabase'
 import { useCarStore } from './car'
 import { useOdometerStore } from './odometer'
 import dayjs from 'dayjs'
 
 export const useTasksStore = defineStore('tasks', () => {
     // State
-    const tasks = ref(loadFromStorage())
+    const tasks = ref([])
+    const loading = ref(false)
+    const error = ref(null)
 
     // Status constants
     const STATUS = {
@@ -42,53 +45,44 @@ export const useTasksStore = defineStore('tasks', () => {
         let kmRemaining = null
         let hasNoMaintenanceHistory = false
 
-        // Check if task has never been performed
         const hasDistanceHistory = task.lastMaintenanceOdometer !== null
         const hasTimeHistory = task.lastMaintenanceDate !== null
 
-        // Calculate distance progress & estimate date
         if (task.type === 'distance' || task.type === 'both') {
             if (hasDistanceHistory && task.intervalKm) {
                 const kmSinceLast = currentOdometer - task.lastMaintenanceOdometer
                 kmRemaining = Math.max(0, task.intervalKm - kmSinceLast)
                 distanceProgress = (kmSinceLast / task.intervalKm) * 100
 
-                // Calculate estimated date if we have daily average
                 if (odometerStore.averageDailyKm > 0 && kmRemaining > 0) {
                     const daysRemaining = Math.ceil(kmRemaining / odometerStore.averageDailyKm)
                     estimatedDate = dayjs().add(daysRemaining, 'day').toISOString()
                 }
             } else if (!hasDistanceHistory && task.intervalKm) {
-                // No maintenance history - treat as overdue
                 hasNoMaintenanceHistory = true
                 distanceProgress = 100
                 kmRemaining = 0
             }
         }
 
-        // Calculate time progress
         if (task.type === 'time' || task.type === 'both') {
             if (hasTimeHistory && task.intervalMonths) {
                 const lastDate = dayjs(task.lastMaintenanceDate)
                 const monthsSinceLast = today.diff(lastDate, 'month', true)
                 timeProgress = (monthsSinceLast / task.intervalMonths) * 100
             } else if (!hasTimeHistory && task.intervalMonths) {
-                // No maintenance history - treat as overdue
                 hasNoMaintenanceHistory = true
                 timeProgress = 100
             }
         }
 
-        // Use the higher progress value
         const progress = Math.max(distanceProgress, timeProgress)
 
-        // If time-based date is sooner (or exists and distance doesn't), use it for estimation
         if (task.type === 'time' || task.type === 'both') {
             if (hasTimeHistory && task.intervalMonths) {
                 const lastDate = dayjs(task.lastMaintenanceDate)
                 const nextDueDate = lastDate.add(task.intervalMonths, 'month')
 
-                // If we have both estimates, take the sooner one
                 if (estimatedDate) {
                     if (nextDueDate.isBefore(dayjs(estimatedDate))) {
                         estimatedDate = nextDueDate.toISOString()
@@ -99,7 +93,6 @@ export const useTasksStore = defineStore('tasks', () => {
             }
         }
 
-        // Check for snooze
         if (task.snoozedUntil && dayjs(task.snoozedUntil).isAfter(today)) {
             return {
                 status: STATUS.GOOD,
@@ -111,7 +104,6 @@ export const useTasksStore = defineStore('tasks', () => {
             }
         }
 
-        // Determine status based on progress
         let status
         if (progress >= 100 || hasNoMaintenanceHistory) {
             status = STATUS.LATE
@@ -125,7 +117,7 @@ export const useTasksStore = defineStore('tasks', () => {
 
         return {
             status,
-            progress: Math.min(progress, 150), // Cap at 150% for display
+            progress: Math.min(progress, 150),
             isSnoozed: false,
             distanceProgress,
             timeProgress,
@@ -149,15 +141,10 @@ export const useTasksStore = defineStore('tasks', () => {
         const priorityOrder = { high: 0, medium: 1, low: 2 }
 
         return [...tasksWithStatus.value].sort((a, b) => {
-            // First sort by status
             const statusDiff = statusOrder[a.statusInfo.status] - statusOrder[b.statusInfo.status]
             if (statusDiff !== 0) return statusDiff
-
-            // Then by priority
             const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority]
             if (priorityDiff !== 0) return priorityDiff
-
-            // Then by progress (higher first)
             return b.statusInfo.progress - a.statusInfo.progress
         })
     })
@@ -184,163 +171,203 @@ export const useTasksStore = defineStore('tasks', () => {
         }
     })
 
-    // Actions
-    function loadFromStorage() {
-        const stored = localStorage.getItem('maintenance_tasks')
-        return stored ? JSON.parse(stored) : getDefaultTasks()
+    // Database mapping
+    function mapFromDb(row) {
+        return {
+            id: row.id,
+            name: row.name,
+            type: row.type,
+            intervalKm: row.interval_km,
+            intervalMonths: row.interval_months,
+            priority: row.priority,
+            isRecurring: row.is_recurring,
+            lastMaintenanceDate: row.last_maintenance_date,
+            lastMaintenanceOdometer: row.last_maintenance_odometer,
+            snoozedUntil: row.snoozed_until,
+            createdAt: row.created_at
+        }
     }
 
-    function saveToStorage() {
-        localStorage.setItem('maintenance_tasks', JSON.stringify(tasks.value))
+    function mapToDb(task) {
+        return {
+            name: task.name,
+            type: task.type,
+            interval_km: task.intervalKm || null,
+            interval_months: task.intervalMonths || null,
+            priority: task.priority || 'medium',
+            is_recurring: task.isRecurring !== false,
+            last_maintenance_date: task.lastMaintenanceDate || null,
+            last_maintenance_odometer: task.lastMaintenanceOdometer || null,
+            snoozed_until: task.snoozedUntil || null
+        }
     }
 
     function getDefaultTasks() {
         return [
-            {
-                id: 1,
-                name: 'تغيير الزيت',
-                type: 'both',
-                intervalKm: 5000,
-                intervalMonths: 3,
-                priority: 'high',
-                isRecurring: true,
-                lastMaintenanceDate: null,
-                lastMaintenanceOdometer: null,
-                snoozedUntil: null,
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 2,
-                name: 'فحص الفرامل',
-                type: 'distance',
-                intervalKm: 20000,
-                intervalMonths: null,
-                priority: 'high',
-                isRecurring: true,
-                lastMaintenanceDate: null,
-                lastMaintenanceOdometer: null,
-                snoozedUntil: null,
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 3,
-                name: 'تغيير فلتر الهواء',
-                type: 'distance',
-                intervalKm: 15000,
-                intervalMonths: null,
-                priority: 'medium',
-                isRecurring: true,
-                lastMaintenanceDate: null,
-                lastMaintenanceOdometer: null,
-                snoozedUntil: null,
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 4,
-                name: 'فحص الإطارات',
-                type: 'time',
-                intervalKm: null,
-                intervalMonths: 6,
-                priority: 'medium',
-                isRecurring: true,
-                lastMaintenanceDate: null,
-                lastMaintenanceOdometer: null,
-                snoozedUntil: null,
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 5,
-                name: 'تجديد الاستمارة',
-                type: 'time',
-                intervalKm: null,
-                intervalMonths: 12,
-                priority: 'high',
-                isRecurring: true,
-                lastMaintenanceDate: null,
-                lastMaintenanceOdometer: null,
-                snoozedUntil: null,
-                createdAt: new Date().toISOString()
-            }
+            { id: 1, name: 'تغيير الزيت', type: 'both', intervalKm: 5000, intervalMonths: 3, priority: 'high', isRecurring: true, lastMaintenanceDate: null, lastMaintenanceOdometer: null, snoozedUntil: null, createdAt: new Date().toISOString() },
+            { id: 2, name: 'فحص الفرامل', type: 'distance', intervalKm: 20000, intervalMonths: null, priority: 'high', isRecurring: true, lastMaintenanceDate: null, lastMaintenanceOdometer: null, snoozedUntil: null, createdAt: new Date().toISOString() },
+            { id: 3, name: 'تغيير فلتر الهواء', type: 'distance', intervalKm: 15000, intervalMonths: null, priority: 'medium', isRecurring: true, lastMaintenanceDate: null, lastMaintenanceOdometer: null, snoozedUntil: null, createdAt: new Date().toISOString() },
+            { id: 4, name: 'فحص الإطارات', type: 'time', intervalKm: null, intervalMonths: 6, priority: 'medium', isRecurring: true, lastMaintenanceDate: null, lastMaintenanceOdometer: null, snoozedUntil: null, createdAt: new Date().toISOString() },
+            { id: 5, name: 'تجديد الاستمارة', type: 'time', intervalKm: null, intervalMonths: 12, priority: 'high', isRecurring: true, lastMaintenanceDate: null, lastMaintenanceOdometer: null, snoozedUntil: null, createdAt: new Date().toISOString() }
         ]
     }
 
-    function addTask(taskData) {
-        const newTask = {
-            id: Date.now(),
-            name: taskData.name,
-            type: taskData.type,
-            intervalKm: taskData.intervalKm || null,
-            intervalMonths: taskData.intervalMonths || null,
-            priority: taskData.priority || 'medium',
-            isRecurring: taskData.isRecurring !== false,
-            lastMaintenanceDate: taskData.lastMaintenanceDate || null,
-            lastMaintenanceOdometer: taskData.lastMaintenanceOdometer || null,
-            snoozedUntil: null,
-            createdAt: new Date().toISOString()
-        }
+    // Actions
+    async function fetchTasks() {
+        loading.value = true
+        error.value = null
+        try {
+            const { data, error: err } = await supabase
+                .from('maintenance_tasks')
+                .select('*')
+                .order('created_at', { ascending: true })
 
-        tasks.value.push(newTask)
-        saveToStorage()
-        return newTask
-    }
+            if (err) throw err
 
-    function updateTask(id, updates) {
-        const index = tasks.value.findIndex(t => t.id === id)
-        if (index !== -1) {
-            tasks.value[index] = {
-                ...tasks.value[index],
-                ...updates,
-                updatedAt: new Date().toISOString()
+            if (data && data.length > 0) {
+                tasks.value = data.map(mapFromDb)
+            } else {
+                // Try to migrate from localStorage or use defaults
+                const stored = localStorage.getItem('maintenance_tasks')
+                if (stored) {
+                    const localTasks = JSON.parse(stored)
+                    for (const task of localTasks) {
+                        await addTask(task)
+                    }
+                    localStorage.removeItem('maintenance_tasks')
+                } else {
+                    // Insert default tasks
+                    const defaults = getDefaultTasks()
+                    for (const task of defaults) {
+                        await addTask(task)
+                    }
+                }
             }
-            saveToStorage()
+        } catch (err) {
+            error.value = err.message
+            console.error('Error fetching tasks:', err)
+        } finally {
+            loading.value = false
         }
     }
 
-    function deleteTask(id) {
-        const index = tasks.value.findIndex(t => t.id === id)
-        if (index !== -1) {
-            tasks.value.splice(index, 1)
-            saveToStorage()
+    async function addTask(taskData) {
+        try {
+            const { data, error: err } = await supabase
+                .from('maintenance_tasks')
+                .insert([mapToDb(taskData)])
+                .select()
+                .single()
+
+            if (err) throw err
+
+            const newTask = mapFromDb(data)
+            tasks.value.push(newTask)
+            return newTask
+        } catch (err) {
+            error.value = err.message
+            console.error('Error adding task:', err)
+            throw err
         }
     }
 
-    function snoozeTask(id, duration) {
-        const durationMap = {
-            'day': 1,
-            'week': 7,
-            'twoWeeks': 14,
-            'month': 30
-        }
+    async function updateTask(id, updates) {
+        try {
+            const dbUpdates = {}
+            if (updates.name !== undefined) dbUpdates.name = updates.name
+            if (updates.type !== undefined) dbUpdates.type = updates.type
+            if (updates.intervalKm !== undefined) dbUpdates.interval_km = updates.intervalKm
+            if (updates.intervalMonths !== undefined) dbUpdates.interval_months = updates.intervalMonths
+            if (updates.priority !== undefined) dbUpdates.priority = updates.priority
+            if (updates.isRecurring !== undefined) dbUpdates.is_recurring = updates.isRecurring
+            if (updates.lastMaintenanceDate !== undefined) dbUpdates.last_maintenance_date = updates.lastMaintenanceDate
+            if (updates.lastMaintenanceOdometer !== undefined) dbUpdates.last_maintenance_odometer = updates.lastMaintenanceOdometer
+            if (updates.snoozedUntil !== undefined) dbUpdates.snoozed_until = updates.snoozedUntil
 
+            const { data, error: err } = await supabase
+                .from('maintenance_tasks')
+                .update(dbUpdates)
+                .eq('id', id)
+                .select()
+                .single()
+
+            if (err) throw err
+
+            const index = tasks.value.findIndex(t => t.id === id)
+            if (index !== -1) {
+                tasks.value[index] = mapFromDb(data)
+            }
+        } catch (err) {
+            error.value = err.message
+            console.error('Error updating task:', err)
+            throw err
+        }
+    }
+
+    async function deleteTask(id) {
+        try {
+            const { error: err } = await supabase
+                .from('maintenance_tasks')
+                .delete()
+                .eq('id', id)
+
+            if (err) throw err
+            tasks.value = tasks.value.filter(t => t.id !== id)
+        } catch (err) {
+            error.value = err.message
+            console.error('Error deleting task:', err)
+            throw err
+        }
+    }
+
+    async function snoozeTask(id, duration) {
+        const durationMap = { 'day': 1, 'week': 7, 'twoWeeks': 14, 'month': 30 }
         const days = durationMap[duration] || 7
         const snoozedUntil = dayjs().add(days, 'day').toISOString()
-
-        updateTask(id, { snoozedUntil })
+        await updateTask(id, { snoozedUntil })
     }
 
-    function cancelSnooze(id) {
-        updateTask(id, { snoozedUntil: null })
+    async function cancelSnooze(id) {
+        await updateTask(id, { snoozedUntil: null })
     }
 
-    function recordMaintenance(taskId, maintenanceData) {
+    async function recordMaintenance(taskId, maintenanceData) {
         const carStore = useCarStore()
         const currentOdometer = maintenanceData.odometer || carStore.car?.currentOdometer || 0
         const maintenanceDate = maintenanceData.date || new Date().toISOString()
 
-        updateTask(taskId, {
+        await updateTask(taskId, {
             lastMaintenanceDate: maintenanceDate,
             lastMaintenanceOdometer: currentOdometer,
             snoozedUntil: null
         })
     }
 
-    function resetTasks() {
-        tasks.value = getDefaultTasks()
-        saveToStorage()
+    async function resetTasks() {
+        try {
+            const { error: err } = await supabase
+                .from('maintenance_tasks')
+                .delete()
+                .neq('id', 0)
+
+            if (err) throw err
+
+            tasks.value = []
+            const defaults = getDefaultTasks()
+            for (const task of defaults) {
+                await addTask(task)
+            }
+        } catch (err) {
+            error.value = err.message
+            console.error('Error resetting tasks:', err)
+            throw err
+        }
     }
 
     return {
         tasks,
+        loading,
+        error,
         STATUS,
         STATUS_LABELS,
         PRIORITY_LABELS,
@@ -349,6 +376,7 @@ export const useTasksStore = defineStore('tasks', () => {
         alertTasks,
         snoozedTasks,
         taskStats,
+        fetchTasks,
         addTask,
         updateTask,
         deleteTask,

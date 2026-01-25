@@ -1,11 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { supabase } from '../lib/supabase'
 import { useCarStore } from './car'
 import dayjs from 'dayjs'
 
 export const useOdometerStore = defineStore('odometer', () => {
     // State
-    const readings = ref(loadFromStorage())
+    const readings = ref([])
+    const loading = ref(false)
+    const error = ref(null)
 
     // Getters
     const sortedReadings = computed(() => {
@@ -48,17 +51,59 @@ export const useOdometerStore = defineStore('odometer', () => {
         })
     })
 
+    // Database mapping
+    function mapFromDb(row) {
+        return {
+            id: row.id,
+            reading: row.reading,
+            date: row.date,
+            notes: row.notes,
+            createdAt: row.created_at
+        }
+    }
+
+    function mapToDb(reading) {
+        return {
+            reading: reading.reading,
+            date: reading.date || new Date().toISOString(),
+            notes: reading.notes || ''
+        }
+    }
+
     // Actions
-    function loadFromStorage() {
-        const stored = localStorage.getItem('odometer_readings')
-        return stored ? JSON.parse(stored) : []
+    async function fetchReadings() {
+        loading.value = true
+        error.value = null
+        try {
+            const { data, error: err } = await supabase
+                .from('odometer_readings')
+                .select('*')
+                .order('date', { ascending: false })
+
+            if (err) throw err
+
+            if (data && data.length > 0) {
+                readings.value = data.map(mapFromDb)
+            } else {
+                // Try to migrate from localStorage
+                const stored = localStorage.getItem('odometer_readings')
+                if (stored) {
+                    const localReadings = JSON.parse(stored)
+                    for (const reading of localReadings) {
+                        await addReading(reading)
+                    }
+                    localStorage.removeItem('odometer_readings')
+                }
+            }
+        } catch (err) {
+            error.value = err.message
+            console.error('Error fetching readings:', err)
+        } finally {
+            loading.value = false
+        }
     }
 
-    function saveToStorage() {
-        localStorage.setItem('odometer_readings', JSON.stringify(readings.value))
-    }
-
-    function addReading(readingData) {
+    async function addReading(readingData) {
         const carStore = useCarStore()
         const currentOdometer = carStore.car?.currentOdometer || 0
 
@@ -66,41 +111,68 @@ export const useOdometerStore = defineStore('odometer', () => {
             throw new Error('قراءة العداد يجب أن تكون أكبر من القراءة السابقة')
         }
 
-        const newReading = {
-            id: Date.now(),
-            reading: readingData.reading,
-            date: readingData.date || new Date().toISOString(),
-            notes: readingData.notes || '',
-            createdAt: new Date().toISOString()
-        }
+        try {
+            const { data, error: err } = await supabase
+                .from('odometer_readings')
+                .insert([mapToDb(readingData)])
+                .select()
+                .single()
 
-        readings.value.push(newReading)
-        carStore.updateOdometer(readingData.reading)
-        saveToStorage()
+            if (err) throw err
 
-        return newReading
-    }
-
-    function deleteReading(id) {
-        const index = readings.value.findIndex(r => r.id === id)
-        if (index !== -1) {
-            readings.value.splice(index, 1)
-            saveToStorage()
+            const newReading = mapFromDb(data)
+            readings.value.push(newReading)
+            await carStore.updateOdometer(readingData.reading)
+            return newReading
+        } catch (err) {
+            error.value = err.message
+            console.error('Error adding reading:', err)
+            throw err
         }
     }
 
-    function clearAllReadings() {
-        readings.value = []
-        saveToStorage()
+    async function deleteReading(id) {
+        try {
+            const { error: err } = await supabase
+                .from('odometer_readings')
+                .delete()
+                .eq('id', id)
+
+            if (err) throw err
+            readings.value = readings.value.filter(r => r.id !== id)
+        } catch (err) {
+            error.value = err.message
+            console.error('Error deleting reading:', err)
+            throw err
+        }
+    }
+
+    async function clearAllReadings() {
+        try {
+            const { error: err } = await supabase
+                .from('odometer_readings')
+                .delete()
+                .neq('id', 0)
+
+            if (err) throw err
+            readings.value = []
+        } catch (err) {
+            error.value = err.message
+            console.error('Error clearing readings:', err)
+            throw err
+        }
     }
 
     return {
         readings,
+        loading,
+        error,
         sortedReadings,
         latestReading,
         totalDistance,
         averageDailyKm,
         readingsWithDistance,
+        fetchReadings,
         addReading,
         deleteReading,
         clearAllReadings

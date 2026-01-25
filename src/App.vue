@@ -154,6 +154,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useTasksStore } from '@/stores/tasks'
 import { useCarStore } from '@/stores/car'
 import { useDocumentsStore } from '@/stores/documents'
+import { useRecordsStore } from '@/stores/records'
+import { useOdometerStore } from '@/stores/odometer'
 import ayarLogo from '@/assets/ayar-logo.png'
 
 const route = useRoute()
@@ -161,6 +163,11 @@ const router = useRouter()
 const tasksStore = useTasksStore()
 const carStore = useCarStore()
 const documentsStore = useDocumentsStore()
+const recordsStore = useRecordsStore()
+const odometerStore = useOdometerStore()
+
+// App loading state
+const appLoading = ref(true)
 
 // Theme
 const theme = ref(localStorage.getItem('theme') || 'dark')
@@ -185,9 +192,28 @@ function checkMobile() {
   }
 }
 
+// Initialize data from Supabase
+async function initializeData() {
+  try {
+    await carStore.fetchCar()
+    // Fetch other data in parallel
+    await Promise.all([
+      tasksStore.fetchTasks(),
+      documentsStore.fetchDocuments(),
+      recordsStore.fetchRecords(),
+      odometerStore.fetchReadings()
+    ])
+  } catch (error) {
+    console.error('Error initializing data:', error)
+  } finally {
+    appLoading.value = false
+  }
+}
+
 onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
+  initializeData()
 })
 
 onUnmounted(() => {

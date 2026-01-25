@@ -1,9 +1,12 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
+import { supabase } from '../lib/supabase'
 
 export const useCarStore = defineStore('car', () => {
     // State
-    const car = ref(loadFromStorage())
+    const car = ref(null)
+    const loading = ref(false)
+    const error = ref(null)
 
     // Getters
     const hasCar = computed(() => car.value !== null)
@@ -17,82 +20,164 @@ export const useCarStore = defineStore('car', () => {
     })
 
     // Actions
-    function loadFromStorage() {
-        // Try to recover data from multi-car storage if simple storage is empty
-        const stored = localStorage.getItem('car_data')
-        if (!stored) {
-            const multiStored = localStorage.getItem('cars_data')
-            if (multiStored) {
-                const cars = JSON.parse(multiStored)
-                const activeId = localStorage.getItem('active_car_id')
-                if (cars.length > 0) {
-                    // Return the active car or the first one found
-                    return activeId ? (cars.find(c => c.id == activeId) || cars[0]) : cars[0]
+    async function fetchCar() {
+        loading.value = true
+        error.value = null
+        try {
+            const { data, error: err } = await supabase
+                .from('cars')
+                .select('*')
+                .limit(1)
+                .single()
+
+            if (err && err.code !== 'PGRST116') {
+                // PGRST116 = no rows returned, which is fine
+                throw err
+            }
+
+            if (data) {
+                car.value = mapFromDb(data)
+            } else {
+                // Try to load from localStorage for migration
+                const stored = localStorage.getItem('car_data')
+                if (stored) {
+                    const localCar = JSON.parse(stored)
+                    await addCar(localCar)
+                    localStorage.removeItem('car_data') // Clear after migration
                 }
             }
-            return null
-        }
-        return JSON.parse(stored)
-    }
-
-    function saveToStorage() {
-        if (car.value) {
-            localStorage.setItem('car_data', JSON.stringify(car.value))
-        } else {
-            localStorage.removeItem('car_data')
+        } catch (err) {
+            error.value = err.message
+            console.error('Error fetching car:', err)
+        } finally {
+            loading.value = false
         }
     }
 
-    function addCar(carData) {
-        car.value = {
-            id: Date.now(),
+    function mapFromDb(row) {
+        return {
+            id: row.id,
+            make: row.make,
+            model: row.model,
+            year: row.year,
+            plateNumber: row.plate_number,
+            color: row.color,
+            vin: row.vin,
+            initialOdometer: row.initial_odometer,
+            currentOdometer: row.current_odometer,
+            image: row.image,
+            notes: row.notes,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+        }
+    }
+
+    function mapToDb(carData) {
+        return {
             make: carData.make,
             model: carData.model,
             year: carData.year,
-            plateNumber: carData.plateNumber,
+            plate_number: carData.plateNumber,
             color: carData.color || '',
             vin: carData.vin || '',
-            initialOdometer: carData.initialOdometer || 0,
-            currentOdometer: carData.initialOdometer || 0,
+            initial_odometer: carData.initialOdometer || 0,
+            current_odometer: carData.currentOdometer || carData.initialOdometer || 0,
             image: carData.image || null,
-            notes: carData.notes || '',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        }
-        saveToStorage()
-    }
-
-    function updateCar(updates) {
-        if (car.value) {
-            car.value = {
-                ...car.value,
-                ...updates,
-                updatedAt: new Date().toISOString()
-            }
-            saveToStorage()
+            notes: carData.notes || ''
         }
     }
 
-    function updateOdometer(reading) {
+    async function addCar(carData) {
+        loading.value = true
+        error.value = null
+        try {
+            const { data, error: err } = await supabase
+                .from('cars')
+                .insert([mapToDb(carData)])
+                .select()
+                .single()
+
+            if (err) throw err
+            car.value = mapFromDb(data)
+            return car.value
+        } catch (err) {
+            error.value = err.message
+            console.error('Error adding car:', err)
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
+
+    async function updateCar(updates) {
+        if (!car.value) return
+        loading.value = true
+        error.value = null
+        try {
+            const dbUpdates = {}
+            if (updates.make !== undefined) dbUpdates.make = updates.make
+            if (updates.model !== undefined) dbUpdates.model = updates.model
+            if (updates.year !== undefined) dbUpdates.year = updates.year
+            if (updates.plateNumber !== undefined) dbUpdates.plate_number = updates.plateNumber
+            if (updates.color !== undefined) dbUpdates.color = updates.color
+            if (updates.vin !== undefined) dbUpdates.vin = updates.vin
+            if (updates.initialOdometer !== undefined) dbUpdates.initial_odometer = updates.initialOdometer
+            if (updates.currentOdometer !== undefined) dbUpdates.current_odometer = updates.currentOdometer
+            if (updates.image !== undefined) dbUpdates.image = updates.image
+            if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+
+            const { data, error: err } = await supabase
+                .from('cars')
+                .update(dbUpdates)
+                .eq('id', car.value.id)
+                .select()
+                .single()
+
+            if (err) throw err
+            car.value = mapFromDb(data)
+        } catch (err) {
+            error.value = err.message
+            console.error('Error updating car:', err)
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
+
+    async function updateOdometer(reading) {
         if (car.value && reading > car.value.currentOdometer) {
-            car.value.currentOdometer = reading
-            car.value.updatedAt = new Date().toISOString()
-            saveToStorage()
+            await updateCar({ currentOdometer: reading })
         }
     }
 
-    function deleteCar() {
-        car.value = null
-        saveToStorage()
-    }
+    async function deleteCar() {
+        if (!car.value) return
+        loading.value = true
+        error.value = null
+        try {
+            const { error: err } = await supabase
+                .from('cars')
+                .delete()
+                .eq('id', car.value.id)
 
-    // Watch for external changes
-    watch(car, saveToStorage, { deep: true })
+            if (err) throw err
+            car.value = null
+        } catch (err) {
+            error.value = err.message
+            console.error('Error deleting car:', err)
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
 
     return {
         car,
+        loading,
+        error,
         hasCar,
         carInfo,
+        fetchCar,
         addCar,
         updateCar,
         updateOdometer,

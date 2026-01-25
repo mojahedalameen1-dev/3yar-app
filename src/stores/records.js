@@ -1,10 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { supabase } from '../lib/supabase'
 import dayjs from 'dayjs'
 
 export const useRecordsStore = defineStore('records', () => {
     // State
-    const records = ref(loadFromStorage())
+    const records = ref([])
+    const loading = ref(false)
+    const error = ref(null)
 
     // Getters
     const sortedRecords = computed(() => {
@@ -68,53 +71,149 @@ export const useRecordsStore = defineStore('records', () => {
         averageCost: averageMaintenanceCost.value
     }))
 
+    // Database mapping
+    function mapFromDb(row) {
+        return {
+            id: row.id,
+            taskId: row.task_id,
+            taskName: row.task_name,
+            date: row.date,
+            odometerReading: row.odometer_reading,
+            cost: row.cost,
+            serviceCenter: row.service_center,
+            invoiceNumber: row.invoice_number,
+            invoiceImage: row.invoice_image,
+            notes: row.notes,
+            createdAt: row.created_at
+        }
+    }
+
+    function mapToDb(record) {
+        return {
+            task_id: record.taskId,
+            task_name: record.taskName,
+            date: record.date || new Date().toISOString(),
+            odometer_reading: record.odometerReading || 0,
+            cost: record.cost || 0,
+            service_center: record.serviceCenter || '',
+            invoice_number: record.invoiceNumber || '',
+            invoice_image: record.invoiceImage || null,
+            notes: record.notes || ''
+        }
+    }
+
     // Actions
-    function loadFromStorage() {
-        const stored = localStorage.getItem('maintenance_records')
-        return stored ? JSON.parse(stored) : []
-    }
+    async function fetchRecords() {
+        loading.value = true
+        error.value = null
+        try {
+            const { data, error: err } = await supabase
+                .from('maintenance_records')
+                .select('*')
+                .order('date', { ascending: false })
 
-    function saveToStorage() {
-        localStorage.setItem('maintenance_records', JSON.stringify(records.value))
-    }
+            if (err) throw err
 
-    function addRecord(recordData) {
-        const newRecord = {
-            id: Date.now(),
-            taskId: recordData.taskId,
-            taskName: recordData.taskName,
-            date: recordData.date || new Date().toISOString(),
-            odometerReading: recordData.odometerReading || 0,
-            cost: recordData.cost || 0,
-            serviceCenter: recordData.serviceCenter || '',
-            invoiceNumber: recordData.invoiceNumber || '',
-            invoiceImage: recordData.invoiceImage || null,
-            notes: recordData.notes || '',
-            createdAt: new Date().toISOString()
-        }
-
-        records.value.push(newRecord)
-        saveToStorage()
-        return newRecord
-    }
-
-    function updateRecord(id, updates) {
-        const index = records.value.findIndex(r => r.id === id)
-        if (index !== -1) {
-            records.value[index] = {
-                ...records.value[index],
-                ...updates,
-                updatedAt: new Date().toISOString()
+            if (data && data.length > 0) {
+                records.value = data.map(mapFromDb)
+            } else {
+                // Try to migrate from localStorage
+                const stored = localStorage.getItem('maintenance_records')
+                if (stored) {
+                    const localRecords = JSON.parse(stored)
+                    for (const record of localRecords) {
+                        await addRecord(record)
+                    }
+                    localStorage.removeItem('maintenance_records')
+                }
             }
-            saveToStorage()
+        } catch (err) {
+            error.value = err.message
+            console.error('Error fetching records:', err)
+        } finally {
+            loading.value = false
         }
     }
 
-    function deleteRecord(id) {
-        const index = records.value.findIndex(r => r.id === id)
-        if (index !== -1) {
-            records.value.splice(index, 1)
-            saveToStorage()
+    async function addRecord(recordData) {
+        loading.value = true
+        error.value = null
+        try {
+            const { data, error: err } = await supabase
+                .from('maintenance_records')
+                .insert([mapToDb(recordData)])
+                .select()
+                .single()
+
+            if (err) throw err
+
+            const newRecord = mapFromDb(data)
+            records.value.push(newRecord)
+            return newRecord
+        } catch (err) {
+            error.value = err.message
+            console.error('Error adding record:', err)
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
+
+    async function updateRecord(id, updates) {
+        loading.value = true
+        error.value = null
+        try {
+            const dbUpdates = {}
+            if (updates.taskId !== undefined) dbUpdates.task_id = updates.taskId
+            if (updates.taskName !== undefined) dbUpdates.task_name = updates.taskName
+            if (updates.date !== undefined) dbUpdates.date = updates.date
+            if (updates.odometerReading !== undefined) dbUpdates.odometer_reading = updates.odometerReading
+            if (updates.cost !== undefined) dbUpdates.cost = updates.cost
+            if (updates.serviceCenter !== undefined) dbUpdates.service_center = updates.serviceCenter
+            if (updates.invoiceNumber !== undefined) dbUpdates.invoice_number = updates.invoiceNumber
+            if (updates.invoiceImage !== undefined) dbUpdates.invoice_image = updates.invoiceImage
+            if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+
+            const { data, error: err } = await supabase
+                .from('maintenance_records')
+                .update(dbUpdates)
+                .eq('id', id)
+                .select()
+                .single()
+
+            if (err) throw err
+
+            const index = records.value.findIndex(r => r.id === id)
+            if (index !== -1) {
+                records.value[index] = mapFromDb(data)
+            }
+        } catch (err) {
+            error.value = err.message
+            console.error('Error updating record:', err)
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
+
+    async function deleteRecord(id) {
+        loading.value = true
+        error.value = null
+        try {
+            const { error: err } = await supabase
+                .from('maintenance_records')
+                .delete()
+                .eq('id', id)
+
+            if (err) throw err
+
+            records.value = records.value.filter(r => r.id !== id)
+        } catch (err) {
+            error.value = err.message
+            console.error('Error deleting record:', err)
+            throw err
+        } finally {
+            loading.value = false
         }
     }
 
@@ -133,13 +232,30 @@ export const useRecordsStore = defineStore('records', () => {
         })
     }
 
-    function clearAllRecords() {
-        records.value = []
-        saveToStorage()
+    async function clearAllRecords() {
+        loading.value = true
+        error.value = null
+        try {
+            const { error: err } = await supabase
+                .from('maintenance_records')
+                .delete()
+                .neq('id', 0) // Delete all
+
+            if (err) throw err
+            records.value = []
+        } catch (err) {
+            error.value = err.message
+            console.error('Error clearing records:', err)
+            throw err
+        } finally {
+            loading.value = false
+        }
     }
 
     return {
         records,
+        loading,
+        error,
         sortedRecords,
         totalCost,
         thisMonthCost,
@@ -148,6 +264,7 @@ export const useRecordsStore = defineStore('records', () => {
         recentRecords,
         averageMaintenanceCost,
         stats,
+        fetchRecords,
         addRecord,
         updateRecord,
         deleteRecord,

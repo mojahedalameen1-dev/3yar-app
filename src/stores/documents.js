@@ -1,10 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { supabase } from '../lib/supabase'
 import dayjs from 'dayjs'
 
-const STORAGE_KEY = 'documents-store'
-
-// Document types
 const DOCUMENT_TYPES = {
     LICENSE: 'license',
     REGISTRATION: 'registration',
@@ -29,7 +27,6 @@ const DOCUMENT_COLORS = {
     [DOCUMENT_TYPES.INSURANCE]: 'success'
 }
 
-// Status calculation
 const STATUS = {
     EXPIRED: 'expired',
     EXPIRING_SOON: 'expiring_soon',
@@ -42,23 +39,11 @@ const STATUS_LABELS = {
     [STATUS.VALID]: 'سارية'
 }
 
-function loadFromStorage() {
-    try {
-        const data = localStorage.getItem(STORAGE_KEY)
-        return data ? JSON.parse(data) : []
-    } catch {
-        return []
-    }
-}
-
 export const useDocumentsStore = defineStore('documents', () => {
-    const documents = ref(loadFromStorage())
+    const documents = ref([])
+    const loading = ref(false)
+    const error = ref(null)
 
-    function saveToStorage() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(documents.value))
-    }
-
-    // Calculate document status
     function getDocumentStatus(expiryDate) {
         if (!expiryDate) return { status: STATUS.VALID, daysLeft: null }
 
@@ -75,7 +60,6 @@ export const useDocumentsStore = defineStore('documents', () => {
         }
     }
 
-    // Documents with status
     const documentsWithStatus = computed(() => {
         return documents.value.map(doc => ({
             ...doc,
@@ -86,14 +70,12 @@ export const useDocumentsStore = defineStore('documents', () => {
         }))
     })
 
-    // Alerts (expired or expiring soon)
     const alertDocuments = computed(() => {
         return documentsWithStatus.value.filter(
             doc => doc.statusInfo.status !== STATUS.VALID
         ).sort((a, b) => (a.statusInfo.daysLeft || 0) - (b.statusInfo.daysLeft || 0))
     })
 
-    // Stats
     const stats = computed(() => {
         const all = documentsWithStatus.value
         return {
@@ -104,61 +86,162 @@ export const useDocumentsStore = defineStore('documents', () => {
         }
     })
 
-    // Get document by type
+    function mapFromDb(row) {
+        return {
+            id: row.id,
+            type: row.type,
+            documentNumber: row.document_number,
+            issueDate: row.issue_date,
+            expiryDate: row.expiry_date,
+            image: row.image,
+            notes: row.notes,
+            reminderDays: row.reminder_days,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+        }
+    }
+
+    function mapToDb(doc) {
+        return {
+            type: doc.type,
+            document_number: doc.documentNumber || '',
+            issue_date: doc.issueDate || null,
+            expiry_date: doc.expiryDate || null,
+            image: doc.image || null,
+            notes: doc.notes || '',
+            reminder_days: doc.reminderDays || 30
+        }
+    }
+
+    async function fetchDocuments() {
+        loading.value = true
+        error.value = null
+        try {
+            const { data, error: err } = await supabase
+                .from('documents')
+                .select('*')
+                .order('created_at', { ascending: true })
+
+            if (err) throw err
+
+            if (data && data.length > 0) {
+                documents.value = data.map(mapFromDb)
+            } else {
+                // Try to migrate from localStorage
+                const stored = localStorage.getItem('documents-store')
+                if (stored) {
+                    const localDocs = JSON.parse(stored)
+                    for (const doc of localDocs) {
+                        await addDocument(doc)
+                    }
+                    localStorage.removeItem('documents-store')
+                }
+            }
+        } catch (err) {
+            error.value = err.message
+            console.error('Error fetching documents:', err)
+        } finally {
+            loading.value = false
+        }
+    }
+
     function getDocumentByType(type) {
         return documentsWithStatus.value.find(d => d.type === type)
     }
 
-    // Add document
-    function addDocument(docData) {
-        // Remove existing document of same type
-        documents.value = documents.value.filter(d => d.type !== docData.type)
-
-        const newDoc = {
-            id: Date.now(),
-            type: docData.type,
-            documentNumber: docData.documentNumber || '',
-            issueDate: docData.issueDate || null,
-            expiryDate: docData.expiryDate || null,
-            image: docData.image || null,
-            notes: docData.notes || '',
-            reminderDays: docData.reminderDays || 30,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        }
-
-        documents.value.push(newDoc)
-        saveToStorage()
-        return newDoc
-    }
-
-    // Update document
-    function updateDocument(id, updates) {
-        const index = documents.value.findIndex(d => d.id === id)
-        if (index !== -1) {
-            documents.value[index] = {
-                ...documents.value[index],
-                ...updates,
-                updatedAt: new Date().toISOString()
+    async function addDocument(docData) {
+        try {
+            // Remove existing document of same type
+            const existing = documents.value.find(d => d.type === docData.type)
+            if (existing) {
+                await deleteDocument(existing.id)
             }
-            saveToStorage()
+
+            const { data, error: err } = await supabase
+                .from('documents')
+                .insert([mapToDb(docData)])
+                .select()
+                .single()
+
+            if (err) throw err
+
+            const newDoc = mapFromDb(data)
+            documents.value.push(newDoc)
+            return newDoc
+        } catch (err) {
+            error.value = err.message
+            console.error('Error adding document:', err)
+            throw err
         }
     }
 
-    // Delete document
-    function deleteDocument(id) {
-        documents.value = documents.value.filter(d => d.id !== id)
-        saveToStorage()
+    async function updateDocument(id, updates) {
+        try {
+            const dbUpdates = {}
+            if (updates.type !== undefined) dbUpdates.type = updates.type
+            if (updates.documentNumber !== undefined) dbUpdates.document_number = updates.documentNumber
+            if (updates.issueDate !== undefined) dbUpdates.issue_date = updates.issueDate
+            if (updates.expiryDate !== undefined) dbUpdates.expiry_date = updates.expiryDate
+            if (updates.image !== undefined) dbUpdates.image = updates.image
+            if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+            if (updates.reminderDays !== undefined) dbUpdates.reminder_days = updates.reminderDays
+
+            const { data, error: err } = await supabase
+                .from('documents')
+                .update(dbUpdates)
+                .eq('id', id)
+                .select()
+                .single()
+
+            if (err) throw err
+
+            const index = documents.value.findIndex(d => d.id === id)
+            if (index !== -1) {
+                documents.value[index] = mapFromDb(data)
+            }
+        } catch (err) {
+            error.value = err.message
+            console.error('Error updating document:', err)
+            throw err
+        }
     }
 
-    // Clear all
-    function clearAllDocuments() {
-        documents.value = []
-        saveToStorage()
+    async function deleteDocument(id) {
+        try {
+            const { error: err } = await supabase
+                .from('documents')
+                .delete()
+                .eq('id', id)
+
+            if (err) throw err
+            documents.value = documents.value.filter(d => d.id !== id)
+        } catch (err) {
+            error.value = err.message
+            console.error('Error deleting document:', err)
+            throw err
+        }
+    }
+
+    async function clearAllDocuments() {
+        try {
+            const { error: err } = await supabase
+                .from('documents')
+                .delete()
+                .neq('id', 0)
+
+            if (err) throw err
+            documents.value = []
+        } catch (err) {
+            error.value = err.message
+            console.error('Error clearing documents:', err)
+            throw err
+        }
     }
 
     return {
         documents,
+        loading,
+        error,
         documentsWithStatus,
         alertDocuments,
         stats,
@@ -168,6 +251,7 @@ export const useDocumentsStore = defineStore('documents', () => {
         DOCUMENT_COLORS,
         STATUS,
         STATUS_LABELS,
+        fetchDocuments,
         getDocumentByType,
         getDocumentStatus,
         addDocument,
