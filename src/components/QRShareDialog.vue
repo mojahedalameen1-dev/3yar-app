@@ -148,8 +148,8 @@ const shareUrl = computed(() => {
 // Initialize on dialog open
 watch(() => props.modelValue, async (isOpen) => {
   if (isOpen && props.car) {
-    shareEnabled.value = props.car.public_share_enabled || false
-    shareToken.value = props.car.share_token || ''
+    shareEnabled.value = props.car.publicShareEnabled || false
+    shareToken.value = props.car.shareToken || ''
     
     if (shareEnabled.value && shareToken.value) {
       await generateQR()
