@@ -3,6 +3,12 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
     // Public routes (no auth required)
     {
+        path: '/',
+        name: 'landing',
+        component: () => import('@/views/LandingView.vue'),
+        meta: { title: 'عيار - رفيق سيارتك الذكي', public: true }
+    },
+    {
         path: '/login',
         name: 'login',
         component: () => import('@/views/LoginView.vue'),
@@ -23,7 +29,7 @@ const routes = [
 
     // Protected routes (auth required)
     {
-        path: '/',
+        path: '/dashboard',
         name: 'dashboard',
         component: () => import('@/views/DashboardView.vue'),
         meta: { title: 'لوحة التحكم', requiresAuth: true }
@@ -62,13 +68,28 @@ const routes = [
 
 const router = createRouter({
     history: createWebHistory(),
-    routes
+    routes,
+    scrollBehavior(to, from, savedPosition) {
+        if (savedPosition) return savedPosition
+        if (to.hash) return { el: to.hash, behavior: 'smooth' }
+        return { top: 0 }
+    }
 })
 
 // Navigation guard for authentication
 router.beforeEach(async (to, from, next) => {
     // Update page title
-    document.title = `${to.meta.title} | عيار`
+    document.title = to.meta.title ? `${to.meta.title} | عيار` : 'عيار'
+
+    // Check if user is authenticated using Supabase
+    const { supabase } = await import('@/lib/supabase')
+    const { data: { session } } = await supabase.auth.getSession()
+
+    // If user is logged in and trying to access landing/login/register, redirect to dashboard
+    if (session && (to.name === 'landing' || to.name === 'login' || to.name === 'register')) {
+        next({ name: 'dashboard' })
+        return
+    }
 
     // If route doesn't require auth, proceed
     if (to.meta.public || !to.meta.requiresAuth) {
@@ -76,15 +97,10 @@ router.beforeEach(async (to, from, next) => {
         return
     }
 
-    // Check if user is authenticated using Supabase
-    const { supabase } = await import('@/lib/supabase')
-    const { data: { session } } = await supabase.auth.getSession()
-
+    // Check auth for protected routes
     if (session) {
-        // User is authenticated
         next()
     } else {
-        // Redirect to login
         next({ name: 'login', query: { redirect: to.fullPath } })
     }
 })

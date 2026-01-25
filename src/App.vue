@@ -265,7 +265,7 @@ const navItems = computed(() => [
   { 
     title: 'لوحة التحكم', 
     icon: 'mdi-view-dashboard', 
-    route: '/', 
+    route: '/dashboard', 
     name: 'dashboard',
     badge: tasksStore.alertTasks.length + documentsStore.alertDocuments.length
   },
