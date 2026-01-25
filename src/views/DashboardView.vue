@@ -109,16 +109,26 @@
                 </div>
               </div>
               
-              <v-btn
-                color="primary"
-                block
-                size="large"
-                class="mt-4"
-                prepend-icon="mdi-plus-circle"
-                @click="showOdometerDialog = true"
-              >
-                تحديث قراءة العداد
-              </v-btn>
+              <!-- Share & Update Buttons -->
+              <div class="d-flex gap-2 mt-4">
+                <v-btn
+                  color="info"
+                  variant="tonal"
+                  class="flex-grow-1"
+                  prepend-icon="mdi-qrcode"
+                  @click="showQRDialog = true"
+                >
+                  مشاركة
+                </v-btn>
+                <v-btn
+                  color="primary"
+                  class="flex-grow-1"
+                  prepend-icon="mdi-plus-circle"
+                  @click="showOdometerDialog = true"
+                >
+                  تحديث العداد
+                </v-btn>
+              </div>
             </v-card-text>
           </v-card>
         </v-col>
@@ -623,6 +633,13 @@
 
     <!-- Onboarding Wizard -->
     <OnboardingWizard v-model="showWizard" @finished="onWizardFinished" />
+
+    <!-- QR Share Dialog -->
+    <QRShareDialog 
+      v-model="showQRDialog" 
+      :car="carStore.car" 
+      @updated="handleShareUpdate"
+    />
   </div>
 </template>
 
@@ -633,6 +650,7 @@ import { useOdometerStore } from '@/stores/odometer'
 import { useTasksStore } from '@/stores/tasks'
 import { useRecordsStore } from '@/stores/records'
 import OnboardingWizard from '@/components/OnboardingWizard.vue'
+import QRShareDialog from '@/components/QRShareDialog.vue'
 const CostChart = defineAsyncComponent(() => import('@/components/CostChart.vue'))
 import confetti from 'canvas-confetti'
 import dayjs from 'dayjs'
@@ -695,6 +713,15 @@ const statsCards = computed(() => [
 const showWizard = ref(false)
 function onWizardFinished() {
   showSnackbar('تم إعداد حسابك بنجاح! 🎉')
+}
+
+// QR Share Dialog
+const showQRDialog = ref(false)
+function handleShareUpdate(updates) {
+  // Update local car state with share settings
+  if (carStore.car) {
+    Object.assign(carStore.car, updates)
+  }
 }
 
 // Car Dialog

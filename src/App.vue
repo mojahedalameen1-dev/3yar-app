@@ -1,113 +1,125 @@
 <template>
   <v-app :theme="theme">
-    <!-- Mobile App Bar -->
-    <v-app-bar v-if="isMobile" class="app-bar-mobile" elevation="0">
-      <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-      <v-toolbar-title class="d-flex align-center ps-0">
-        <v-img :src="ayarLogo" width="32" height="32" class="me-2" contain></v-img>
-        <span class="text-h6 font-weight-bold" style="line-height: 1;">عيار</span>
-      </v-toolbar-title>
-      <v-spacer></v-spacer>
-      <v-btn icon @click="toggleTheme">
-        <v-icon>{{ theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
-      </v-btn>
-    </v-app-bar>
+    <!-- Show navigation only for authenticated routes -->
+    <template v-if="showNavigation">
+      <!-- Mobile App Bar -->
+      <v-app-bar v-if="isMobile" class="app-bar-mobile" elevation="0">
+        <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
+        <v-toolbar-title class="d-flex align-center ps-0">
+          <v-img :src="ayarLogo" width="32" height="32" class="me-2" contain></v-img>
+          <span class="text-h6 font-weight-bold" style="line-height: 1;">عيار</span>
+        </v-toolbar-title>
+        <v-spacer></v-spacer>
+        <v-btn icon @click="toggleTheme">
+          <v-icon>{{ theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
+        </v-btn>
+      </v-app-bar>
 
-    <!-- Navigation Drawer -->
-    <v-navigation-drawer
-      v-model="drawer"
-      :rail="rail && !isMobile"
-      :temporary="isMobile"
-      :permanent="!isMobile"
-      class="app-nav"
-    >
-      <v-list-item
-        :prepend-icon="rail && !isMobile ? 'mdi-car' : undefined"
-        class="nav-header pa-4"
+      <!-- Navigation Drawer -->
+      <v-navigation-drawer
+        v-model="drawer"
+        :rail="rail && !isMobile"
+        :temporary="isMobile"
+        :permanent="!isMobile"
+        class="app-nav"
       >
-        <template v-if="!rail || isMobile">
-          <div class="d-flex align-center ps-2 branding-container">
-            <div class="logo-wrapper-new me-3 elevation-1">
-              <v-img :src="ayarLogo" width="40" height="40" contain></v-img>
-            </div>
-            <div>
-              <div class="text-h6 font-weight-bold text-primary" style="line-height: 1.2;">عيار</div>
-              <div class="text-caption text-medium-emphasis">رفيق سيارتك الذكي</div>
-            </div>
-          </div>
-        </template>
-      </v-list-item>
-
-      <v-divider class="my-2"></v-divider>
-
-      <!-- Quick Stats in Sidebar -->
-      <div v-if="(!rail || isMobile) && carStore.hasCar" class="px-4 py-2">
-        <v-card class="quick-stats-card" variant="tonal" color="primary">
-          <v-card-text class="pa-3">
-            <div class="d-flex align-center justify-space-between">
-              <div>
-                <div class="text-caption text-medium-emphasis">العداد الحالي</div>
-                <div class="text-subtitle-1 font-weight-bold">
-                  {{ carStore.car?.currentOdometer?.toLocaleString() || 0 }} كم
-                </div>
-              </div>
-              <v-avatar color="primary" size="36">
-                <v-icon size="20">mdi-speedometer</v-icon>
-              </v-avatar>
-            </div>
-          </v-card-text>
-        </v-card>
-      </div>
-
-      <v-list density="comfortable" nav class="px-2 mt-2">
         <v-list-item
-          v-for="item in navItems"
-          :key="item.route"
-          :to="item.route"
-          :prepend-icon="item.icon"
-          :title="rail && !isMobile ? '' : item.title"
-          rounded="lg"
-          class="nav-item mb-1"
-          :class="{ 'nav-item-active': $route.name === item.name }"
-          @click="isMobile ? drawer = false : null"
+          :prepend-icon="rail && !isMobile ? 'mdi-car' : undefined"
+          class="nav-header pa-4"
         >
-          <template v-if="item.badge && (!rail || isMobile)" #append>
-            <v-badge
-              v-if="item.badge > 0"
-              :content="item.badge"
-              color="error"
-              inline
-            ></v-badge>
+          <template v-if="!rail || isMobile">
+            <div class="d-flex align-center ps-2 branding-container">
+              <div class="logo-wrapper-new me-3 elevation-1">
+                <v-img :src="ayarLogo" width="40" height="40" contain></v-img>
+              </div>
+              <div>
+                <div class="text-h6 font-weight-bold text-primary" style="line-height: 1.2;">عيار</div>
+                <div class="text-caption text-medium-emphasis">رفيق سيارتك الذكي</div>
+              </div>
+            </div>
           </template>
         </v-list-item>
-      </v-list>
 
-      <template #append>
         <v-divider class="my-2"></v-divider>
-        <v-list density="comfortable" nav class="px-2">
+
+        <!-- Quick Stats in Sidebar -->
+        <div v-if="(!rail || isMobile) && carStore.hasCar" class="px-4 py-2">
+          <v-card class="quick-stats-card" variant="tonal" color="primary">
+            <v-card-text class="pa-3">
+              <div class="d-flex align-center justify-space-between">
+                <div>
+                  <div class="text-caption text-medium-emphasis">العداد الحالي</div>
+                  <div class="text-subtitle-1 font-weight-bold">
+                    {{ carStore.car?.currentOdometer?.toLocaleString() || 0 }} كم
+                  </div>
+                </div>
+                <v-avatar color="primary" size="36">
+                  <v-icon size="20">mdi-speedometer</v-icon>
+                </v-avatar>
+              </div>
+            </v-card-text>
+          </v-card>
+        </div>
+
+        <v-list density="comfortable" nav class="px-2 mt-2">
           <v-list-item
-            v-if="!isMobile"
-            :prepend-icon="theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-            :title="rail ? '' : (theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي')"
+            v-for="item in navItems"
+            :key="item.route"
+            :to="item.route"
+            :prepend-icon="item.icon"
+            :title="rail && !isMobile ? '' : item.title"
             rounded="lg"
-            class="nav-item"
-            @click="toggleTheme"
-          ></v-list-item>
-          <v-list-item
-            v-if="!isMobile"
-            :prepend-icon="rail ? 'mdi-chevron-left' : 'mdi-chevron-right'"
-            :title="rail ? '' : 'تصغير القائمة'"
-            rounded="lg"
-            class="nav-item"
-            @click="rail = !rail"
-          ></v-list-item>
+            class="nav-item mb-1"
+            :class="{ 'nav-item-active': $route.name === item.name }"
+            @click="isMobile ? drawer = false : null"
+          >
+            <template v-if="item.badge && (!rail || isMobile)" #append>
+              <v-badge
+                v-if="item.badge > 0"
+                :content="item.badge"
+                color="error"
+                inline
+              ></v-badge>
+            </template>
+          </v-list-item>
         </v-list>
-      </template>
-    </v-navigation-drawer>
+
+        <template #append>
+          <v-divider class="my-2"></v-divider>
+          <v-list density="comfortable" nav class="px-2">
+            <v-list-item
+              v-if="!isMobile"
+              :prepend-icon="theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
+              :title="rail ? '' : (theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي')"
+              rounded="lg"
+              class="nav-item"
+              @click="toggleTheme"
+            ></v-list-item>
+            <v-list-item
+              v-if="!isMobile"
+              :prepend-icon="rail ? 'mdi-chevron-left' : 'mdi-chevron-right'"
+              :title="rail ? '' : 'تصغير القائمة'"
+              rounded="lg"
+              class="nav-item"
+              @click="rail = !rail"
+            ></v-list-item>
+          </v-list>
+          
+          <!-- User Profile -->
+          <UserProfile v-if="authStore.isAuthenticated" @logout="handleLogout" />
+        </template>
+      </v-navigation-drawer>
+    </template>
 
     <!-- Main Content -->
-    <v-main class="app-main">
-      <v-container fluid class="pa-4 pa-md-6">
+    <v-main :class="{ 'app-main': showNavigation }">
+      <!-- Loading Overlay -->
+      <div v-if="appLoading && showNavigation" class="loading-overlay">
+        <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
+        <p class="text-body-1 mt-4">جاري التحميل...</p>
+      </div>
+      
+      <v-container v-else fluid :class="showNavigation ? 'pa-4 pa-md-6' : 'pa-0'">
         <router-view v-slot="{ Component }">
           <transition name="slide-fade" mode="out-in">
             <component :is="Component" />
@@ -137,7 +149,7 @@
 
     <!-- Floating Action Button for Mobile -->
     <v-fab
-      v-if="isMobile && $route.name !== 'settings'"
+      v-if="isMobile && showNavigation && $route.name !== 'settings'"
       icon="mdi-plus"
       color="primary"
       location="bottom end"
@@ -149,17 +161,20 @@
 </template>
 
 <script setup>
-import { ref, computed, provide, onMounted, onUnmounted } from 'vue'
+import { ref, computed, provide, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { useTasksStore } from '@/stores/tasks'
 import { useCarStore } from '@/stores/car'
 import { useDocumentsStore } from '@/stores/documents'
 import { useRecordsStore } from '@/stores/records'
 import { useOdometerStore } from '@/stores/odometer'
+import UserProfile from '@/components/UserProfile.vue'
 import ayarLogo from '@/assets/ayar-logo.png'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const tasksStore = useTasksStore()
 const carStore = useCarStore()
 const documentsStore = useDocumentsStore()
@@ -168,6 +183,11 @@ const odometerStore = useOdometerStore()
 
 // App loading state
 const appLoading = ref(true)
+
+// Show navigation only for protected routes
+const showNavigation = computed(() => {
+  return !route.meta.public && authStore.isAuthenticated
+})
 
 // Theme
 const theme = ref(localStorage.getItem('theme') || 'dark')
@@ -192,6 +212,19 @@ function checkMobile() {
   }
 }
 
+// Initialize auth and data
+async function initialize() {
+  // Initialize auth first
+  await authStore.initialize()
+  
+  // If authenticated, fetch data
+  if (authStore.isAuthenticated) {
+    await initializeData()
+  } else {
+    appLoading.value = false
+  }
+}
+
 // Initialize data from Supabase
 async function initializeData() {
   try {
@@ -210,10 +243,18 @@ async function initializeData() {
   }
 }
 
+// Watch for auth changes to reload data
+watch(() => authStore.isAuthenticated, async (isAuth) => {
+  if (isAuth) {
+    appLoading.value = true
+    await initializeData()
+  }
+})
+
 onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
-  initializeData()
+  initialize()
 })
 
 onUnmounted(() => {
@@ -264,6 +305,13 @@ function handleFabClick() {
   } else if (route.name === 'tasks') {
     // Emit event for tasks page
   }
+}
+
+// Handle logout
+async function handleLogout() {
+  await authStore.signOut()
+  router.push('/login')
+  showSnackbar('تم تسجيل الخروج بنجاح')
 }
 
 // Snackbar
@@ -345,6 +393,14 @@ provide('isMobile', isMobile)
 .app-main {
   background: rgb(var(--v-theme-background));
   min-height: 100vh;
+}
+
+.loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
 }
 
 /* Page transitions */

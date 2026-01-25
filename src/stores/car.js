@@ -67,6 +67,8 @@ export const useCarStore = defineStore('car', () => {
             currentOdometer: row.current_odometer,
             image: row.image,
             notes: row.notes,
+            publicShareEnabled: row.public_share_enabled,
+            shareToken: row.share_token,
             createdAt: row.created_at,
             updatedAt: row.updated_at
         }

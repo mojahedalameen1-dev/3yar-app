@@ -1,104 +1,170 @@
--- Supabase Database Schema for 3yar-app
--- Run this SQL in your Supabase SQL Editor (Dashboard > SQL Editor > New query)
+-- =====================================================
+-- Multi-User Authentication & QR Status Feature
+-- Run this SQL in Supabase SQL Editor
+-- =====================================================
 
--- Cars table
-CREATE TABLE IF NOT EXISTS cars (
-    id BIGSERIAL PRIMARY KEY,
-    make VARCHAR(100) NOT NULL,
-    model VARCHAR(100) NOT NULL,
-    year INTEGER NOT NULL,
-    plate_number VARCHAR(50),
-    color VARCHAR(50),
-    vin VARCHAR(50),
-    initial_odometer INTEGER DEFAULT 0,
-    current_odometer INTEGER DEFAULT 0,
-    image TEXT,
-    notes TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+-- Step 1: Add user_id column to all tables
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+ALTER TABLE maintenance_tasks ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+ALTER TABLE maintenance_records ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+ALTER TABLE odometer_readings ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+
+-- Step 2: Add public sharing columns to cars table
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS public_share_enabled BOOLEAN DEFAULT false;
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS share_token UUID DEFAULT gen_random_uuid();
+
+-- Step 3: Create index on share_token for fast lookups
+CREATE INDEX IF NOT EXISTS idx_cars_share_token ON cars(share_token);
+CREATE INDEX IF NOT EXISTS idx_cars_user_id ON cars(user_id);
+
+-- Step 4: Drop existing open policies
+DROP POLICY IF EXISTS "Allow all for cars" ON cars;
+DROP POLICY IF EXISTS "Allow all for maintenance_tasks" ON maintenance_tasks;
+DROP POLICY IF EXISTS "Allow all for maintenance_records" ON maintenance_records;
+DROP POLICY IF EXISTS "Allow all for documents" ON documents;
+DROP POLICY IF EXISTS "Allow all for odometer_readings" ON odometer_readings;
+
+-- Step 5: Create user-isolation policies for cars
+CREATE POLICY "Users can manage their own cars"
+ON cars FOR ALL 
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Public read access for shared cars (QR feature)
+CREATE POLICY "Public can view shared cars"
+ON cars FOR SELECT 
+USING (public_share_enabled = true);
+
+-- Step 6: Create user-isolation policies for maintenance_tasks
+CREATE POLICY "Users can manage their own tasks"
+ON maintenance_tasks FOR ALL 
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Public read access for tasks of shared cars
+CREATE POLICY "Public can view tasks of shared cars"
+ON maintenance_tasks FOR SELECT 
+USING (
+  EXISTS (
+    SELECT 1 FROM cars 
+    WHERE cars.id = maintenance_tasks.car_id 
+    AND cars.public_share_enabled = true
+  )
 );
 
--- Maintenance Tasks table
-CREATE TABLE IF NOT EXISTS maintenance_tasks (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(200) NOT NULL,
-    type VARCHAR(20) NOT NULL CHECK (type IN ('distance', 'time', 'both')),
-    interval_km INTEGER,
-    interval_months INTEGER,
-    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('high', 'medium', 'low')),
-    is_recurring BOOLEAN DEFAULT TRUE,
-    last_maintenance_date TIMESTAMPTZ,
-    last_maintenance_odometer INTEGER,
-    snoozed_until TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+-- Step 7: Create user-isolation policies for maintenance_records
+CREATE POLICY "Users can manage their own records"
+ON maintenance_records FOR ALL 
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Step 8: Create user-isolation policies for documents
+CREATE POLICY "Users can manage their own documents"
+ON documents FOR ALL 
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Public read access for documents of shared cars
+CREATE POLICY "Public can view documents of shared cars"
+ON documents FOR SELECT 
+USING (
+  EXISTS (
+    SELECT 1 FROM cars 
+    WHERE cars.id = documents.car_id 
+    AND cars.public_share_enabled = true
+  )
 );
 
--- Maintenance Records table
-CREATE TABLE IF NOT EXISTS maintenance_records (
-    id BIGSERIAL PRIMARY KEY,
-    task_id BIGINT,
-    task_name VARCHAR(200) NOT NULL,
-    date TIMESTAMPTZ DEFAULT NOW(),
-    odometer_reading INTEGER DEFAULT 0,
-    cost DECIMAL(10, 2) DEFAULT 0,
-    service_center VARCHAR(200),
-    invoice_number VARCHAR(100),
-    invoice_image TEXT,
-    notes TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+-- Step 9: Create user-isolation policies for odometer_readings
+CREATE POLICY "Users can manage their own readings"
+ON odometer_readings FOR ALL 
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Public read access for odometer of shared cars
+CREATE POLICY "Public can view odometer of shared cars"
+ON odometer_readings FOR SELECT 
+USING (
+  EXISTS (
+    SELECT 1 FROM cars 
+    WHERE cars.id = odometer_readings.car_id 
+    AND cars.public_share_enabled = true
+  )
 );
 
--- Documents table
-CREATE TABLE IF NOT EXISTS documents (
-    id BIGSERIAL PRIMARY KEY,
-    type VARCHAR(50) NOT NULL,
-    document_number VARCHAR(100),
-    issue_date DATE,
-    expiry_date DATE,
-    image TEXT,
-    notes TEXT,
-    reminder_days INTEGER DEFAULT 30,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- Step 10: Add car_id foreign keys if not exists
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'maintenance_tasks' AND column_name = 'car_id'
+    ) THEN
+        ALTER TABLE maintenance_tasks ADD COLUMN car_id BIGINT REFERENCES cars(id);
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'maintenance_records' AND column_name = 'car_id'
+    ) THEN
+        ALTER TABLE maintenance_records ADD COLUMN car_id BIGINT REFERENCES cars(id);
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'documents' AND column_name = 'car_id'
+    ) THEN
+        ALTER TABLE documents ADD COLUMN car_id BIGINT REFERENCES cars(id);
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'odometer_readings' AND column_name = 'car_id'
+    ) THEN
+        ALTER TABLE odometer_readings ADD COLUMN car_id BIGINT REFERENCES cars(id);
+    END IF;
+END $$;
 
--- Odometer Readings table
-CREATE TABLE IF NOT EXISTS odometer_readings (
-    id BIGSERIAL PRIMARY KEY,
-    reading INTEGER NOT NULL,
-    date TIMESTAMPTZ DEFAULT NOW(),
-    notes TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Enable Row Level Security (RLS) for all tables
--- Note: For now, policies allow all operations. Add auth later for user-specific data.
-
-ALTER TABLE cars ENABLE ROW LEVEL SECURITY;
-ALTER TABLE maintenance_tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE maintenance_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE odometer_readings ENABLE ROW LEVEL SECURITY;
-
--- Create policies to allow all operations (no auth for now)
-CREATE POLICY "Allow all for cars" ON cars FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all for maintenance_tasks" ON maintenance_tasks FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all for maintenance_records" ON maintenance_records FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all for documents" ON documents FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all for odometer_readings" ON odometer_readings FOR ALL USING (true) WITH CHECK (true);
-
--- Create updated_at trigger function
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+-- Step 11: Create function to auto-set user_id on insert
+CREATE OR REPLACE FUNCTION set_user_id()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = NOW();
+    NEW.user_id = auth.uid();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Add triggers for updated_at
-CREATE TRIGGER update_cars_updated_at BEFORE UPDATE ON cars
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Step 12: Create triggers for auto-setting user_id
+DROP TRIGGER IF EXISTS set_cars_user_id ON cars;
+CREATE TRIGGER set_cars_user_id
+    BEFORE INSERT ON cars
+    FOR EACH ROW
+    EXECUTE FUNCTION set_user_id();
 
-CREATE TRIGGER update_documents_updated_at BEFORE UPDATE ON documents
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS set_tasks_user_id ON maintenance_tasks;
+CREATE TRIGGER set_tasks_user_id
+    BEFORE INSERT ON maintenance_tasks
+    FOR EACH ROW
+    EXECUTE FUNCTION set_user_id();
+
+DROP TRIGGER IF EXISTS set_records_user_id ON maintenance_records;
+CREATE TRIGGER set_records_user_id
+    BEFORE INSERT ON maintenance_records
+    FOR EACH ROW
+    EXECUTE FUNCTION set_user_id();
+
+DROP TRIGGER IF EXISTS set_documents_user_id ON documents;
+CREATE TRIGGER set_documents_user_id
+    BEFORE INSERT ON documents
+    FOR EACH ROW
+    EXECUTE FUNCTION set_user_id();
+
+DROP TRIGGER IF EXISTS set_readings_user_id ON odometer_readings;
+CREATE TRIGGER set_readings_user_id
+    BEFORE INSERT ON odometer_readings
+    FOR EACH ROW
+    EXECUTE FUNCTION set_user_id();
+
+-- Done! 
+-- Note: After running this, enable Email Auth in Supabase Dashboard:
+-- Authentication > Providers > Email > Enable
