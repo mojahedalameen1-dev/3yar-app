@@ -172,7 +172,7 @@ async function toggleShare(enabled) {
       await generateQR()
     }
 
-    emit('updated', { public_share_enabled: enabled })
+    emit('updated', { publicShareEnabled: enabled })
   } catch (err) {
     console.error('Error toggling share:', err)
     shareEnabled.value = !enabled // Revert
