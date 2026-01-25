@@ -715,15 +715,6 @@ function onWizardFinished() {
   showSnackbar('تم إعداد حسابك بنجاح! 🎉')
 }
 
-// QR Share Dialog
-const showQRDialog = ref(false)
-function handleShareUpdate(updates) {
-  // Update local car state with share settings
-  if (carStore.car) {
-    Object.assign(carStore.car, updates)
-  }
-}
-
 // Car Dialog
 const showCarDialog = ref(false)
 const carFormValid = ref(false)
