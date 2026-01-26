@@ -227,7 +227,7 @@ export const useTasksStore = defineStore('tasks', () => {
             if (data && data.length > 0) {
                 tasks.value = data.map(mapFromDb)
             } else {
-                // Try to migrate from localStorage or use defaults
+                // Try to migrate from localStorage only (no auto defaults)
                 const stored = localStorage.getItem('maintenance_tasks')
                 if (stored) {
                     const localTasks = JSON.parse(stored)
@@ -235,13 +235,9 @@ export const useTasksStore = defineStore('tasks', () => {
                         await addTask(task)
                     }
                     localStorage.removeItem('maintenance_tasks')
-                } else {
-                    // Insert default tasks
-                    const defaults = getDefaultTasks()
-                    for (const task of defaults) {
-                        await addTask(task)
-                    }
                 }
+                // Note: Default tasks are now only added through the Onboarding Wizard
+                // This ensures new users start with a clean slate
             }
         } catch (err) {
             error.value = err.message
@@ -353,14 +349,20 @@ export const useTasksStore = defineStore('tasks', () => {
             if (err) throw err
 
             tasks.value = []
-            const defaults = getDefaultTasks()
-            for (const task of defaults) {
-                await addTask(task)
-            }
+            // Note: Default tasks are no longer auto-added here
+            // Use addDefaultTasks() explicitly if needed
         } catch (err) {
             error.value = err.message
             console.error('Error resetting tasks:', err)
             throw err
+        }
+    }
+
+    // Add default tasks explicitly (called from Wizard or Settings)
+    async function addDefaultTasks() {
+        const defaults = getDefaultTasks()
+        for (const task of defaults) {
+            await addTask(task)
         }
     }
 
@@ -384,6 +386,7 @@ export const useTasksStore = defineStore('tasks', () => {
         cancelSnooze,
         recordMaintenance,
         resetTasks,
+        addDefaultTasks,
         calculateTaskStatus
     }
 })

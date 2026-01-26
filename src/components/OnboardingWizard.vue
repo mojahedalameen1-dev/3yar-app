@@ -337,7 +337,7 @@ async function finishWizard() {
       : null
 
     // 2. Add Car (Initialize with past reading if exists to allow chronological addition)
-    carStore.addCar({
+    await carStore.addCar({
       ...carData.value,
       initialOdometer: pastReading || carData.value.currentOdometer,
       currentOdometer: pastReading || carData.value.currentOdometer // Set current to match initial for now
@@ -348,31 +348,31 @@ async function finishWizard() {
       const pastDate = new Date()
       pastDate.setDate(pastDate.getDate() - 30)
       
-      odometerStore.addReading({
+      await odometerStore.addReading({
         reading: pastReading,
         date: pastDate.toISOString(),
         notes: 'Initial Estimate Base'
       })
       
       // 4. Now Add Current Reading (this will update car current odometer)
-      odometerStore.addReading({
+      await odometerStore.addReading({
         reading: carData.value.currentOdometer,
         notes: 'Qeraah eftetahyuh (Initial Reading via Wizard)'
       })
     } else {
       // Just add current reading if no past estimate
-      odometerStore.addReading({
+      await odometerStore.addReading({
         reading: carData.value.currentOdometer,
         notes: 'Qeraah eftetahyuh (Initial Reading via Wizard)'
       })
     }
 
-    // 4. Add Selected Tasks
-    tasksStore.resetTasks()
-    tasksStore.tasks = []
+    // 4. Add Selected Tasks (clear existing first, then add selected)
+    await tasksStore.resetTasks()
     
-    defaultTasks.value.filter(t => t.selected).forEach(task => {
-      tasksStore.addTask({
+    const selectedTasks = defaultTasks.value.filter(t => t.selected)
+    for (const task of selectedTasks) {
+      await tasksStore.addTask({
         name: task.name,
         type: task.type,
         intervalKm: task.km,
@@ -380,7 +380,7 @@ async function finishWizard() {
         priority: task.priority,
         isRecurring: true
       })
-    })
+    }
 
     // Close dialog first, then emit finished
     emit('update:modelValue', false)

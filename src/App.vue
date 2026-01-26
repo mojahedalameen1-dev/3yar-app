@@ -229,13 +229,16 @@ async function initialize() {
 async function initializeData() {
   try {
     await carStore.fetchCar()
-    // Fetch other data in parallel
-    await Promise.all([
-      tasksStore.fetchTasks(),
-      documentsStore.fetchDocuments(),
-      recordsStore.fetchRecords(),
-      odometerStore.fetchReadings()
-    ])
+    // Only fetch other data if user has a car
+    // This ensures new users start with a clean slate
+    if (carStore.hasCar) {
+      await Promise.all([
+        tasksStore.fetchTasks(),
+        documentsStore.fetchDocuments(),
+        recordsStore.fetchRecords(),
+        odometerStore.fetchReadings()
+      ])
+    }
   } catch (error) {
     console.error('Error initializing data:', error)
   } finally {
