@@ -192,60 +192,6 @@
           </v-card-text>
         </v-card>
 
-        <!-- Data Management -->
-        <v-card class="glass-card mb-6">
-          <v-card-title class="d-flex align-center pa-5">
-            <div class="title-icon me-3 bg-success">
-              <v-icon color="white">mdi-file-export</v-icon>
-            </div>
-            <div>
-              <div class="text-subtitle-1 font-weight-bold">تصدير البيانات</div>
-              <div class="text-caption text-medium-emphasis">حمّل تقريراً لسيارتك</div>
-            </div>
-          </v-card-title>
-          <v-divider></v-divider>
-          <v-card-text class="pa-4">
-            <v-row>
-              <!-- PDF Export Button -->
-              <v-col cols="6">
-                <v-btn
-                  block
-                  size="large"
-                  color="error"
-                  variant="tonal"
-                  class="export-btn"
-                  :loading="exportingPDF"
-                  :disabled="!carStore.hasCar"
-                  @click="exportPDF"
-                >
-                  <v-icon start>mdi-file-pdf-box</v-icon>
-                  تقرير PDF
-                </v-btn>
-              </v-col>
-              <!-- Excel Export Button -->
-              <v-col cols="6">
-                <v-btn
-                  block
-                  size="large"
-                  color="success"
-                  variant="tonal"
-                  class="export-btn"
-                  :loading="exportingExcel"
-                  :disabled="!carStore.hasCar"
-                  @click="exportExcel"
-                >
-                  <v-icon start>mdi-microsoft-excel</v-icon>
-                  ملف Excel
-                </v-btn>
-              </v-col>
-            </v-row>
-            <p v-if="!carStore.hasCar" class="text-caption text-center text-medium-emphasis mt-3 mb-0">
-              <v-icon size="14" class="me-1">mdi-information</v-icon>
-              أضف بيانات سيارتك أولاً لتتمكن من التصدير
-            </p>
-          </v-card-text>
-        </v-card>
-
         <!-- Danger Zone -->
         <v-card class="glass-card danger-zone-card">
           <v-card-title class="d-flex align-center pa-5">
@@ -386,99 +332,6 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-
-    <!-- Hidden PDF Report Template -->
-    <div ref="reportRef" class="pdf-report-container">
-      <!-- Header -->
-      <div class="report-header">
-        <div class="d-flex justify-space-between align-center mb-6">
-          <div class="report-brand">
-            <h1 class="text-h4 font-weight-bold primary--text mb-1">عيار</h1>
-            <p class="text-subtitle-1 text-grey">تقرير صيانة السيارة</p>
-          </div>
-          <div class="report-meta text-left">
-            <p><strong>تاريخ التقرير:</strong> {{ new Date().toLocaleDateString('ar-SA') }}</p>
-            <p v-if="carStore.car"><strong>السيارة:</strong> {{ carStore.car.year }} {{ carStore.car.make }} {{ carStore.car.model }}</p>
-            <p v-if="carStore.car"><strong>اللوحة:</strong> {{ carStore.car.plateNumber }}</p>
-          </div>
-        </div>
-        <div class="header-divider"></div>
-      </div>
-
-      <!-- Stats Grid -->
-      <div class="report-section">
-        <h2 class="section-title">ملخص الحالة</h2>
-        <div class="stats-grid">
-          <div class="stat-box">
-            <span class="stat-label">عداد المسافات</span>
-            <span class="stat-value">{{ carStore.car?.currentOdometer?.toLocaleString() || 0 }} كم</span>
-          </div>
-          <div class="stat-box">
-            <span class="stat-label">إجمالي المصروفات</span>
-            <span class="stat-value">{{ recordsStore.totalCost.toLocaleString() }} ر.س</span>
-          </div>
-          <div class="stat-box">
-            <span class="stat-label">سجلات الصيانة</span>
-            <span class="stat-value">{{ recordsStore.records.length }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Upcoming Tasks -->
-      <div v-if="tasksStore.dueTasks.length > 0" class="report-section">
-        <h2 class="section-title text-warning">المهام المستحقة</h2>
-        <table class="report-table">
-          <thead>
-            <tr>
-              <th>المهمة</th>
-              <th>النوع</th>
-              <th>الحالة</th>
-              <th>المتبقي</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="task in tasksStore.dueTasks" :key="task.id">
-              <td>{{ task.name }}</td>
-              <td>{{ task.isRecurring ? 'دوري' : 'مرة واحدة' }}</td>
-              <td class="text-warning">مستحق</td>
-              <td>{{ task.statusInfo.kmRemaining ? task.statusInfo.kmRemaining.toLocaleString() + ' كم' : '-' }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Records History -->
-      <div class="report-section">
-        <h2 class="section-title">سجل الصيانة</h2>
-        <table class="report-table" v-if="recordsStore.records.length > 0">
-          <thead>
-            <tr>
-              <th>المهمة</th>
-              <th>التاريخ</th>
-              <th>العداد</th>
-              <th>التكلفة</th>
-              <th>مركز الصيانة</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="record in recordsStore.records.slice(0, 15)" :key="record.id">
-              <td>{{ record.taskName }}</td>
-              <td>{{ new Date(record.date).toLocaleDateString('ar-SA') }}</td>
-              <td>{{ record.odometerReading?.toLocaleString() }} كم</td>
-              <td>{{ record.cost?.toLocaleString() }} ر.س</td>
-              <td>{{ record.serviceCenter || '-' }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p v-else class="text-center text-grey py-4">لا توجد سجلات صيانة للعرض</p>
-      </div>
-
-      <!-- Footer -->
-      <div class="report-footer">
-        <p>تم إصدار هذا التقرير تلقائياً بواسطة تطبيق عيار</p>
-        <p class="footer-link">3yar.app</p>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -491,8 +344,6 @@ import { useRecordsStore } from '@/stores/records'
 import { useDocumentsStore } from '@/stores/documents'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from 'vuetify'
-import { exportToExcel } from '@/utils/exportUtils'
-import { exportToPDF } from '@/utils/pdfExport'
 
 const showSnackbar = inject('showSnackbar')
 const theme = useTheme()
@@ -520,10 +371,6 @@ const carData = reactive({
   make: '', model: '', year: 2024, plateNumber: '', 
   color: '', vin: '', notes: '', image: null 
 })
-
-// Export States
-const exportingPDF = ref(false)
-const exportingExcel = ref(false)
 
 // Delete Data State
 const showClearDataDialog = ref(false)
@@ -660,80 +507,6 @@ async function handleClearData() {
     deleteError.value = err.message || 'حدث خطأ أثناء الحذف'
   } finally {
     deletingData.value = false
-  }
-}
-
-// PDF Export
-const reportRef = ref(null)
-
-async function exportPDF() {
-  if (!carStore.hasCar) {
-    showSnackbar('أضف سيارة أولاً', 'warning')
-    return
-  }
-  
-  exportingPDF.value = true
-  try {
-    // Fetch fresh data
-    await Promise.all([
-      tasksStore.fetchTasks(),
-      recordsStore.fetchRecords(),
-      odometerStore.fetchReadings()
-    ])
-    
-    // Allow DOM to update
-    await new Promise(resolve => setTimeout(resolve, 100))
-
-    if (!reportRef.value) {
-      throw new Error('فشل في الوصول إلى قالب التقرير')
-    }
-    
-    const fileName = await exportToPDF(
-      reportRef.value,
-      carStore.car,
-      {
-        tasks: tasksStore.tasksWithStatus,
-        records: recordsStore.records,
-        readings: odometerStore.readings
-      }
-    )
-    showSnackbar(`تم تحميل التقرير: ${fileName}`, 'success')
-  } catch (error) {
-    console.error('PDF export error:', error)
-    showSnackbar('حدث خطأ أثناء إنشاء التقرير: ' + error.message, 'error')
-  } finally {
-    exportingPDF.value = false
-  }
-}
-
-// Excel Export
-async function exportExcel() {
-  if (!carStore.hasCar) {
-    showSnackbar('أضف سيارة أولاً', 'warning')
-    return
-  }
-  
-  exportingExcel.value = true
-  try {
-    // Fetch fresh data
-    await Promise.all([
-      tasksStore.fetchTasks(),
-      recordsStore.fetchRecords(),
-      documentsStore.fetchDocuments()
-    ])
-    
-    const fileName = await exportToExcel(
-      carStore.car,
-      tasksStore.tasks,
-      recordsStore.records,
-      documentsStore.documents
-    )
-    showSnackbar(`تم تحميل الملف: ${fileName}`, 'success')
-  } catch (error) {
-    console.error('Excel export error:', error)
-    showSnackbar('حدث خطأ أثناء إنشاء الملف', 'error')
-  } finally {
-    exportingExcel.value = false
   }
 }
 </script>
