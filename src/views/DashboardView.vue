@@ -650,11 +650,12 @@
 </template>
 
 <script setup>
-import { ref, computed, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, inject, defineAsyncComponent, onMounted } from 'vue'
 import { useCarStore } from '@/stores/car'
 import { useOdometerStore } from '@/stores/odometer'
 import { useTasksStore } from '@/stores/tasks'
 import { useRecordsStore } from '@/stores/records'
+import { useProfileStore } from '@/stores/profile'
 import OnboardingWizard from '@/components/OnboardingWizard.vue'
 import QRShareDialog from '@/components/QRShareDialog.vue'
 const CostChart = defineAsyncComponent(() => import('@/components/CostChart.vue'))
@@ -671,13 +672,24 @@ const carStore = useCarStore()
 const odometerStore = useOdometerStore()
 const tasksStore = useTasksStore()
 const recordsStore = useRecordsStore()
+const profileStore = useProfileStore()
 
-// Greeting
+// Fetch profile on mount
+onMounted(async () => {
+  if (!profileStore.hasProfile) {
+    await profileStore.fetchProfile()
+  }
+})
+
+// Greeting with first name
 const greeting = computed(() => {
   const hour = new Date().getHours()
-  if (hour < 12) return 'صباح الخير ☀️'
-  if (hour < 18) return 'مساء الخير 🌤️'
-  return 'مساء الخير 🌙'
+  const name = profileStore.firstName || ''
+  const nameText = name ? `، ${name}` : ''
+  
+  if (hour < 12) return `صباح الخير${nameText} ☀️`
+  if (hour < 18) return `مساء الخير${nameText} 🌤️`
+  return `مساء الخير${nameText} 🌙`
 })
 
 // Features for empty state

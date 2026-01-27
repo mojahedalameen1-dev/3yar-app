@@ -171,6 +171,7 @@ import { useCarStore } from '@/stores/car'
 import { useDocumentsStore } from '@/stores/documents'
 import { useRecordsStore } from '@/stores/records'
 import { useOdometerStore } from '@/stores/odometer'
+import { useProfileStore } from '@/stores/profile'
 import UserProfile from '@/components/UserProfile.vue'
 import ayarLogo from '@/assets/ayar-logo.png'
 
@@ -182,6 +183,7 @@ const carStore = useCarStore()
 const documentsStore = useDocumentsStore()
 const recordsStore = useRecordsStore()
 const odometerStore = useOdometerStore()
+const profileStore = useProfileStore()
 
 // App loading state
 const appLoading = ref(true)
@@ -230,6 +232,9 @@ async function initialize() {
 // Initialize data from Supabase
 async function initializeData() {
   try {
+    // Fetch profile first
+    await profileStore.fetchProfile()
+    
     await carStore.fetchCar()
     // Only fetch other data if user has a car
     // This ensures new users start with a clean slate

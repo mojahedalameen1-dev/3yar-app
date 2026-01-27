@@ -27,6 +27,7 @@ export const useAuthStore = defineStore('auth', () => {
         const { useRecordsStore } = require('./records')
         const { useDocumentsStore } = require('./documents')
         const { useOdometerStore } = require('./odometer')
+        const { useProfileStore } = require('./profile')
 
         // Reset each store
         const carStore = useCarStore()
@@ -34,12 +35,14 @@ export const useAuthStore = defineStore('auth', () => {
         const recordsStore = useRecordsStore()
         const documentsStore = useDocumentsStore()
         const odometerStore = useOdometerStore()
+        const profileStore = useProfileStore()
 
         carStore.$reset()
         tasksStore.$reset()
         recordsStore.$reset()
         documentsStore.$reset()
         odometerStore.$reset()
+        profileStore.$reset()
     }
 
     // Initialize auth state
