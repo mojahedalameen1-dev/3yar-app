@@ -96,7 +96,15 @@
         <template #append>
           <v-divider class="my-2"></v-divider>
           <v-list density="comfortable" nav class="px-2">
-            <!-- Theme Toggle REMOVED from Sidebar -->
+            <!-- Theme Toggle Button -->
+            <v-list-item
+              :prepend-icon="theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
+              :title="rail && !isMobile ? '' : (theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي')"
+              rounded="lg"
+              class="nav-item"
+              @click="toggleTheme"
+            ></v-list-item>
+            <!-- Collapse Menu Button -->
             <v-list-item
               v-if="!isMobile"
               :prepend-icon="rail ? 'mdi-chevron-left' : 'mdi-chevron-right'"

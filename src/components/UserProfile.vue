@@ -36,7 +36,7 @@
               <v-list-item-title>الإعدادات</v-list-item-title>
             </v-list-item>
             <v-divider class="my-1"></v-divider>
-            <v-list-item @click="emit('logout')" class="px-4">
+            <v-list-item @click="handleLogout" class="px-4">
               <template #prepend>
                 <v-icon size="20" color="error">mdi-logout</v-icon>
               </template>
@@ -61,9 +61,11 @@
 
 <script setup>
 import { computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
 
@@ -75,6 +77,16 @@ onMounted(async () => {
     await profileStore.fetchProfile()
   }
 })
+
+// Handle logout directly - more reliable than emitting
+async function handleLogout() {
+  try {
+    await authStore.signOut()
+    router.push('/login')
+  } catch (error) {
+    console.error('Logout error:', error)
+  }
+}
 
 // Display name: use profile name if available, otherwise email prefix
 const displayName = computed(() => {
