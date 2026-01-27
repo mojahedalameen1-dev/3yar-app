@@ -166,7 +166,7 @@ onMounted(async () => {
       .select('*')
       .eq('share_token', shareToken)
       .eq('public_share_enabled', true)
-      .single()
+      .maybeSingle()
 
     if (carError || !carData) {
       error.value = 'لم يتم العثور على السيارة أو المشاركة غير مفعلة'

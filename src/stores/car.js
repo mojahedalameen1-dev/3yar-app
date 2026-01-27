@@ -97,7 +97,7 @@ export const useCarStore = defineStore('car', () => {
                 .from('cars')
                 .insert([mapToDb(carData)])
                 .select()
-                .single()
+                .maybeSingle()
 
             if (err) throw err
             car.value = mapFromDb(data)

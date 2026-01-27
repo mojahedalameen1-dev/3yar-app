@@ -253,7 +253,7 @@ export const useTasksStore = defineStore('tasks', () => {
                 .from('maintenance_tasks')
                 .insert([mapToDb(taskData)])
                 .select()
-                .single()
+                .maybeSingle()
 
             if (err) throw err
 
@@ -285,7 +285,7 @@ export const useTasksStore = defineStore('tasks', () => {
                 .update(dbUpdates)
                 .eq('id', id)
                 .select()
-                .single()
+                .maybeSingle()
 
             if (err) throw err
 

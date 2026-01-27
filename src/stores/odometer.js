@@ -116,7 +116,7 @@ export const useOdometerStore = defineStore('odometer', () => {
                 .from('odometer_readings')
                 .insert([mapToDb(readingData)])
                 .select()
-                .single()
+                .maybeSingle()
 
             if (err) throw err
 

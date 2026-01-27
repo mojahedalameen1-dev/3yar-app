@@ -143,7 +143,7 @@ export const useRecordsStore = defineStore('records', () => {
                 .from('maintenance_records')
                 .insert([mapToDb(recordData)])
                 .select()
-                .single()
+                .maybeSingle()
 
             if (err) throw err
 
@@ -179,7 +179,7 @@ export const useRecordsStore = defineStore('records', () => {
                 .update(dbUpdates)
                 .eq('id', id)
                 .select()
-                .single()
+                .maybeSingle()
 
             if (err) throw err
 

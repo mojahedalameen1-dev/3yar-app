@@ -161,7 +161,7 @@ export const useDocumentsStore = defineStore('documents', () => {
                 .from('documents')
                 .insert([mapToDb(docData)])
                 .select()
-                .single()
+                .maybeSingle()
 
             if (err) throw err
 
@@ -191,7 +191,7 @@ export const useDocumentsStore = defineStore('documents', () => {
                 .update(dbUpdates)
                 .eq('id', id)
                 .select()
-                .single()
+                .maybeSingle()
 
             if (err) throw err
 
