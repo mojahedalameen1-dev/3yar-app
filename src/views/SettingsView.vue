@@ -446,7 +446,17 @@ async function saveCar() {
   const oldCarData = { ...carStore.car }
   
   try {
+    console.log('Saving car data:', carData)
     await carStore.updateCar(carData)
+    
+    // Re-fetch to ensure UI is synced
+    await carStore.fetchCar()
+    
+    // Update local form with fresh data
+    if (carStore.car) {
+      Object.assign(carData, carStore.car)
+    }
+    
     showSnackbar('تم حفظ التغييرات بنجاح', 'success')
   } catch (error) {
     // Rollback on error
