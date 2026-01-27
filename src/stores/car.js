@@ -28,16 +28,16 @@ export const useCarStore = defineStore('car', () => {
                 .from('cars')
                 .select('*')
                 .limit(1)
-                .single()
+                .maybeSingle()
 
-            if (err && err.code !== 'PGRST116') {
-                // PGRST116 = no rows returned, which is fine
+            if (err) {
                 throw err
             }
 
             if (data) {
                 car.value = mapFromDb(data)
             } else {
+                car.value = null
                 // Try to load from localStorage for migration
                 const stored = localStorage.getItem('car_data')
                 if (stored) {
@@ -112,7 +112,9 @@ export const useCarStore = defineStore('car', () => {
     }
 
     async function updateCar(updates) {
-        if (!car.value) return
+        if (!car.value || !car.value.id) {
+            throw new Error('لا توجد سيارة للتحديث')
+        }
         loading.value = true
         error.value = null
         try {
@@ -133,10 +135,12 @@ export const useCarStore = defineStore('car', () => {
                 .update(dbUpdates)
                 .eq('id', car.value.id)
                 .select()
-                .single()
+                .maybeSingle()
 
             if (err) throw err
-            car.value = mapFromDb(data)
+            if (data) {
+                car.value = mapFromDb(data)
+            }
         } catch (err) {
             error.value = err.message
             console.error('Error updating car:', err)

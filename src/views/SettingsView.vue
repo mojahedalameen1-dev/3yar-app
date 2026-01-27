@@ -217,14 +217,49 @@
           <v-divider></v-divider>
           <v-card-text class="pa-0">
             <v-list lines="two" class="bg-transparent">
+              <!-- PDF Export -->
+              <v-list-item class="px-5" @click="exportPDF" :disabled="exportingPDF || !carStore.hasCar">
+                <template #prepend>
+                  <div class="setting-icon bg-error me-4">
+                    <v-icon color="white" size="20">mdi-file-pdf-box</v-icon>
+                  </div>
+                </template>
+                <v-list-item-title class="font-weight-medium">تحميل تقرير PDF</v-list-item-title>
+                <v-list-item-subtitle>تقرير احترافي لحالة السيارة</v-list-item-subtitle>
+                <template #append>
+                  <v-progress-circular v-if="exportingPDF" indeterminate size="20" width="2" color="error"></v-progress-circular>
+                  <v-icon v-else>mdi-chevron-left</v-icon>
+                </template>
+              </v-list-item>
+              
+              <v-divider class="mx-5"></v-divider>
+              
+              <!-- Excel Export -->
+              <v-list-item class="px-5" @click="exportExcel" :disabled="exportingExcel || !carStore.hasCar">
+                <template #prepend>
+                  <div class="setting-icon bg-green-darken-1 me-4">
+                    <v-icon color="white" size="20">mdi-microsoft-excel</v-icon>
+                  </div>
+                </template>
+                <v-list-item-title class="font-weight-medium">تصدير ملف إكسل</v-list-item-title>
+                <v-list-item-subtitle>بيانات الصيانة بتنسيق Excel</v-list-item-subtitle>
+                <template #append>
+                  <v-progress-circular v-if="exportingExcel" indeterminate size="20" width="2" color="green"></v-progress-circular>
+                  <v-icon v-else>mdi-chevron-left</v-icon>
+                </template>
+              </v-list-item>
+              
+              <v-divider class="mx-5"></v-divider>
+              
+              <!-- JSON Export (existing) -->
               <v-list-item class="px-5" @click="exportAllData">
                 <template #prepend>
                   <div class="setting-icon bg-success me-4">
                     <v-icon color="white" size="20">mdi-download</v-icon>
                   </div>
                 </template>
-                <v-list-item-title class="font-weight-medium">تصدير البيانات</v-list-item-title>
-                <v-list-item-subtitle>حفظ نسخة احتياطية كاملة</v-list-item-subtitle>
+                <v-list-item-title class="font-weight-medium">تصدير البيانات (JSON)</v-list-item-title>
+                <v-list-item-subtitle>نسخة احتياطية بتنسيق JSON</v-list-item-subtitle>
                 <template #append>
                   <v-icon>mdi-chevron-left</v-icon>
                 </template>
@@ -355,7 +390,9 @@ import { useCarStore } from '@/stores/car'
 import { useOdometerStore } from '@/stores/odometer'
 import { useTasksStore } from '@/stores/tasks'
 import { useRecordsStore } from '@/stores/records'
+import { useDocumentsStore } from '@/stores/documents'
 import { useTheme } from 'vuetify'
+import { exportToExcel, exportToPDF } from '@/utils/exportUtils'
 
 const showSnackbar = inject('showSnackbar')
 const theme = useTheme()
@@ -364,6 +401,7 @@ const carStore = useCarStore()
 const odometerStore = useOdometerStore()
 const tasksStore = useTasksStore()
 const recordsStore = useRecordsStore()
+const documentsStore = useDocumentsStore()
 
 // Car Form
 const carFormValid = ref(false)
@@ -372,6 +410,10 @@ const carData = reactive({
   make: '', model: '', year: 2024, plateNumber: '', 
   color: '', vin: '', notes: '', image: null 
 })
+
+// Export States
+const exportingPDF = ref(false)
+const exportingExcel = ref(false)
 
 // Image Upload
 const imageInput = ref(null)
@@ -441,6 +483,68 @@ const showClearDataDialog = ref(false)
 function clearAllData() {
   localStorage.clear()
   location.reload()
+}
+
+// PDF Export
+async function exportPDF() {
+  if (!carStore.hasCar) {
+    showSnackbar('أضف سيارة أولاً', 'warning')
+    return
+  }
+  
+  exportingPDF.value = true
+  try {
+    // Fetch fresh data
+    await Promise.all([
+      tasksStore.fetchTasks(),
+      recordsStore.fetchRecords(),
+      odometerStore.fetchReadings()
+    ])
+    
+    const fileName = await exportToPDF(
+      carStore.car,
+      tasksStore.tasksWithStatus,
+      recordsStore.records,
+      odometerStore.readings
+    )
+    showSnackbar(`تم تحميل التقرير: ${fileName}`, 'success')
+  } catch (error) {
+    console.error('PDF export error:', error)
+    showSnackbar('حدث خطأ أثناء إنشاء التقرير', 'error')
+  } finally {
+    exportingPDF.value = false
+  }
+}
+
+// Excel Export
+async function exportExcel() {
+  if (!carStore.hasCar) {
+    showSnackbar('أضف سيارة أولاً', 'warning')
+    return
+  }
+  
+  exportingExcel.value = true
+  try {
+    // Fetch fresh data
+    await Promise.all([
+      tasksStore.fetchTasks(),
+      recordsStore.fetchRecords(),
+      documentsStore.fetchDocuments()
+    ])
+    
+    const fileName = await exportToExcel(
+      carStore.car,
+      tasksStore.tasks,
+      recordsStore.records,
+      documentsStore.documents
+    )
+    showSnackbar(`تم تحميل الملف: ${fileName}`, 'success')
+  } catch (error) {
+    console.error('Excel export error:', error)
+    showSnackbar('حدث خطأ أثناء إنشاء الملف', 'error')
+  } finally {
+    exportingExcel.value = false
+  }
 }
 </script>
 

@@ -14,12 +14,15 @@
     "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
     "dayjs": "^1.11.10",
+    "jspdf": "^4.0.0",
+    "jspdf-autotable": "^5.0.7",
     "pinia": "^2.1.7",
     "qrcode": "^1.5.4",
     "vue": "^3.4.0",
     "vue-chartjs": "^5.3.3",
     "vue-router": "^4.2.5",
-    "vuetify": "^3.4.0"
+    "vuetify": "^3.4.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",
