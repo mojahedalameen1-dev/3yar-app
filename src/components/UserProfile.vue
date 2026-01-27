@@ -2,49 +2,44 @@
   <div class="user-profile">
     <!-- Logged In State -->
     <template v-if="authStore.isAuthenticated">
-      <v-menu v-model="menuOpen" location="top end" :offset="8">
-        <template #activator="{ props }">
-          <div class="profile-section" v-bind="props">
-            <!-- User Info Display -->
-            <div class="user-info px-4 py-3">
-              <v-avatar color="primary" size="42" class="elevation-2 mb-2">
-                <span class="text-h6 font-weight-bold text-white">
-                  {{ userInitials }}
-                </span>
-              </v-avatar>
-              <div class="user-details text-center">
-                <div class="user-name text-truncate">
-                  {{ displayName }}
-                </div>
-                <div class="user-email text-truncate">
-                  {{ authStore.userEmail }}
-                </div>
-              </div>
-            </div>
-            <!-- Menu trigger hint -->
-            <div class="menu-hint d-flex align-center justify-center py-2">
-              <v-icon size="16" class="opacity-50">mdi-chevron-up</v-icon>
-            </div>
-          </div>
+      <!-- User Info Display (clickable for settings only) -->
+      <v-list-item 
+        to="/settings" 
+        class="profile-item px-4 py-3"
+        :ripple="true"
+      >
+        <template #prepend>
+          <v-avatar color="primary" size="42" class="elevation-2">
+            <span class="text-h6 font-weight-bold text-white">
+              {{ userInitials }}
+            </span>
+          </v-avatar>
         </template>
-        <v-card class="rounded-xl elevation-4" min-width="200">
-          <v-list density="compact" class="py-2">
-            <v-list-item to="/settings" @click="menuOpen = false" class="px-4">
-              <template #prepend>
-                <v-icon size="20" color="primary">mdi-cog</v-icon>
-              </template>
-              <v-list-item-title>الإعدادات</v-list-item-title>
-            </v-list-item>
-            <v-divider class="my-1"></v-divider>
-            <v-list-item @click.stop="handleLogout" class="px-4 logout-item">
-              <template #prepend>
-                <v-icon size="20" color="error">mdi-logout</v-icon>
-              </template>
-              <v-list-item-title class="text-error">تسجيل الخروج</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-card>
-      </v-menu>
+        <v-list-item-title class="user-name text-truncate">
+          {{ displayName }}
+        </v-list-item-title>
+        <v-list-item-subtitle class="user-email text-truncate">
+          {{ authStore.userEmail }}
+        </v-list-item-subtitle>
+        <template #append>
+          <v-icon size="18" color="primary">mdi-cog</v-icon>
+        </template>
+      </v-list-item>
+
+      <!-- Logout Button - DIRECT, no menu -->
+      <div class="px-4 pb-2 pt-1">
+        <v-btn
+          color="error"
+          variant="tonal"
+          block
+          size="small"
+          prepend-icon="mdi-logout"
+          @click="handleLogout"
+          :loading="loggingOut"
+        >
+          تسجيل الخروج
+        </v-btn>
+      </div>
     </template>
 
     <!-- Logged Out State -->
@@ -61,16 +56,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
 
-const router = useRouter()
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
 
-// Menu state
-const menuOpen = ref(false)
+// Loading state for logout
+const loggingOut = ref(false)
 
 // Fetch profile on mount if authenticated
 onMounted(async () => {
@@ -79,25 +72,19 @@ onMounted(async () => {
   }
 })
 
-// Handle logout - close menu first, then sign out
+// Handle logout - simple and direct
 async function handleLogout() {
-  // Close menu immediately
-  menuOpen.value = false
+  loggingOut.value = true
   
   try {
     // Sign out from Supabase
     await authStore.signOut()
-    
-    // Navigate to landing page using both methods for reliability
-    await router.push('/')
-    
-    // Force reload as fallback to clear all state
-    window.location.href = '/'
   } catch (error) {
     console.error('Logout error:', error)
-    // Force reload even on error
-    window.location.href = '/'
   }
+  
+  // Always redirect to landing page, even if error
+  window.location.href = '/'
 }
 
 // Display name: use profile name if available, otherwise email prefix
@@ -128,51 +115,24 @@ const userInitials = computed(() => {
   padding-bottom: 8px;
 }
 
-.profile-section {
+.profile-item {
   cursor: pointer;
-  margin: 8px;
   border-radius: 12px;
+  margin: 8px;
   transition: background-color 0.2s ease;
-  background: rgba(var(--v-theme-surface-variant), 0.3);
 }
 
-.profile-section:hover {
+.profile-item:hover {
   background: rgba(var(--v-theme-primary), 0.08);
-}
-
-.user-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.user-details {
-  width: 100%;
-  max-width: 160px;
 }
 
 .user-name {
   font-size: 0.9rem;
   font-weight: 600;
-  color: rgb(var(--v-theme-on-surface));
-  line-height: 1.3;
 }
 
 .user-email {
   font-size: 0.75rem;
-  color: rgba(var(--v-theme-on-surface), 0.6);
-  line-height: 1.3;
-}
-
-.menu-hint {
-  border-top: 1px solid rgba(var(--v-border-color), 0.08);
-}
-
-.logout-item {
-  cursor: pointer;
-}
-
-.logout-item:hover {
-  background: rgba(var(--v-theme-error), 0.08);
+  opacity: 0.7;
 }
 </style>
