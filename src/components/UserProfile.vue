@@ -2,7 +2,7 @@
   <div class="user-profile">
     <!-- Logged In State -->
     <template v-if="authStore.isAuthenticated">
-      <v-menu location="top end" :offset="8">
+      <v-menu v-model="menuOpen" location="top end" :offset="8">
         <template #activator="{ props }">
           <div class="profile-section" v-bind="props">
             <!-- User Info Display -->
@@ -29,14 +29,14 @@
         </template>
         <v-card class="rounded-xl elevation-4" min-width="200">
           <v-list density="compact" class="py-2">
-            <v-list-item to="/settings" class="px-4">
+            <v-list-item to="/settings" @click="menuOpen = false" class="px-4">
               <template #prepend>
                 <v-icon size="20" color="primary">mdi-cog</v-icon>
               </template>
               <v-list-item-title>الإعدادات</v-list-item-title>
             </v-list-item>
             <v-divider class="my-1"></v-divider>
-            <v-list-item @click="handleLogout" class="px-4">
+            <v-list-item @click.stop="handleLogout" class="px-4 logout-item">
               <template #prepend>
                 <v-icon size="20" color="error">mdi-logout</v-icon>
               </template>
@@ -60,7 +60,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
@@ -69,7 +69,8 @@ const router = useRouter()
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
 
-const emit = defineEmits(['logout'])
+// Menu state
+const menuOpen = ref(false)
 
 // Fetch profile on mount if authenticated
 onMounted(async () => {
@@ -78,13 +79,24 @@ onMounted(async () => {
   }
 })
 
-// Handle logout directly - more reliable than emitting
+// Handle logout - close menu first, then sign out
 async function handleLogout() {
+  // Close menu immediately
+  menuOpen.value = false
+  
   try {
+    // Sign out from Supabase
     await authStore.signOut()
-    router.push('/')
+    
+    // Navigate to landing page using both methods for reliability
+    await router.push('/')
+    
+    // Force reload as fallback to clear all state
+    window.location.href = '/'
   } catch (error) {
     console.error('Logout error:', error)
+    // Force reload even on error
+    window.location.href = '/'
   }
 }
 
@@ -154,5 +166,13 @@ const userInitials = computed(() => {
 
 .menu-hint {
   border-top: 1px solid rgba(var(--v-border-color), 0.08);
+}
+
+.logout-item {
+  cursor: pointer;
+}
+
+.logout-item:hover {
+  background: rgba(var(--v-theme-error), 0.08);
 }
 </style>
