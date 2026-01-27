@@ -44,6 +44,19 @@ export const useDocumentsStore = defineStore('documents', () => {
     const loading = ref(false)
     const error = ref(null)
 
+    // Reset store state
+    function $reset() {
+        documents.value = []
+        loading.value = false
+        error.value = null
+    }
+
+    // Get current user ID from session
+    async function getUserId() {
+        const { data: { session } } = await supabase.auth.getSession()
+        return session?.user?.id || null
+    }
+
     function getDocumentStatus(expiryDate) {
         if (!expiryDate) return { status: STATUS.VALID, daysLeft: null }
 
@@ -117,26 +130,21 @@ export const useDocumentsStore = defineStore('documents', () => {
         loading.value = true
         error.value = null
         try {
+            const userId = await getUserId()
+            if (!userId) {
+                documents.value = []
+                return
+            }
+
             const { data, error: err } = await supabase
                 .from('documents')
                 .select('*')
+                .eq('user_id', userId)
                 .order('created_at', { ascending: true })
 
             if (err) throw err
 
-            if (data && data.length > 0) {
-                documents.value = data.map(mapFromDb)
-            } else {
-                // Try to migrate from localStorage
-                const stored = localStorage.getItem('documents-store')
-                if (stored) {
-                    const localDocs = JSON.parse(stored)
-                    for (const doc of localDocs) {
-                        await addDocument(doc)
-                    }
-                    localStorage.removeItem('documents-store')
-                }
-            }
+            documents.value = data ? data.map(mapFromDb) : []
         } catch (err) {
             error.value = err.message
             console.error('Error fetching documents:', err)
@@ -242,6 +250,7 @@ export const useDocumentsStore = defineStore('documents', () => {
         documents,
         loading,
         error,
+        $reset,
         documentsWithStatus,
         alertDocuments,
         stats,

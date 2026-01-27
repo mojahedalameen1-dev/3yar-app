@@ -12,11 +12,35 @@ export const useAuthStore = defineStore('auth', () => {
     // Getters
     const isAuthenticated = computed(() => !!user.value)
     const userEmail = computed(() => user.value?.email || '')
+    const userId = computed(() => user.value?.id || null)
     const userInitials = computed(() => {
         if (!user.value?.email) return '?'
         const email = user.value.email
         return email.charAt(0).toUpperCase()
     })
+
+    // Clear all other stores (called on login/logout)
+    function clearAllStores() {
+        // Import stores dynamically to avoid circular dependencies
+        const { useCarStore } = require('./car')
+        const { useTasksStore } = require('./tasks')
+        const { useRecordsStore } = require('./records')
+        const { useDocumentsStore } = require('./documents')
+        const { useOdometerStore } = require('./odometer')
+
+        // Reset each store
+        const carStore = useCarStore()
+        const tasksStore = useTasksStore()
+        const recordsStore = useRecordsStore()
+        const documentsStore = useDocumentsStore()
+        const odometerStore = useOdometerStore()
+
+        carStore.$reset()
+        tasksStore.$reset()
+        recordsStore.$reset()
+        documentsStore.$reset()
+        odometerStore.$reset()
+    }
 
     // Initialize auth state
     async function initialize() {
@@ -29,8 +53,14 @@ export const useAuthStore = defineStore('auth', () => {
 
             // Listen for auth changes
             supabase.auth.onAuthStateChange((event, newSession) => {
+                const previousUser = user.value?.id
                 session.value = newSession
                 user.value = newSession?.user || null
+
+                // Clear stores when user changes or signs out
+                if (event === 'SIGNED_OUT' || (previousUser && previousUser !== newSession?.user?.id)) {
+                    clearAllStores()
+                }
             })
         } catch (err) {
             error.value = err.message
@@ -64,6 +94,9 @@ export const useAuthStore = defineStore('auth', () => {
         loading.value = true
         error.value = null
         try {
+            // Clear stores BEFORE login to prevent flash of previous data
+            clearAllStores()
+
             const { data, error: err } = await supabase.auth.signInWithPassword({
                 email,
                 password
@@ -85,6 +118,9 @@ export const useAuthStore = defineStore('auth', () => {
         loading.value = true
         error.value = null
         try {
+            // Clear stores BEFORE signOut
+            clearAllStores()
+
             const { error: err } = await supabase.auth.signOut()
             if (err) throw err
             user.value = null
@@ -123,11 +159,14 @@ export const useAuthStore = defineStore('auth', () => {
         error,
         isAuthenticated,
         userEmail,
+        userId,
         userInitials,
         initialize,
         signUp,
         signIn,
         signOut,
-        resetPassword
+        resetPassword,
+        clearAllStores
     }
 })
+

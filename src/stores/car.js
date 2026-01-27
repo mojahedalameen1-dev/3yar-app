@@ -19,14 +19,34 @@ export const useCarStore = defineStore('car', () => {
         }
     })
 
+    // Reset store state
+    function $reset() {
+        car.value = null
+        loading.value = false
+        error.value = null
+    }
+
+    // Get current user ID from session
+    async function getUserId() {
+        const { data: { session } } = await supabase.auth.getSession()
+        return session?.user?.id || null
+    }
+
     // Actions
     async function fetchCar() {
         loading.value = true
         error.value = null
         try {
+            const userId = await getUserId()
+            if (!userId) {
+                car.value = null
+                return
+            }
+
             const { data, error: err } = await supabase
                 .from('cars')
                 .select('*')
+                .eq('user_id', userId)
                 .limit(1)
                 .maybeSingle()
 
@@ -38,13 +58,6 @@ export const useCarStore = defineStore('car', () => {
                 car.value = mapFromDb(data)
             } else {
                 car.value = null
-                // Try to load from localStorage for migration
-                const stored = localStorage.getItem('car_data')
-                if (stored) {
-                    const localCar = JSON.parse(stored)
-                    await addCar(localCar)
-                    localStorage.removeItem('car_data') // Clear after migration
-                }
             }
         } catch (err) {
             error.value = err.message
@@ -93,9 +106,17 @@ export const useCarStore = defineStore('car', () => {
         loading.value = true
         error.value = null
         try {
+            const userId = await getUserId()
+            if (!userId) throw new Error('يجب تسجيل الدخول أولاً')
+
+            const dbData = {
+                ...mapToDb(carData),
+                user_id: userId
+            }
+
             const { data, error: err } = await supabase
                 .from('cars')
-                .insert([mapToDb(carData)])
+                .insert([dbData])
                 .select()
                 .maybeSingle()
 
@@ -103,7 +124,9 @@ export const useCarStore = defineStore('car', () => {
             if (!data) {
                 throw new Error('فشل في إضافة السيارة')
             }
-            car.value = mapFromDb(data)
+
+            // Re-fetch to ensure sync
+            await fetchCar()
             return car.value
         } catch (err) {
             error.value = err.message
@@ -121,6 +144,9 @@ export const useCarStore = defineStore('car', () => {
         loading.value = true
         error.value = null
         try {
+            const userId = await getUserId()
+            if (!userId) throw new Error('يجب تسجيل الدخول أولاً')
+
             const dbUpdates = {}
             if (updates.make !== undefined) dbUpdates.make = updates.make
             if (updates.model !== undefined) dbUpdates.model = updates.model
@@ -137,13 +163,15 @@ export const useCarStore = defineStore('car', () => {
                 .from('cars')
                 .update(dbUpdates)
                 .eq('id', car.value.id)
+                .eq('user_id', userId)
                 .select()
                 .maybeSingle()
 
             if (err) throw err
-            if (data) {
-                car.value = mapFromDb(data)
-            }
+
+            // Re-fetch to ensure sync with database
+            await fetchCar()
+            return car.value
         } catch (err) {
             error.value = err.message
             console.error('Error updating car:', err)
@@ -164,10 +192,14 @@ export const useCarStore = defineStore('car', () => {
         loading.value = true
         error.value = null
         try {
+            const userId = await getUserId()
+            if (!userId) throw new Error('يجب تسجيل الدخول أولاً')
+
             const { error: err } = await supabase
                 .from('cars')
                 .delete()
                 .eq('id', car.value.id)
+                .eq('user_id', userId)
 
             if (err) throw err
             car.value = null
@@ -186,6 +218,7 @@ export const useCarStore = defineStore('car', () => {
         error,
         hasCar,
         carInfo,
+        $reset,
         fetchCar,
         addCar,
         updateCar,
@@ -193,3 +226,4 @@ export const useCarStore = defineStore('car', () => {
         deleteCar
     }
 })
+

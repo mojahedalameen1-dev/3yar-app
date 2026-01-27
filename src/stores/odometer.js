@@ -10,6 +10,19 @@ export const useOdometerStore = defineStore('odometer', () => {
     const loading = ref(false)
     const error = ref(null)
 
+    // Reset store state
+    function $reset() {
+        readings.value = []
+        loading.value = false
+        error.value = null
+    }
+
+    // Get current user ID from session
+    async function getUserId() {
+        const { data: { session } } = await supabase.auth.getSession()
+        return session?.user?.id || null
+    }
+
     // Getters
     const sortedReadings = computed(() => {
         return [...readings.value].sort((a, b) =>
@@ -75,26 +88,21 @@ export const useOdometerStore = defineStore('odometer', () => {
         loading.value = true
         error.value = null
         try {
+            const userId = await getUserId()
+            if (!userId) {
+                readings.value = []
+                return
+            }
+
             const { data, error: err } = await supabase
                 .from('odometer_readings')
                 .select('*')
+                .eq('user_id', userId)
                 .order('date', { ascending: false })
 
             if (err) throw err
 
-            if (data && data.length > 0) {
-                readings.value = data.map(mapFromDb)
-            } else {
-                // Try to migrate from localStorage
-                const stored = localStorage.getItem('odometer_readings')
-                if (stored) {
-                    const localReadings = JSON.parse(stored)
-                    for (const reading of localReadings) {
-                        await addReading(reading)
-                    }
-                    localStorage.removeItem('odometer_readings')
-                }
-            }
+            readings.value = data ? data.map(mapFromDb) : []
         } catch (err) {
             error.value = err.message
             console.error('Error fetching readings:', err)
@@ -167,6 +175,7 @@ export const useOdometerStore = defineStore('odometer', () => {
         readings,
         loading,
         error,
+        $reset,
         sortedReadings,
         latestReading,
         totalDistance,

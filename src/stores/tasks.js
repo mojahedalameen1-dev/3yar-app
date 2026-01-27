@@ -11,6 +11,19 @@ export const useTasksStore = defineStore('tasks', () => {
     const loading = ref(false)
     const error = ref(null)
 
+    // Reset store state
+    function $reset() {
+        tasks.value = []
+        loading.value = false
+        error.value = null
+    }
+
+    // Get current user ID from session
+    async function getUserId() {
+        const { data: { session } } = await supabase.auth.getSession()
+        return session?.user?.id || null
+    }
+
     // Status constants
     const STATUS = {
         LATE: 'late',
@@ -217,28 +230,21 @@ export const useTasksStore = defineStore('tasks', () => {
         loading.value = true
         error.value = null
         try {
+            const userId = await getUserId()
+            if (!userId) {
+                tasks.value = []
+                return
+            }
+
             const { data, error: err } = await supabase
                 .from('maintenance_tasks')
                 .select('*')
+                .eq('user_id', userId)
                 .order('created_at', { ascending: true })
 
             if (err) throw err
 
-            if (data && data.length > 0) {
-                tasks.value = data.map(mapFromDb)
-            } else {
-                // Try to migrate from localStorage only (no auto defaults)
-                const stored = localStorage.getItem('maintenance_tasks')
-                if (stored) {
-                    const localTasks = JSON.parse(stored)
-                    for (const task of localTasks) {
-                        await addTask(task)
-                    }
-                    localStorage.removeItem('maintenance_tasks')
-                }
-                // Note: Default tasks are now only added through the Onboarding Wizard
-                // This ensures new users start with a clean slate
-            }
+            tasks.value = data ? data.map(mapFromDb) : []
         } catch (err) {
             error.value = err.message
             console.error('Error fetching tasks:', err)
@@ -370,6 +376,7 @@ export const useTasksStore = defineStore('tasks', () => {
         tasks,
         loading,
         error,
+        $reset,
         STATUS,
         STATUS_LABELS,
         PRIORITY_LABELS,

@@ -9,6 +9,19 @@ export const useRecordsStore = defineStore('records', () => {
     const loading = ref(false)
     const error = ref(null)
 
+    // Reset store state
+    function $reset() {
+        records.value = []
+        loading.value = false
+        error.value = null
+    }
+
+    // Get current user ID from session
+    async function getUserId() {
+        const { data: { session } } = await supabase.auth.getSession()
+        return session?.user?.id || null
+    }
+
     // Getters
     const sortedRecords = computed(() => {
         return [...records.value].sort((a, b) =>
@@ -107,26 +120,21 @@ export const useRecordsStore = defineStore('records', () => {
         loading.value = true
         error.value = null
         try {
+            const userId = await getUserId()
+            if (!userId) {
+                records.value = []
+                return
+            }
+
             const { data, error: err } = await supabase
                 .from('maintenance_records')
                 .select('*')
+                .eq('user_id', userId)
                 .order('date', { ascending: false })
 
             if (err) throw err
 
-            if (data && data.length > 0) {
-                records.value = data.map(mapFromDb)
-            } else {
-                // Try to migrate from localStorage
-                const stored = localStorage.getItem('maintenance_records')
-                if (stored) {
-                    const localRecords = JSON.parse(stored)
-                    for (const record of localRecords) {
-                        await addRecord(record)
-                    }
-                    localStorage.removeItem('maintenance_records')
-                }
-            }
+            records.value = data ? data.map(mapFromDb) : []
         } catch (err) {
             error.value = err.message
             console.error('Error fetching records:', err)
@@ -256,6 +264,7 @@ export const useRecordsStore = defineStore('records', () => {
         records,
         loading,
         error,
+        $reset,
         sortedRecords,
         totalCost,
         thisMonthCost,

@@ -28,36 +28,44 @@ const routes = [
         meta: { title: 'حالة السيارة', public: true }
     },
 
-    // Protected routes (auth required)
+    // Onboarding route (auth required, no car required)
+    {
+        path: '/setup-car',
+        name: 'setup-car',
+        component: () => import('@/views/SetupCarView.vue'),
+        meta: { title: 'إعداد السيارة', requiresAuth: true, isOnboarding: true }
+    },
+
+    // Protected routes (auth required + car required)
     {
         path: '/dashboard',
         name: 'dashboard',
         component: () => import('@/views/DashboardView.vue'),
-        meta: { title: 'لوحة التحكم', requiresAuth: true }
+        meta: { title: 'لوحة التحكم', requiresAuth: true, requiresCar: true }
     },
     {
         path: '/tasks',
         name: 'tasks',
         component: () => import('@/views/TasksView.vue'),
-        meta: { title: 'مهام الصيانة', requiresAuth: true }
+        meta: { title: 'مهام الصيانة', requiresAuth: true, requiresCar: true }
     },
     {
         path: '/records',
         name: 'records',
         component: () => import('@/views/RecordsView.vue'),
-        meta: { title: 'سجل الصيانة', requiresAuth: true }
+        meta: { title: 'سجل الصيانة', requiresAuth: true, requiresCar: true }
     },
     {
         path: '/documents',
         name: 'documents',
         component: () => import('@/views/DocumentsView.vue'),
-        meta: { title: 'وثائق السيارة', requiresAuth: true }
+        meta: { title: 'وثائق السيارة', requiresAuth: true, requiresCar: true }
     },
     {
         path: '/settings',
         name: 'settings',
         component: () => import('@/views/SettingsView.vue'),
-        meta: { title: 'الإعدادات', requiresAuth: true }
+        meta: { title: 'الإعدادات', requiresAuth: true, requiresCar: true }
     },
 
     // Catch-all redirect
@@ -77,7 +85,7 @@ const router = createRouter({
     }
 })
 
-// Navigation guard for authentication
+// Navigation guard for authentication and onboarding
 router.beforeEach(async (to, from, next) => {
     // Update page title
     document.title = to.meta.title ? `${to.meta.title} | عيار` : 'عيار'
@@ -85,9 +93,20 @@ router.beforeEach(async (to, from, next) => {
     // Check if user is authenticated using Supabase
     const { data: { session } } = await supabase.auth.getSession()
 
-    // If user is logged in and trying to access landing/login/register, redirect to dashboard
+    // If user is logged in and trying to access landing/login/register
     if (session && (to.name === 'landing' || to.name === 'login' || to.name === 'register')) {
-        next({ name: 'dashboard' })
+        // Check if user has a car
+        const { data: cars } = await supabase
+            .from('cars')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .limit(1)
+
+        if (cars && cars.length > 0) {
+            next({ name: 'dashboard' })
+        } else {
+            next({ name: 'setup-car' })
+        }
         return
     }
 
@@ -98,11 +117,41 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // Check auth for protected routes
-    if (session) {
-        next()
-    } else {
+    if (!session) {
         next({ name: 'login', query: { redirect: to.fullPath } })
+        return
     }
+
+    // If route requires a car, check if user has one
+    if (to.meta.requiresCar) {
+        const { data: cars } = await supabase
+            .from('cars')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .limit(1)
+
+        if (!cars || cars.length === 0) {
+            next({ name: 'setup-car' })
+            return
+        }
+    }
+
+    // If user is on setup-car but already has a car, redirect to dashboard
+    if (to.meta.isOnboarding) {
+        const { data: cars } = await supabase
+            .from('cars')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .limit(1)
+
+        if (cars && cars.length > 0) {
+            next({ name: 'dashboard' })
+            return
+        }
+    }
+
+    next()
 })
 
 export default router
+
