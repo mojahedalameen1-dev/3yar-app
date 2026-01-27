@@ -11,9 +11,22 @@
       <div v-if="hasData" style="height: 250px; position: relative;">
         <Bar :data="chartData" :options="chartOptions" />
       </div>
-      <div v-else class="d-flex flex-column align-center justify-center py-8 text-medium-emphasis">
-        <v-icon size="48" class="mb-2 opacity-50">mdi-chart-line-variant</v-icon>
-        <p>لا توجد بيانات كافية للرسم البياني</p>
+      <div v-else class="empty-chart-state d-flex flex-column align-center justify-center py-10">
+        <div class="empty-icon mb-4">
+          <v-icon size="48" color="white">mdi-chart-areaspline</v-icon>
+        </div>
+        <h4 class="text-h6 font-weight-bold mb-2">لا توجد مصاريف مسجلة</h4>
+        <p class="text-body-2 text-medium-emphasis mb-4 text-center" style="max-width: 280px;">
+          سجّل أول صيانة لسيارتك لتبدأ في رؤية تحليل المصاريف
+        </p>
+        <v-btn 
+          color="primary" 
+          variant="tonal"
+          prepend-icon="mdi-plus"
+          @click="$emit('add-record')"
+        >
+          أضف أول صيانة
+        </v-btn>
       </div>
     </v-card-text>
   </v-card>
@@ -44,6 +57,8 @@ const props = defineProps({
   },
   loading: Boolean
 })
+
+const emit = defineEmits(['add-record'])
 
 const hasData = computed(() => props.records && props.records.length > 0)
 
@@ -122,3 +137,22 @@ const chartOptions = {
   }
 }
 </script>
+
+<style scoped>
+.empty-chart-state {
+  background: linear-gradient(135deg, rgba(var(--v-theme-primary), 0.03), rgba(var(--v-theme-primary), 0.08));
+  border-radius: 16px;
+  margin: 0 16px 16px;
+}
+
+.empty-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgb(var(--v-theme-primary)), #1565C0);
+  box-shadow: 0 8px 24px rgba(var(--v-theme-primary), 0.3);
+}
+</style>

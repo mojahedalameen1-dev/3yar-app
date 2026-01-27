@@ -2,38 +2,50 @@
   <div class="user-profile">
     <!-- Logged In State -->
     <template v-if="authStore.isAuthenticated">
-      <v-list-item class="px-4 py-3">
-        <template #prepend>
-          <v-avatar color="primary" size="40">
-            <span class="text-h6 font-weight-bold text-white">
-              {{ authStore.userInitials }}
-            </span>
-          </v-avatar>
-        </template>
-        <v-list-item-title class="font-weight-medium text-truncate" style="max-width: 140px;">
-          {{ authStore.userEmail }}
-        </v-list-item-title>
-        <v-list-item-subtitle class="text-caption">
-          حساب نشط
-        </v-list-item-subtitle>
-        <template #append>
-          <v-menu>
-            <template #activator="{ props }">
-              <v-btn icon variant="text" size="small" v-bind="props">
-                <v-icon>mdi-dots-vertical</v-icon>
-              </v-btn>
+      <v-menu location="top end" :offset="8">
+        <template #activator="{ props }">
+          <v-list-item 
+            class="profile-item px-4 py-3" 
+            v-bind="props"
+            :ripple="true"
+          >
+            <template #prepend>
+              <v-avatar color="primary" size="42" class="elevation-2">
+                <span class="text-h6 font-weight-bold text-white">
+                  {{ authStore.userInitials }}
+                </span>
+              </v-avatar>
             </template>
-            <v-list density="compact" class="rounded-lg">
-              <v-list-item @click="emit('logout')">
-                <template #prepend>
-                  <v-icon size="small" color="error">mdi-logout</v-icon>
-                </template>
-                <v-list-item-title class="text-error">تسجيل الخروج</v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
+            <v-list-item-title class="font-weight-medium text-truncate" style="max-width: 140px;">
+              {{ authStore.userEmail }}
+            </v-list-item-title>
+            <v-list-item-subtitle class="text-caption d-flex align-center gap-1">
+              <v-icon size="10" color="success">mdi-circle</v-icon>
+              حساب نشط
+            </v-list-item-subtitle>
+            <template #append>
+              <v-icon size="18" class="opacity-60">mdi-chevron-up</v-icon>
+            </template>
+          </v-list-item>
         </template>
-      </v-list-item>
+        <v-card class="rounded-xl elevation-4" min-width="200">
+          <v-list density="compact" class="py-2">
+            <v-list-item to="/settings" class="px-4">
+              <template #prepend>
+                <v-icon size="20" color="primary">mdi-cog</v-icon>
+              </template>
+              <v-list-item-title>الإعدادات</v-list-item-title>
+            </v-list-item>
+            <v-divider class="my-1"></v-divider>
+            <v-list-item @click="emit('logout')" class="px-4">
+              <template #prepend>
+                <v-icon size="20" color="error">mdi-logout</v-icon>
+              </template>
+              <v-list-item-title class="text-error">تسجيل الخروج</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-card>
+      </v-menu>
     </template>
 
     <!-- Logged Out State -->
@@ -59,5 +71,17 @@ const emit = defineEmits(['logout'])
 <style scoped>
 .user-profile {
   border-top: 1px solid rgba(var(--v-border-color), 0.1);
+  padding-bottom: 8px;
+}
+
+.profile-item {
+  cursor: pointer;
+  border-radius: 12px;
+  margin: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.profile-item:hover {
+  background: rgba(var(--v-theme-primary), 0.08);
 }
 </style>

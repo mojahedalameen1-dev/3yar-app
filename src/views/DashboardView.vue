@@ -64,12 +64,18 @@
                 loading="eager"
               >
                 <div class="image-overlay d-flex align-center justify-center">
-                  <v-icon size="40" color="white">mdi-camera</v-icon>
+                  <div class="overlay-content text-center">
+                    <v-icon size="36" color="white" class="mb-2">mdi-camera-flip</v-icon>
+                    <div class="text-caption text-white">تغيير الصورة</div>
+                  </div>
                 </div>
               </v-img>
               <div v-else class="car-placeholder d-flex flex-column align-center justify-center">
-                <v-icon size="60" color="primary" class="mb-2">mdi-camera-plus</v-icon>
-                <span class="text-body-2 text-medium-emphasis">انقر لإضافة صورة</span>
+                <div class="upload-icon-wrapper mb-3">
+                  <v-icon size="36" color="white">mdi-car-side</v-icon>
+                </div>
+                <span class="text-subtitle-2 font-weight-medium mb-1">أضف صورة سيارتك</span>
+                <span class="text-caption text-medium-emphasis">اسحب أو انقر للرفع</span>
               </div>
               <input
                 ref="imageInput"
@@ -1017,5 +1023,67 @@ function formatDate(date) { return dayjs(date).format('DD/MM/YYYY') }
 
 .upload-placeholder:hover {
   background: linear-gradient(135deg, rgba(25, 118, 210, 0.2), rgba(25, 118, 210, 0.1));
+}
+
+.upload-icon-wrapper {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgb(var(--v-theme-primary)), #1565C0);
+  box-shadow: 0 8px 24px rgba(var(--v-theme-primary), 0.3);
+  transition: transform 0.3s ease;
+}
+
+.car-placeholder:hover .upload-icon-wrapper {
+  transform: scale(1.1);
+}
+
+.overlay-content {
+  transform: translateY(10px);
+  opacity: 0.9;
+  transition: all 0.3s ease;
+}
+
+.image-overlay:hover .overlay-content {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Entry Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.car-card {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.stat-card {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.stat-card:nth-child(1) { animation-delay: 0.1s; }
+.stat-card:nth-child(2) { animation-delay: 0.2s; }
+.stat-card:nth-child(3) { animation-delay: 0.3s; }
+.stat-card:nth-child(4) { animation-delay: 0.4s; }
+
+.next-maintenance-card {
+  animation: fadeInUp 0.6s ease-out forwards;
+  animation-delay: 0.15s;
+}
+
+.glass-card {
+  animation: fadeInUp 0.6s ease-out forwards;
+  animation-delay: 0.2s;
 }
 </style>

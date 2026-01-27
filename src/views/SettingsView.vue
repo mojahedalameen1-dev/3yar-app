@@ -132,7 +132,12 @@
                 حذف السيارة
               </v-btn>
               <v-spacer></v-spacer>
-              <v-btn color="primary" :disabled="!carFormValid" @click="saveCar">
+              <v-btn 
+                color="primary" 
+                :disabled="!carFormValid || savingCar" 
+                :loading="savingCar"
+                @click="saveCar"
+              >
                 <v-icon start>mdi-content-save</v-icon>
                 حفظ التغييرات
               </v-btn>
@@ -362,6 +367,7 @@ const recordsStore = useRecordsStore()
 
 // Car Form
 const carFormValid = ref(false)
+const savingCar = ref(false)
 const carData = reactive({ 
   make: '', model: '', year: 2024, plateNumber: '', 
   color: '', vin: '', notes: '', image: null 
@@ -391,9 +397,23 @@ onMounted(() => {
   }
 })
 
-function saveCar() {
-  carStore.updateCar(carData)
-  showSnackbar('تم حفظ التغييرات بنجاح')
+async function saveCar() {
+  savingCar.value = true
+  
+  // Optimistic UI - save old values for rollback
+  const oldCarData = { ...carStore.car }
+  
+  try {
+    await carStore.updateCar(carData)
+    showSnackbar('تم حفظ التغييرات بنجاح', 'success')
+  } catch (error) {
+    // Rollback on error
+    Object.assign(carData, oldCarData)
+    showSnackbar('حدث خطأ أثناء الحفظ: ' + error.message, 'error')
+    console.error('Save error:', error)
+  } finally {
+    savingCar.value = false
+  }
 }
 
 // Delete Car
