@@ -1,5 +1,6 @@
 <template>
   <v-app :theme="theme">
+    <ProfileSetup />
     <!-- Show navigation only for authenticated routes -->
     <template v-if="showNavigation">
       <!-- Mobile App Bar -->
@@ -181,6 +182,7 @@ import { useRecordsStore } from '@/stores/records'
 import { useOdometerStore } from '@/stores/odometer'
 import { useProfileStore } from '@/stores/profile'
 import UserProfile from '@/components/UserProfile.vue'
+import ProfileSetup from '@/components/ProfileSetup.vue'
 import ayarLogo from '@/assets/ayar-logo.png'
 
 const route = useRoute()
