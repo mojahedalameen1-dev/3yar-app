@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { supabase } from '@/lib/supabase'
 
 const routes = [
     // Public routes (no auth required)
@@ -82,7 +83,6 @@ router.beforeEach(async (to, from, next) => {
     document.title = to.meta.title ? `${to.meta.title} | عيار` : 'عيار'
 
     // Check if user is authenticated using Supabase
-    const { supabase } = await import('@/lib/supabase')
     const { data: { session } } = await supabase.auth.getSession()
 
     // If user is logged in and trying to access landing/login/register, redirect to dashboard

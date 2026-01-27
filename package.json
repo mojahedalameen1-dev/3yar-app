@@ -14,7 +14,8 @@
     "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
     "dayjs": "^1.11.10",
-    "jspdf": "^4.0.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
     "jspdf-autotable": "^5.0.7",
     "pinia": "^2.1.7",
     "qrcode": "^1.5.4",
@@ -30,5 +31,8 @@
     "vite": "^5.0.0",
     "vite-plugin-pwa": "^1.2.0",
     "vite-plugin-vuetify": "^2.0.1"
+  },
+  "overrides": {
+    "dompurify": "^3.2.4"
   }
 }

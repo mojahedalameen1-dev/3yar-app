@@ -100,6 +100,9 @@ export const useCarStore = defineStore('car', () => {
                 .maybeSingle()
 
             if (err) throw err
+            if (!data) {
+                throw new Error('فشل في إضافة السيارة')
+            }
             car.value = mapFromDb(data)
             return car.value
         } catch (err) {

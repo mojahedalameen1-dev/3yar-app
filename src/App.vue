@@ -10,8 +10,17 @@
           <span class="text-h6 font-weight-bold" style="line-height: 1;">عيار</span>
         </v-toolbar-title>
         <v-spacer></v-spacer>
-        <v-btn icon @click="toggleTheme">
-          <v-icon>{{ theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
+        <!-- Distinctive Theme Toggle (Top Left) -->
+        <v-btn 
+          class="theme-toggle-btn ms-2"
+          :color="theme === 'dark' ? 'amber' : 'primary'"
+          variant="tonal"
+          size="small"
+          rounded="pill"
+          prepend-icon="theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
+          @click="toggleTheme"
+        >
+          <v-icon :icon="theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"></v-icon>
         </v-btn>
       </v-app-bar>
 
@@ -87,14 +96,7 @@
         <template #append>
           <v-divider class="my-2"></v-divider>
           <v-list density="comfortable" nav class="px-2">
-            <v-list-item
-              v-if="!isMobile"
-              :prepend-icon="theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-              :title="rail ? '' : (theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي')"
-              rounded="lg"
-              class="nav-item"
-              @click="toggleTheme"
-            ></v-list-item>
+            <!-- Theme Toggle REMOVED from Sidebar -->
             <v-list-item
               v-if="!isMobile"
               :prepend-icon="rail ? 'mdi-chevron-left' : 'mdi-chevron-right'"

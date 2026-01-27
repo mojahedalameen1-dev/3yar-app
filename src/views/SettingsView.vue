@@ -156,47 +156,36 @@
             </div>
             <div>
               <div class="text-subtitle-1 font-weight-bold">إعدادات التطبيق</div>
-              <div class="text-caption text-medium-emphasis">تخصيص التطبيق</div>
+              <div class="text-caption text-medium-emphasis">تخصيص المظهر</div>
             </div>
           </v-card-title>
           <v-divider></v-divider>
           <v-card-text class="pa-0">
             <v-list lines="two" class="bg-transparent">
-              <v-list-item class="px-5">
+              <!-- Dark Mode Toggle -->
+              <v-list-item class="px-5 py-3">
                 <template #prepend>
-                  <div class="setting-icon bg-amber-darken-1 me-4">
-                    <v-icon color="white" size="20">mdi-weather-night</v-icon>
+                  <div class="setting-icon me-4" :class="isDarkMode ? 'bg-indigo' : 'bg-amber-darken-1'">
+                    <v-icon color="white" size="20">{{ isDarkMode ? 'mdi-weather-night' : 'mdi-white-balance-sunny' }}</v-icon>
                   </div>
                 </template>
-                <v-list-item-title class="font-weight-medium">الوضع الليلي</v-list-item-title>
-                <v-list-item-subtitle>تفعيل المظهر الداكن</v-list-item-subtitle>
+                <v-list-item-title class="font-weight-medium">
+                  {{ isDarkMode ? 'الوضع الليلي' : 'الوضع النهاري' }}
+                </v-list-item-title>
+                <v-list-item-subtitle>
+                  {{ isDarkMode ? 'مفعّل - اضغط للتبديل' : 'غير مفعّل - اضغط للتبديل' }}
+                </v-list-item-subtitle>
                 <template #append>
-                  <v-switch 
-                    v-model="isDarkMode" 
-                    color="primary" 
-                    hide-details 
-                    @update:modelValue="toggleTheme"
-                  ></v-switch>
-                </template>
-              </v-list-item>
-              
-              <v-divider class="mx-5"></v-divider>
-              
-              <v-list-item class="px-5">
-                <template #prepend>
-                  <div class="setting-icon bg-info me-4">
-                    <v-icon color="white" size="20">mdi-bell-ring</v-icon>
+                  <div class="d-flex align-center">
+                    <v-switch 
+                      v-model="isDarkMode" 
+                      color="primary" 
+                      hide-details
+                      density="compact"
+                      class="rtl-switch"
+                      @update:modelValue="toggleTheme"
+                    ></v-switch>
                   </div>
-                </template>
-                <v-list-item-title class="font-weight-medium">إشعارات المتصفح</v-list-item-title>
-                <v-list-item-subtitle>تلقي تنبيهات الصيانة</v-list-item-subtitle>
-                <template #append>
-                  <v-switch 
-                    v-model="notificationsEnabled" 
-                    color="primary" 
-                    hide-details 
-                    @update:modelValue="toggleNotifications"
-                  ></v-switch>
                 </template>
               </v-list-item>
             </v-list>
@@ -207,110 +196,78 @@
         <v-card class="glass-card mb-6">
           <v-card-title class="d-flex align-center pa-5">
             <div class="title-icon me-3 bg-success">
-              <v-icon color="white">mdi-database</v-icon>
+              <v-icon color="white">mdi-file-export</v-icon>
             </div>
             <div>
-              <div class="text-subtitle-1 font-weight-bold">إدارة البيانات</div>
-              <div class="text-caption text-medium-emphasis">نسخ احتياطي واستعادة</div>
+              <div class="text-subtitle-1 font-weight-bold">تصدير البيانات</div>
+              <div class="text-caption text-medium-emphasis">حمّل تقريراً لسيارتك</div>
             </div>
           </v-card-title>
           <v-divider></v-divider>
-          <v-card-text class="pa-0">
-            <v-list lines="two" class="bg-transparent">
-              <!-- PDF Export -->
-              <v-list-item class="px-5" @click="exportPDF" :disabled="exportingPDF || !carStore.hasCar">
-                <template #prepend>
-                  <div class="setting-icon bg-error me-4">
-                    <v-icon color="white" size="20">mdi-file-pdf-box</v-icon>
-                  </div>
-                </template>
-                <v-list-item-title class="font-weight-medium">تحميل تقرير PDF</v-list-item-title>
-                <v-list-item-subtitle>تقرير احترافي لحالة السيارة</v-list-item-subtitle>
-                <template #append>
-                  <v-progress-circular v-if="exportingPDF" indeterminate size="20" width="2" color="error"></v-progress-circular>
-                  <v-icon v-else>mdi-chevron-left</v-icon>
-                </template>
-              </v-list-item>
-              
-              <v-divider class="mx-5"></v-divider>
-              
-              <!-- Excel Export -->
-              <v-list-item class="px-5" @click="exportExcel" :disabled="exportingExcel || !carStore.hasCar">
-                <template #prepend>
-                  <div class="setting-icon bg-green-darken-1 me-4">
-                    <v-icon color="white" size="20">mdi-microsoft-excel</v-icon>
-                  </div>
-                </template>
-                <v-list-item-title class="font-weight-medium">تصدير ملف إكسل</v-list-item-title>
-                <v-list-item-subtitle>بيانات الصيانة بتنسيق Excel</v-list-item-subtitle>
-                <template #append>
-                  <v-progress-circular v-if="exportingExcel" indeterminate size="20" width="2" color="green"></v-progress-circular>
-                  <v-icon v-else>mdi-chevron-left</v-icon>
-                </template>
-              </v-list-item>
-              
-              <v-divider class="mx-5"></v-divider>
-              
-              <!-- JSON Export (existing) -->
-              <v-list-item class="px-5" @click="exportAllData">
-                <template #prepend>
-                  <div class="setting-icon bg-success me-4">
-                    <v-icon color="white" size="20">mdi-download</v-icon>
-                  </div>
-                </template>
-                <v-list-item-title class="font-weight-medium">تصدير البيانات (JSON)</v-list-item-title>
-                <v-list-item-subtitle>نسخة احتياطية بتنسيق JSON</v-list-item-subtitle>
-                <template #append>
-                  <v-icon>mdi-chevron-left</v-icon>
-                </template>
-              </v-list-item>
-              
-              <v-divider class="mx-5"></v-divider>
-              
-              <v-list-item class="px-5" @click="triggerImport">
-                <template #prepend>
-                  <div class="setting-icon bg-info me-4">
-                    <v-icon color="white" size="20">mdi-upload</v-icon>
-                  </div>
-                </template>
-                <v-list-item-title class="font-weight-medium">استيراد البيانات</v-list-item-title>
-                <v-list-item-subtitle>استعادة من نسخة احتياطية</v-list-item-subtitle>
-                <template #append>
-                  <v-icon>mdi-chevron-left</v-icon>
-                </template>
-                <input 
-                  ref="importInput" 
-                  type="file" 
-                  accept=".json" 
-                  style="display: none" 
-                  @change="importData"
-                />
-              </v-list-item>
-              
-              <v-divider class="mx-5"></v-divider>
-              
-              <v-list-item class="px-5" @click="resetTasks">
-                <template #prepend>
-                  <div class="setting-icon bg-warning me-4">
-                    <v-icon color="white" size="20">mdi-refresh</v-icon>
-                  </div>
-                </template>
-                <v-list-item-title class="font-weight-medium">إعادة تعيين المهام</v-list-item-title>
-                <v-list-item-subtitle>استعادة المهام الافتراضية</v-list-item-subtitle>
-              </v-list-item>
-              
-              <v-divider class="mx-5"></v-divider>
-              
-              <v-list-item class="px-5" @click="showClearDataDialog = true">
-                <template #prepend>
-                  <div class="setting-icon bg-error me-4">
-                    <v-icon color="white" size="20">mdi-delete-sweep</v-icon>
-                  </div>
-                </template>
-                <v-list-item-title class="font-weight-medium text-error">مسح جميع البيانات</v-list-item-title>
-                <v-list-item-subtitle>حذف جميع البيانات المحفوظة</v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
+          <v-card-text class="pa-4">
+            <v-row>
+              <!-- PDF Export Button -->
+              <v-col cols="6">
+                <v-btn
+                  block
+                  size="large"
+                  color="error"
+                  variant="tonal"
+                  class="export-btn"
+                  :loading="exportingPDF"
+                  :disabled="!carStore.hasCar"
+                  @click="exportPDF"
+                >
+                  <v-icon start>mdi-file-pdf-box</v-icon>
+                  تقرير PDF
+                </v-btn>
+              </v-col>
+              <!-- Excel Export Button -->
+              <v-col cols="6">
+                <v-btn
+                  block
+                  size="large"
+                  color="success"
+                  variant="tonal"
+                  class="export-btn"
+                  :loading="exportingExcel"
+                  :disabled="!carStore.hasCar"
+                  @click="exportExcel"
+                >
+                  <v-icon start>mdi-microsoft-excel</v-icon>
+                  ملف Excel
+                </v-btn>
+              </v-col>
+            </v-row>
+            <p v-if="!carStore.hasCar" class="text-caption text-center text-medium-emphasis mt-3 mb-0">
+              <v-icon size="14" class="me-1">mdi-information</v-icon>
+              أضف بيانات سيارتك أولاً لتتمكن من التصدير
+            </p>
+          </v-card-text>
+        </v-card>
+
+        <!-- Danger Zone -->
+        <v-card class="glass-card danger-zone-card">
+          <v-card-title class="d-flex align-center pa-5">
+            <div class="title-icon me-3 bg-error">
+              <v-icon color="white">mdi-alert</v-icon>
+            </div>
+            <div>
+              <div class="text-subtitle-1 font-weight-bold text-error">منطقة الخطر</div>
+              <div class="text-caption text-medium-emphasis">إجراءات لا يمكن التراجع عنها</div>
+            </div>
+          </v-card-title>
+          <v-divider></v-divider>
+          <v-card-text class="pa-4">
+            <v-btn
+              block
+              variant="outlined"
+              color="error"
+              @click="showClearDataDialog = true"
+            >
+              <v-icon start>mdi-delete-sweep</v-icon>
+              مسح جميع البيانات
+            </v-btn>
           </v-card-text>
         </v-card>
 
@@ -354,33 +311,174 @@
     </v-dialog>
 
     <!-- Clear Data Dialog -->
-    <v-dialog v-model="showClearDataDialog" max-width="400">
+    <v-dialog v-model="showClearDataDialog" max-width="450">
       <v-card class="rounded-xl">
-        <v-card-title class="pa-5">
-          <v-icon color="error" class="me-2">mdi-delete-sweep</v-icon>
-          مسح جميع البيانات
+        <v-card-title class="pa-5 bg-error text-white">
+          <v-icon color="white" class="me-2">mdi-delete-sweep</v-icon>
+          مسح البيانات
         </v-card-title>
-        <v-divider></v-divider>
+        
         <v-card-text class="pa-5">
-          <v-alert type="error" variant="tonal" class="mb-4">
-            هذا الإجراء لا يمكن التراجع عنه!
+          <p class="text-body-2 mb-4">حدد البيانات التي تريد حذفها نهائياً:</p>
+          
+          <div class="delete-options mb-4">
+            <v-checkbox 
+              v-model="deleteOptions.car" 
+              label="بيانات السيارة والعداد" 
+              color="error" 
+              density="compact"
+              hide-details
+            ></v-checkbox>
+            <v-checkbox 
+              v-model="deleteOptions.tasks" 
+              label="إعدادات المهام المخصصة" 
+              color="error" 
+              density="compact"
+              hide-details
+            ></v-checkbox>
+            <v-checkbox 
+              v-model="deleteOptions.records" 
+              label="سجلات الصيانة والمصاريف" 
+              color="error" 
+              density="compact"
+              hide-details
+            ></v-checkbox>
+            <v-checkbox 
+              v-model="deleteOptions.documents" 
+              label="الوثائق والمستندات" 
+              color="error" 
+              density="compact"
+              hide-details
+            ></v-checkbox>
+          </div>
+
+          <v-divider class="mb-4"></v-divider>
+
+          <p class="text-caption text-medium-emphasis mb-2">للتأكيد، يرجى إدخال كلمة المرور:</p>
+          <v-text-field
+            v-model="deletePassword"
+            label="كلمة المرور"
+            type="password"
+            variant="outlined"
+            density="compact"
+            prepend-inner-icon="mdi-lock"
+            :error-messages="deleteError"
+            @keyup.enter="handleClearData"
+          ></v-text-field>
+          
+          <v-alert type="warning" variant="tonal" density="compact" class="mt-2 text-caption">
+            تنبيه: لا يمكن التراجع عن هذه العملية بعد التأكيد.
           </v-alert>
-          <p class="mb-3">سيتم حذف:</p>
-          <ul class="delete-list">
-            <li><v-icon size="16" color="error" class="me-2">mdi-car</v-icon>بيانات السيارة</li>
-            <li><v-icon size="16" color="error" class="me-2">mdi-speedometer</v-icon>قراءات العداد</li>
-            <li><v-icon size="16" color="error" class="me-2">mdi-wrench</v-icon>مهام الصيانة</li>
-            <li><v-icon size="16" color="error" class="me-2">mdi-history</v-icon>سجل الصيانة</li>
-          </ul>
         </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions class="pa-4">
+
+        <v-card-actions class="pa-4 pt-0">
           <v-spacer></v-spacer>
           <v-btn variant="text" @click="showClearDataDialog = false">إلغاء</v-btn>
-          <v-btn color="error" @click="clearAllData">مسح الكل</v-btn>
+          <v-btn 
+            color="error" 
+            variant="flat" 
+            :loading="deletingData"
+            :disabled="!deletePassword"
+            @click="handleClearData"
+          >
+            تأكيد والحذف
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Hidden PDF Report Template -->
+    <div ref="reportRef" class="pdf-report-container">
+      <!-- Header -->
+      <div class="report-header">
+        <div class="d-flex justify-space-between align-center mb-6">
+          <div class="report-brand">
+            <h1 class="text-h4 font-weight-bold primary--text mb-1">عيار</h1>
+            <p class="text-subtitle-1 text-grey">تقرير صيانة السيارة</p>
+          </div>
+          <div class="report-meta text-left">
+            <p><strong>تاريخ التقرير:</strong> {{ new Date().toLocaleDateString('ar-SA') }}</p>
+            <p v-if="carStore.car"><strong>السيارة:</strong> {{ carStore.car.year }} {{ carStore.car.make }} {{ carStore.car.model }}</p>
+            <p v-if="carStore.car"><strong>اللوحة:</strong> {{ carStore.car.plateNumber }}</p>
+          </div>
+        </div>
+        <div class="header-divider"></div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="report-section">
+        <h2 class="section-title">ملخص الحالة</h2>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-label">عداد المسافات</span>
+            <span class="stat-value">{{ carStore.car?.currentOdometer?.toLocaleString() || 0 }} كم</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">إجمالي المصروفات</span>
+            <span class="stat-value">{{ recordsStore.totalCost.toLocaleString() }} ر.س</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">سجلات الصيانة</span>
+            <span class="stat-value">{{ recordsStore.records.length }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upcoming Tasks -->
+      <div v-if="tasksStore.dueTasks.length > 0" class="report-section">
+        <h2 class="section-title text-warning">المهام المستحقة</h2>
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>المهمة</th>
+              <th>النوع</th>
+              <th>الحالة</th>
+              <th>المتبقي</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="task in tasksStore.dueTasks" :key="task.id">
+              <td>{{ task.name }}</td>
+              <td>{{ task.isRecurring ? 'دوري' : 'مرة واحدة' }}</td>
+              <td class="text-warning">مستحق</td>
+              <td>{{ task.statusInfo.kmRemaining ? task.statusInfo.kmRemaining.toLocaleString() + ' كم' : '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Records History -->
+      <div class="report-section">
+        <h2 class="section-title">سجل الصيانة</h2>
+        <table class="report-table" v-if="recordsStore.records.length > 0">
+          <thead>
+            <tr>
+              <th>المهمة</th>
+              <th>التاريخ</th>
+              <th>العداد</th>
+              <th>التكلفة</th>
+              <th>مركز الصيانة</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="record in recordsStore.records.slice(0, 15)" :key="record.id">
+              <td>{{ record.taskName }}</td>
+              <td>{{ new Date(record.date).toLocaleDateString('ar-SA') }}</td>
+              <td>{{ record.odometerReading?.toLocaleString() }} كم</td>
+              <td>{{ record.cost?.toLocaleString() }} ر.س</td>
+              <td>{{ record.serviceCenter || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="text-center text-grey py-4">لا توجد سجلات صيانة للعرض</p>
+      </div>
+
+      <!-- Footer -->
+      <div class="report-footer">
+        <p>تم إصدار هذا التقرير تلقائياً بواسطة تطبيق عيار</p>
+        <p class="footer-link">3yar.app</p>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -391,8 +489,10 @@ import { useOdometerStore } from '@/stores/odometer'
 import { useTasksStore } from '@/stores/tasks'
 import { useRecordsStore } from '@/stores/records'
 import { useDocumentsStore } from '@/stores/documents'
+import { useAuthStore } from '@/stores/auth'
 import { useTheme } from 'vuetify'
-import { exportToExcel, exportToPDF } from '@/utils/exportUtils'
+import { exportToExcel } from '@/utils/exportUtils'
+import { exportToPDF } from '@/utils/pdfExport'
 
 const showSnackbar = inject('showSnackbar')
 const theme = useTheme()
@@ -402,8 +502,18 @@ const odometerStore = useOdometerStore()
 const tasksStore = useTasksStore()
 const recordsStore = useRecordsStore()
 const documentsStore = useDocumentsStore()
+const authStore = useAuthStore()
+
+// Theme State
+const isDarkMode = ref(theme.global.current.value.dark)
+
+function toggleTheme() {
+  theme.global.name.value = theme.global.current.value.dark ? 'light' : 'dark'
+  isDarkMode.value = theme.global.current.value.dark
+}
 
 // Car Form
+const carForm = ref(null)
 const carFormValid = ref(false)
 const savingCar = ref(false)
 const carData = reactive({ 
@@ -414,6 +524,18 @@ const carData = reactive({
 // Export States
 const exportingPDF = ref(false)
 const exportingExcel = ref(false)
+
+// Delete Data State
+const showClearDataDialog = ref(false)
+const deletePassword = ref('')
+const deletingData = ref(false)
+const deleteError = ref('')
+const deleteOptions = reactive({
+  car: true,
+  tasks: true,
+  records: true,
+  documents: true
+})
 
 // Image Upload
 const imageInput = ref(null)
@@ -487,15 +609,63 @@ function resetTasks() {
   showSnackbar('تم إعادة تعيين المهام')
 }
 
-// Clear All Data
-const showClearDataDialog = ref(false)
+// Verify and Clear Data
+async function handleClearData() {
+  if (!deletePassword.value) {
+    deleteError.value = 'يرجى إدخال كلمة المرور'
+    return
+  }
 
-function clearAllData() {
-  localStorage.clear()
-  location.reload()
+  deletingData.value = true
+  deleteError.value = ''
+
+  try {
+    // 1. Verify Password
+    const { error } = await authStore.signIn(authStore.userEmail, deletePassword.value)
+    
+    if (error) {
+      throw new Error('كلمة المرور غير صحيحة')
+    }
+
+    // 2. Perform Deletion
+    const promises = []
+
+    if (deleteOptions.car) {
+      promises.push(carStore.deleteCar())
+      promises.push(odometerStore.clearAllReadings())
+      // Reset local form
+      Object.assign(carData, { make: '', model: '', year: 2024, plateNumber: '', color: '', vin: '', notes: '', image: null })
+    }
+
+    if (deleteOptions.tasks) {
+      promises.push(tasksStore.resetTasks())
+    }
+
+    if (deleteOptions.records) {
+      promises.push(recordsStore.clearAllRecords())
+    }
+    
+    if (deleteOptions.documents) {
+      promises.push(documentsStore.clearAllDocuments())
+    }
+
+    await Promise.all(promises)
+    
+    showSnackbar('تم حذف البيانات المحددة بنجاح', 'success')
+    showClearDataDialog.value = false
+    deletePassword.value = ''
+    
+  } catch (err) {
+    console.error('Delete error:', err)
+    deleteError.value = err.message || 'حدث خطأ أثناء الحذف'
+  } finally {
+    deletingData.value = false
+  }
 }
 
 // PDF Export
+const reportRef = ref(null)
+
 async function exportPDF() {
   if (!carStore.hasCar) {
     showSnackbar('أضف سيارة أولاً', 'warning')
@@ -511,16 +681,26 @@ async function exportPDF() {
       odometerStore.fetchReadings()
     ])
     
+    // Allow DOM to update
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    if (!reportRef.value) {
+      throw new Error('فشل في الوصول إلى قالب التقرير')
+    }
+    
     const fileName = await exportToPDF(
+      reportRef.value,
       carStore.car,
-      tasksStore.tasksWithStatus,
-      recordsStore.records,
-      odometerStore.readings
+      {
+        tasks: tasksStore.tasksWithStatus,
+        records: recordsStore.records,
+        readings: odometerStore.readings
+      }
     )
     showSnackbar(`تم تحميل التقرير: ${fileName}`, 'success')
   } catch (error) {
     console.error('PDF export error:', error)
-    showSnackbar('حدث خطأ أثناء إنشاء التقرير', 'error')
+    showSnackbar('حدث خطأ أثناء إنشاء التقرير: ' + error.message, 'error')
   } finally {
     exportingPDF.value = false
   }
@@ -644,5 +824,26 @@ async function exportExcel() {
   display: flex;
   align-items: center;
   padding: 8px 0;
+}
+
+/* RTL Switch Fix */
+.rtl-switch {
+  direction: ltr;
+}
+
+.rtl-switch :deep(.v-switch__track) {
+  transform: scaleX(-1);
+}
+
+/* Export Buttons */
+.export-btn {
+  height: 56px !important;
+  font-weight: 600;
+  border-radius: 12px !important;
+}
+
+/* Danger Zone */
+.danger-zone-card {
+  border: 1px solid rgba(239, 83, 80, 0.3);
 }
 </style>
