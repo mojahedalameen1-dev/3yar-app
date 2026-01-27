@@ -82,7 +82,7 @@ onMounted(async () => {
 async function handleLogout() {
   try {
     await authStore.signOut()
-    router.push('/login')
+    router.push('/')
   } catch (error) {
     console.error('Logout error:', error)
   }

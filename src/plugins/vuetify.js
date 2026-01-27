@@ -7,19 +7,25 @@ import { ar } from 'vuetify/locale'
 const lightTheme = {
     dark: false,
     colors: {
-        background: '#F5F5FA',
+        background: '#EEF2F6', // Softer gray-blue background
         surface: '#FFFFFF',
-        'surface-variant': '#E8EAF6',
-        primary: '#0D3C61', // Navy Blue
-        secondary: '#C66C1E', // Bronze
-        error: '#D32F2F',
-        warning: '#F57C00',
-        info: '#0288D1',
-        success: '#388E3C',
-        'status-late': '#D32F2F',
-        'status-due': '#F57C00',
-        'status-soon': '#FFA000',
-        'status-good': '#388E3C',
+        'surface-variant': '#E3E8EF', // Subtle contrast
+        'on-background': '#1A2C3D', // Dark text for readability
+        'on-surface': '#1A2C3D',
+        primary: '#0D3C61', // Navy Blue (brand)
+        'primary-darken-1': '#092C48',
+        secondary: '#C66C1E', // Bronze (brand)
+        'secondary-darken-1': '#A85A16',
+        error: '#C62828',
+        warning: '#E65100',
+        info: '#0277BD',
+        success: '#2E7D32',
+        'status-late': '#C62828',
+        'status-due': '#E65100',
+        'status-soon': '#F9A825',
+        'status-good': '#2E7D32',
+        // Border colors for visibility
+        'border-color': 'rgba(13, 60, 97, 0.15)', // Navy with transparency
     }
 }
 
