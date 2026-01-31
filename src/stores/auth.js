@@ -139,6 +139,34 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
+    // Sign in with Google
+    async function signInWithGoogle() {
+        loading.value = true
+        error.value = null
+        try {
+            clearAllStores()
+
+            const { data, error: err } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/dashboard`,
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent',
+                    },
+                }
+            })
+
+            if (err) throw err
+            return { success: true, data }
+        } catch (err) {
+            error.value = err.message
+            return { success: false, error: err.message }
+        } finally {
+            loading.value = false
+        }
+    }
+
     // Reset password
     async function resetPassword(email) {
         loading.value = true
@@ -169,6 +197,7 @@ export const useAuthStore = defineStore('auth', () => {
         initialize,
         signUp,
         signIn,
+        signInWithGoogle,
         signOut,
         resetPassword,
         clearAllStores
