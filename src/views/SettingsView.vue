@@ -165,25 +165,25 @@
               <!-- Dark Mode Toggle -->
               <v-list-item class="px-5 py-3">
                 <template #prepend>
-                  <div class="setting-icon me-4" :class="isDarkMode ? 'bg-indigo' : 'bg-amber-darken-1'">
-                    <v-icon color="white" size="20">{{ isDarkMode ? 'mdi-weather-night' : 'mdi-white-balance-sunny' }}</v-icon>
+                  <div class="setting-icon me-4" :class="themeStore.isDarkMode ? 'bg-indigo' : 'bg-amber-darken-1'">
+                    <v-icon color="white" size="20">{{ themeStore.isDarkMode ? 'mdi-weather-night' : 'mdi-white-balance-sunny' }}</v-icon>
                   </div>
                 </template>
                 <v-list-item-title class="font-weight-medium">
-                  {{ isDarkMode ? 'الوضع الليلي' : 'الوضع النهاري' }}
+                  {{ themeStore.isDarkMode ? 'الوضع الليلي' : 'الوضع النهاري' }}
                 </v-list-item-title>
-                <v-list-item-subtitle>
-                  {{ isDarkMode ? 'مفعّل - اضغط للتبديل' : 'غير مفعّل - اضغط للتبديل' }}
+                <v-list-item-subtitle class="mt-1">
+                  تفعيل المظهر الداكن لتحسين الرؤية وتقليل إجهاد العين
                 </v-list-item-subtitle>
                 <template #append>
                   <div class="d-flex align-center">
                     <v-switch 
-                      v-model="isDarkMode" 
+                      :model-value="themeStore.isDarkMode" 
                       color="primary" 
                       hide-details
                       density="compact"
                       class="rtl-switch"
-                      @update:modelValue="toggleTheme"
+                      @update:modelValue="themeStore.toggleTheme()"
                     ></v-switch>
                   </div>
                 </template>
@@ -343,10 +343,10 @@ import { useTasksStore } from '@/stores/tasks'
 import { useRecordsStore } from '@/stores/records'
 import { useDocumentsStore } from '@/stores/documents'
 import { useAuthStore } from '@/stores/auth'
-import { useTheme } from 'vuetify'
+import { useThemeStore } from '@/stores/theme'
 
 const showSnackbar = inject('showSnackbar')
-const theme = useTheme()
+const themeStore = useThemeStore()
 
 const carStore = useCarStore()
 const odometerStore = useOdometerStore()
@@ -355,13 +355,6 @@ const recordsStore = useRecordsStore()
 const documentsStore = useDocumentsStore()
 const authStore = useAuthStore()
 
-// Theme State
-const isDarkMode = ref(theme.global.current.value.dark)
-
-function toggleTheme() {
-  theme.global.name.value = theme.global.current.value.dark ? 'light' : 'dark'
-  isDarkMode.value = theme.global.current.value.dark
-}
 
 // Car Form
 const carForm = ref(null)

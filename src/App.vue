@@ -14,14 +14,14 @@
         <!-- Distinctive Theme Toggle (Top Left) -->
         <v-btn 
           class="theme-toggle-btn ms-2"
-          :color="theme === 'dark' ? 'amber' : 'primary'"
+          :color="themeStore.currentTheme === 'dark' ? 'amber' : 'primary'"
           variant="tonal"
           size="small"
           rounded="pill"
-          prepend-icon="theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
+          prepend-icon="themeStore.currentTheme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
           @click="toggleTheme"
         >
-          <v-icon :icon="theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"></v-icon>
+          <v-icon :icon="themeStore.currentTheme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"></v-icon>
         </v-btn>
       </v-app-bar>
 
@@ -99,8 +99,8 @@
           <v-list density="comfortable" nav class="px-2">
             <!-- Theme Toggle Button -->
             <v-list-item
-              :prepend-icon="theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-              :title="rail && !isMobile ? '' : (theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي')"
+              :prepend-icon="themeStore.currentTheme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
+              :title="rail && !isMobile ? '' : (themeStore.currentTheme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي')"
               rounded="lg"
               class="nav-item"
               @click="toggleTheme"
@@ -181,6 +181,7 @@ import { useDocumentsStore } from '@/stores/documents'
 import { useRecordsStore } from '@/stores/records'
 import { useOdometerStore } from '@/stores/odometer'
 import { useProfileStore } from '@/stores/profile'
+import { useThemeStore } from '@/stores/theme'
 import UserProfile from '@/components/UserProfile.vue'
 import ProfileSetup from '@/components/ProfileSetup.vue'
 import ayarLogo from '@/assets/ayar-logo.png'
@@ -203,13 +204,13 @@ const showNavigation = computed(() => {
   return !route.meta.public && authStore.isAuthenticated
 })
 
-// Theme
-const theme = ref(localStorage.getItem('theme') || 'dark')
+// Theme Store
+const themeStore = useThemeStore()
 
 function toggleTheme() {
-  theme.value = theme.value === 'dark' ? 'light' : 'dark'
-  localStorage.setItem('theme', theme.value)
+  themeStore.toggleTheme()
 }
+
 
 // Responsive
 const isMobile = ref(false)
@@ -228,6 +229,9 @@ function checkMobile() {
 
 // Initialize auth and data
 async function initialize() {
+  // Initialize theme
+  themeStore.initialize()
+
   // Initialize auth first
   await authStore.initialize()
   
