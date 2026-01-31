@@ -55,10 +55,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
 
+const router = useRouter()
+const showSnackbar = inject('showSnackbar')
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
 
@@ -72,19 +75,29 @@ onMounted(async () => {
   }
 })
 
-// Handle logout - simple and direct
+// Handle logout
 async function handleLogout() {
   loggingOut.value = true
   
   try {
-    // Sign out from Supabase
-    await authStore.signOut()
+    // Sign out from Supabase & Clear State
+    const result = await authStore.signOut()
+    
+    if (result.success) {
+      if (showSnackbar) showSnackbar('تم تسجيل الخروج بنجاح', 'success')
+      await router.push('/')
+    } else {
+      // Even if API failed, local state is cleared in store, so redirect
+      console.warn('Logout had some issues but proceeding:', result.error)
+      if (showSnackbar) showSnackbar('تم تسجيل الخروج محلياً', 'warning')
+      window.location.href = '/'
+    }
   } catch (error) {
-    console.error('Logout error:', error)
+    console.error('Logout Unexpected Error:', error)
+    window.location.href = '/'
+  } finally {
+    loggingOut.value = false
   }
-  
-  // Always redirect to landing page, even if error
-  window.location.href = '/'
 }
 
 // Display name: use profile name if available, otherwise email prefix

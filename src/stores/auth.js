@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
+import { useCarStore } from './car'
+import { useTasksStore } from './tasks'
+import { useRecordsStore } from './records'
+import { useDocumentsStore } from './documents'
+import { useOdometerStore } from './odometer'
+import { useProfileStore } from './profile'
 
 export const useAuthStore = defineStore('auth', () => {
     // State
@@ -21,28 +27,17 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Clear all other stores (called on login/logout)
     function clearAllStores() {
-        // Import stores dynamically to avoid circular dependencies
-        const { useCarStore } = require('./car')
-        const { useTasksStore } = require('./tasks')
-        const { useRecordsStore } = require('./records')
-        const { useDocumentsStore } = require('./documents')
-        const { useOdometerStore } = require('./odometer')
-        const { useProfileStore } = require('./profile')
-
         // Reset each store
-        const carStore = useCarStore()
-        const tasksStore = useTasksStore()
-        const recordsStore = useRecordsStore()
-        const documentsStore = useDocumentsStore()
-        const odometerStore = useOdometerStore()
-        const profileStore = useProfileStore()
+        useCarStore().$reset()
+        useTasksStore().$reset()
+        useRecordsStore().$reset()
+        useDocumentsStore().$reset()
+        useOdometerStore().$reset()
+        useProfileStore().$reset()
 
-        carStore.$reset()
-        tasksStore.$reset()
-        recordsStore.$reset()
-        documentsStore.$reset()
-        odometerStore.$reset()
-        profileStore.$reset()
+        // Clear Local Storage to remove any persisted state or tokens
+        localStorage.clear()
+        sessionStorage.clear()
     }
 
     // Initialize auth state
@@ -121,15 +116,22 @@ export const useAuthStore = defineStore('auth', () => {
         loading.value = true
         error.value = null
         try {
-            // Clear stores BEFORE signOut
-            clearAllStores()
-
             const { error: err } = await supabase.auth.signOut()
             if (err) throw err
+
+            // Clear stores AFTER successful signOut
+            clearAllStores()
+
             user.value = null
             session.value = null
             return { success: true }
         } catch (err) {
+            // Even if Supabase errors, we should clear local state
+            console.error('Supabase signOut error, forcing local cleanup:', err)
+            clearAllStores()
+            user.value = null
+            session.value = null
+
             error.value = err.message
             return { success: false, error: err.message }
         } finally {
