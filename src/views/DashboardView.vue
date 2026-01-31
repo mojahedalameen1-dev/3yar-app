@@ -142,6 +142,35 @@
         <!-- Stats & Alerts -->
         <v-col cols="12" lg="8">
           <v-row>
+            <!-- Regulatory Alert (Saudi Fahas/Istimara Logic) -->
+            <v-col cols="12" v-if="regulatoryStatus.hasAlert">
+              <v-card :color="regulatoryStatus.color" class="text-white">
+                <v-card-text class="d-flex align-start pa-4">
+                  <v-icon size="40" color="white" class="me-4 mt-1">{{ regulatoryStatus.icon }}</v-icon>
+                  <div>
+                    <div class="text-h6 font-weight-bold mb-1">{{ regulatoryStatus.message }}</div>
+                    <div class="text-body-2 opacity-90">{{ regulatoryStatus.description }}</div>
+                    <div class="mt-3">
+                      <v-btn 
+                        variant="outlined" 
+                        color="white" 
+                        size="small" 
+                        to="/documents"
+                        prepend-icon="mdi-file-document-multiple"
+                      >
+                        إدارة الوثائق
+                      </v-btn>
+                      <v-tooltip location="bottom" text="حسب الأنظمة المرورية السعودية">
+                        <template #activator="{ props }">
+                          <v-icon v-bind="props" size="small" class="ms-3 opacity-70">mdi-information-outline</v-icon>
+                        </template>
+                      </v-tooltip>
+                    </div>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+
             <!-- Next Maintenance Card -->
             <v-col cols="12">
               <v-card 
@@ -655,6 +684,7 @@ import { useCarStore } from '@/stores/car'
 import { useOdometerStore } from '@/stores/odometer'
 import { useTasksStore } from '@/stores/tasks'
 import { useRecordsStore } from '@/stores/records'
+import { useDocumentsStore } from '@/stores/documents'
 import { useProfileStore } from '@/stores/profile'
 import OnboardingWizard from '@/components/OnboardingWizard.vue'
 import QRShareDialog from '@/components/QRShareDialog.vue'
@@ -673,12 +703,15 @@ const odometerStore = useOdometerStore()
 const tasksStore = useTasksStore()
 const recordsStore = useRecordsStore()
 const profileStore = useProfileStore()
+const documentsStore = useDocumentsStore()
 
 // Fetch profile on mount
 onMounted(async () => {
   if (!profileStore.hasProfile) {
     await profileStore.fetchProfile()
   }
+  // Ensure documents are fetched for regulatory check
+  if (documentsStore.documents.length === 0) await documentsStore.fetchDocuments()
 })
 
 // Greeting with first name
@@ -712,6 +745,7 @@ const formattedDate = computed(() => dayjs().format('DD MMMM YYYY'))
 const formattedOdometer = computed(() => (carStore.car?.currentOdometer || 0).toLocaleString())
 const alertTasks = computed(() => tasksStore.alertTasks)
 const recentRecords = computed(() => recordsStore.recentRecords)
+const regulatoryStatus = computed(() => documentsStore.regulatoryStatus)
 
 const nextMaintenance = computed(() => {
   const alerts = tasksStore.alertTasks

@@ -6,6 +6,11 @@
         <h1 class="text-h4 font-weight-bold mb-1">وثائق السيارة</h1>
         <p class="text-body-2 text-medium-emphasis">إدارة جميع الوثائق الرسمية المتعلقة بسيارتك</p>
       </div>
+      <div>
+        <v-btn color="primary" class="ms-2" prepend-icon="mdi-plus" @click="openAddDialog('custom')">
+          وثيقة مخصصة
+        </v-btn>
+      </div>
     </div>
 
     <!-- Stats Overview -->
@@ -56,173 +61,115 @@
       </v-col>
     </v-row>
 
-    <!-- Documents Grid -->
-    <v-row>
-      <!-- License Card -->
-      <v-col cols="12" md="4">
+    <!-- Standard Documents Grid -->
+    <h2 class="text-h6 font-weight-bold mb-4">الوثائق الأساسية</h2>
+    <v-row class="mb-6">
+      
+      <!-- Component for Standard Document Card -->
+      <v-col v-for="type in standardTypes" :key="type" cols="12" md="6" lg="3">
         <v-card 
-          v-if="licenseDoc"
+          v-if="getDocument(type)"
           class="document-card glass-card h-100"
-          :class="`status-${licenseDoc.statusInfo.status}`"
+          :class="`status-${getDocument(type).statusInfo.status}`"
         >
-          <div v-if="licenseDoc.image" class="document-image-wrapper" @click="openViewDialog(licenseDoc)">
-            <template v-if="isPdf(licenseDoc.image)">
+          <div v-if="getDocument(type).image" class="document-image-wrapper" @click="openViewDialog(getDocument(type))">
+            <template v-if="isPdf(getDocument(type).image)">
               <div class="document-icon-placeholder bg-grey-lighten-4">
                 <v-icon size="64" color="error">mdi-file-pdf-box</v-icon>
               </div>
             </template>
-            <v-img v-else :src="licenseDoc.image" height="140" cover class="document-image"></v-img>
+            <v-img v-else :src="getDocument(type).image" height="140" cover class="document-image"></v-img>
             <div class="image-view-overlay"><v-icon size="32" color="white">mdi-eye</v-icon></div>
           </div>
-          <div v-else class="document-icon-placeholder bg-primary">
-            <v-icon size="48" color="white">mdi-card-account-details</v-icon>
+          <div v-else class="document-icon-placeholder" :class="`bg-${documentsStore.DOCUMENT_COLORS[type]}`">
+            <v-icon size="48" color="white">{{ documentsStore.DOCUMENT_ICONS[type] }}</v-icon>
           </div>
           <v-card-text class="pa-4">
             <div class="d-flex align-center justify-space-between mb-2">
-              <h3 class="text-subtitle-1 font-weight-bold">رخصة القيادة</h3>
-              <v-chip :color="getStatusColor(licenseDoc.statusInfo.status)" size="small" variant="flat">
-                {{ documentsStore.STATUS_LABELS[licenseDoc.statusInfo.status] }}
+              <h3 class="text-subtitle-1 font-weight-bold text-truncate">{{ documentsStore.DOCUMENT_LABELS[type] }}</h3>
+              <v-chip :color="getStatusColor(getDocument(type).statusInfo.status)" size="small" variant="flat">
+                {{ documentsStore.STATUS_LABELS[getDocument(type).statusInfo.status] }}
               </v-chip>
             </div>
-            <div v-if="licenseDoc.documentNumber" class="text-body-2 text-medium-emphasis mb-2">
-              <v-icon size="14" class="me-1">mdi-pound</v-icon>{{ licenseDoc.documentNumber }}
-            </div>
+            
             <div class="text-body-2 mb-2">
-              <v-icon size="14" class="me-1">mdi-calendar</v-icon>ينتهي: {{ formatDate(licenseDoc.expiryDate) }}
+              <v-icon size="14" class="me-1">mdi-calendar</v-icon>ينتهي: {{ formatDate(getDocument(type).expiryDate) }}
             </div>
-            <div v-if="licenseDoc.statusInfo.daysLeft !== null" :class="`text-caption text-${getStatusColor(licenseDoc.statusInfo.status)} font-weight-medium`">
-              {{ getDaysText(licenseDoc.statusInfo.daysLeft) }}
+            <div v-if="getDocument(type).statusInfo.daysLeft !== null" :class="`text-caption text-${getStatusColor(getDocument(type).statusInfo.status)} font-weight-medium`">
+              {{ getDaysText(getDocument(type).statusInfo.daysLeft) }}
             </div>
             <div class="d-flex gap-2 mt-3">
-              <v-btn variant="tonal" size="small" class="flex-grow-1" @click="openEditDialog(licenseDoc)">
+              <v-btn variant="tonal" size="small" class="flex-grow-1" @click="openEditDialog(getDocument(type))">
                 <v-icon start>mdi-pencil</v-icon>تعديل
               </v-btn>
-              <v-btn icon variant="text" size="small" color="error" @click="confirmDelete(licenseDoc)">
+              <v-btn icon variant="text" size="small" color="error" @click="confirmDelete(getDocument(type))">
                 <v-icon>mdi-delete</v-icon>
               </v-btn>
             </div>
           </v-card-text>
         </v-card>
-        <v-card v-else class="document-card glass-card h-100 document-empty" @click="openAddDialog('license')">
-          <v-card-text class="pa-8 text-center">
-            <div class="empty-icon mx-auto mb-4 bg-primary"><v-icon size="36" color="white">mdi-card-account-details</v-icon></div>
-            <h3 class="text-subtitle-1 font-weight-bold mb-1">رخصة القيادة</h3>
-            <p class="text-body-2 text-medium-emphasis mb-4">لم تتم إضافة الوثيقة بعد</p>
-            <v-btn color="primary" size="small"><v-icon start>mdi-plus</v-icon>إضافة</v-btn>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      <!-- Registration Card -->
-      <v-col cols="12" md="4">
-        <v-card 
-          v-if="registrationDoc"
-          class="document-card glass-card h-100"
-          :class="`status-${registrationDoc.statusInfo.status}`"
-        >
-          <div v-if="registrationDoc.image" class="document-image-wrapper" @click="openViewDialog(registrationDoc)">
-             <template v-if="isPdf(registrationDoc.image)">
-              <div class="document-icon-placeholder bg-grey-lighten-4">
-                <v-icon size="64" color="error">mdi-file-pdf-box</v-icon>
-              </div>
-            </template>
-            <v-img v-else :src="registrationDoc.image" height="140" cover class="document-image"></v-img>
-            <div class="image-view-overlay"><v-icon size="32" color="white">mdi-eye</v-icon></div>
-          </div>
-          <div v-else class="document-icon-placeholder bg-info">
-            <v-icon size="48" color="white">mdi-file-document</v-icon>
-          </div>
-          <v-card-text class="pa-4">
-            <div class="d-flex align-center justify-space-between mb-2">
-              <h3 class="text-subtitle-1 font-weight-bold">استمارة السيارة</h3>
-              <v-chip :color="getStatusColor(registrationDoc.statusInfo.status)" size="small" variant="flat">
-                {{ documentsStore.STATUS_LABELS[registrationDoc.statusInfo.status] }}
-              </v-chip>
+        
+        <!-- Empty State Card -->
+        <v-card v-else class="document-card glass-card h-100 document-empty" @click="openAddDialog(type)">
+          <v-card-text class="pa-8 text-center h-100 d-flex flex-column justify-center align-center">
+            <div class="empty-icon mb-4" :class="`bg-${documentsStore.DOCUMENT_COLORS[type]}`">
+              <v-icon size="36" color="white">{{ documentsStore.DOCUMENT_ICONS[type] }}</v-icon>
             </div>
-            <div v-if="registrationDoc.documentNumber" class="text-body-2 text-medium-emphasis mb-2">
-              <v-icon size="14" class="me-1">mdi-pound</v-icon>{{ registrationDoc.documentNumber }}
-            </div>
-            <div class="text-body-2 mb-2">
-              <v-icon size="14" class="me-1">mdi-calendar</v-icon>ينتهي: {{ formatDate(registrationDoc.expiryDate) }}
-            </div>
-            <div v-if="registrationDoc.statusInfo.daysLeft !== null" :class="`text-caption text-${getStatusColor(registrationDoc.statusInfo.status)} font-weight-medium`">
-              {{ getDaysText(registrationDoc.statusInfo.daysLeft) }}
-            </div>
-            <div class="d-flex gap-2 mt-3">
-              <v-btn variant="tonal" size="small" class="flex-grow-1" @click="openEditDialog(registrationDoc)">
-                <v-icon start>mdi-pencil</v-icon>تعديل
-              </v-btn>
-              <v-btn icon variant="text" size="small" color="error" @click="confirmDelete(registrationDoc)">
-                <v-icon>mdi-delete</v-icon>
-              </v-btn>
-            </div>
-          </v-card-text>
-        </v-card>
-        <v-card v-else class="document-card glass-card h-100 document-empty" @click="openAddDialog('registration')">
-          <v-card-text class="pa-8 text-center">
-            <div class="empty-icon mx-auto mb-4 bg-info"><v-icon size="36" color="white">mdi-file-document</v-icon></div>
-            <h3 class="text-subtitle-1 font-weight-bold mb-1">استمارة السيارة</h3>
-            <p class="text-body-2 text-medium-emphasis mb-4">لم تتم إضافة الوثيقة بعد</p>
-            <v-btn color="info" size="small"><v-icon start>mdi-plus</v-icon>إضافة</v-btn>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      <!-- Insurance Card -->
-      <v-col cols="12" md="4">
-        <v-card 
-          v-if="insuranceDoc"
-          class="document-card glass-card h-100"
-          :class="`status-${insuranceDoc.statusInfo.status}`"
-        >
-          <div v-if="insuranceDoc.image" class="document-image-wrapper" @click="openViewDialog(insuranceDoc)">
-             <template v-if="isPdf(insuranceDoc.image)">
-              <div class="document-icon-placeholder bg-grey-lighten-4">
-                <v-icon size="64" color="error">mdi-file-pdf-box</v-icon>
-              </div>
-            </template>
-            <v-img v-else :src="insuranceDoc.image" height="140" cover class="document-image"></v-img>
-            <div class="image-view-overlay"><v-icon size="32" color="white">mdi-eye</v-icon></div>
-          </div>
-          <div v-else class="document-icon-placeholder bg-success">
-            <v-icon size="48" color="white">mdi-shield-car</v-icon>
-          </div>
-          <v-card-text class="pa-4">
-            <div class="d-flex align-center justify-space-between mb-2">
-              <h3 class="text-subtitle-1 font-weight-bold">التأمين</h3>
-              <v-chip :color="getStatusColor(insuranceDoc.statusInfo.status)" size="small" variant="flat">
-                {{ documentsStore.STATUS_LABELS[insuranceDoc.statusInfo.status] }}
-              </v-chip>
-            </div>
-            <div v-if="insuranceDoc.documentNumber" class="text-body-2 text-medium-emphasis mb-2">
-              <v-icon size="14" class="me-1">mdi-pound</v-icon>{{ insuranceDoc.documentNumber }}
-            </div>
-            <div class="text-body-2 mb-2">
-              <v-icon size="14" class="me-1">mdi-calendar</v-icon>ينتهي: {{ formatDate(insuranceDoc.expiryDate) }}
-            </div>
-            <div v-if="insuranceDoc.statusInfo.daysLeft !== null" :class="`text-caption text-${getStatusColor(insuranceDoc.statusInfo.status)} font-weight-medium`">
-              {{ getDaysText(insuranceDoc.statusInfo.daysLeft) }}
-            </div>
-            <div class="d-flex gap-2 mt-3">
-              <v-btn variant="tonal" size="small" class="flex-grow-1" @click="openEditDialog(insuranceDoc)">
-                <v-icon start>mdi-pencil</v-icon>تعديل
-              </v-btn>
-              <v-btn icon variant="text" size="small" color="error" @click="confirmDelete(insuranceDoc)">
-                <v-icon>mdi-delete</v-icon>
-              </v-btn>
-            </div>
-          </v-card-text>
-        </v-card>
-        <v-card v-else class="document-card glass-card h-100 document-empty" @click="openAddDialog('insurance')">
-          <v-card-text class="pa-8 text-center">
-            <div class="empty-icon mx-auto mb-4 bg-success"><v-icon size="36" color="white">mdi-shield-car</v-icon></div>
-            <h3 class="text-subtitle-1 font-weight-bold mb-1">التأمين</h3>
-            <p class="text-body-2 text-medium-emphasis mb-4">لم تتم إضافة الوثيقة بعد</p>
-            <v-btn color="success" size="small"><v-icon start>mdi-plus</v-icon>إضافة</v-btn>
+            <h3 class="text-subtitle-1 font-weight-bold mb-1">{{ documentsStore.DOCUMENT_LABELS[type] }}</h3>
+            <p class="text-body-2 text-medium-emphasis mb-4">لم تتم الإضافة</p>
+            <v-btn :color="documentsStore.DOCUMENT_COLORS[type]" size="small" variant="flat">
+              <v-icon start>mdi-plus</v-icon>إضافة
+            </v-btn>
           </v-card-text>
         </v-card>
       </v-col>
     </v-row>
+
+    <!-- Custom Documents Section -->
+    <template v-if="customDocuments.length > 0">
+      <h2 class="text-h6 font-weight-bold mb-4">وثائق أخرى</h2>
+      <v-row>
+        <v-col v-for="doc in customDocuments" :key="doc.id" cols="12" md="6" lg="3">
+          <v-card class="document-card glass-card h-100" :class="`status-${doc.statusInfo.status}`">
+            <div v-if="doc.image" class="document-image-wrapper" @click="openViewDialog(doc)">
+              <template v-if="isPdf(doc.image)">
+                <div class="document-icon-placeholder bg-grey-lighten-4">
+                  <v-icon size="64" color="error">mdi-file-pdf-box</v-icon>
+                </div>
+              </template>
+              <v-img v-else :src="doc.image" height="140" cover class="document-image"></v-img>
+              <div class="image-view-overlay"><v-icon size="32" color="white">mdi-eye</v-icon></div>
+            </div>
+            <div v-else class="document-icon-placeholder bg-grey-darken-1">
+              <v-icon size="48" color="white">mdi-file-document-outline</v-icon>
+            </div>
+            <v-card-text class="pa-4">
+              <div class="d-flex align-center justify-space-between mb-2">
+                <h3 class="text-subtitle-1 font-weight-bold text-truncate">{{ doc.title }}</h3>
+                <v-chip :color="getStatusColor(doc.statusInfo.status)" size="small" variant="flat">
+                  {{ documentsStore.STATUS_LABELS[doc.statusInfo.status] }}
+                </v-chip>
+              </div>
+              
+              <div class="text-body-2 mb-2">
+                <v-icon size="14" class="me-1">mdi-calendar</v-icon>ينتهي: {{ formatDate(doc.expiryDate) }}
+              </div>
+              <div v-if="doc.statusInfo.daysLeft !== null" :class="`text-caption text-${getStatusColor(doc.statusInfo.status)} font-weight-medium`">
+                {{ getDaysText(doc.statusInfo.daysLeft) }}
+              </div>
+              <div class="d-flex gap-2 mt-3">
+                <v-btn variant="tonal" size="small" class="flex-grow-1" @click="openEditDialog(doc)">
+                  <v-icon start>mdi-pencil</v-icon>تعديل
+                </v-btn>
+                <v-btn icon variant="text" size="small" color="error" @click="confirmDelete(doc)">
+                  <v-icon>mdi-delete</v-icon>
+                </v-btn>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+    </template>
 
     <!-- Add/Edit Dialog -->
     <v-dialog v-model="showDialog" max-width="550" persistent>
@@ -261,7 +208,16 @@
             </div>
           </div>
 
-          <v-text-field v-model="formData.documentNumber" label="رقم الوثيقة" placeholder="أدخل رقم الوثيقة" prepend-inner-icon="mdi-pound" class="mb-3"></v-text-field>
+          <!-- Document Title (Only for Custom) -->
+          <v-text-field 
+            v-if="dialogType === 'custom'"
+            v-model="formData.title" 
+            label="اسم الوثيقة" 
+            placeholder="مثال: تصريح دخول" 
+            prepend-inner-icon="mdi-format-title" 
+            class="mb-3"
+            :rules="[v => !!v || 'اسم الوثيقة مطلوب']"
+          ></v-text-field>
 
           <v-row>
             <v-col cols="12" sm="6">
@@ -312,10 +268,6 @@
         </div>
         <v-card-text class="pa-4">
           <v-row>
-            <v-col cols="6">
-              <div class="text-caption text-medium-emphasis">رقم الوثيقة</div>
-              <div class="font-weight-medium">{{ viewDocument.documentNumber || '-' }}</div>
-            </v-col>
             <v-col cols="6">
               <div class="text-caption text-medium-emphasis">الحالة</div>
               <v-chip :color="getStatusColor(viewDocument.statusInfo.status)" size="small" variant="flat">
@@ -369,10 +321,15 @@ const documentsStore = useDocumentsStore()
 
 const stats = computed(() => documentsStore.stats)
 
+// Standard document types to display in main grid
+const standardTypes = ['registration', 'fahas', 'insurance', 'license']
+
 // Document getters
-const licenseDoc = computed(() => documentsStore.getDocumentByType('license'))
-const registrationDoc = computed(() => documentsStore.getDocumentByType('registration'))
-const insuranceDoc = computed(() => documentsStore.getDocumentByType('insurance'))
+const getDocument = (type) => documentsStore.getDocumentByType(type)
+
+const customDocuments = computed(() => {
+  return documentsStore.documentsWithStatus.filter(d => d.type === 'custom')
+})
 
 // Dialog state
 const showDialog = ref(false)
@@ -381,7 +338,11 @@ const dialogType = ref('license')
 const formData = ref(getEmptyForm())
 const imageInput = ref(null)
 
-const dialogTitle = computed(() => documentsStore.DOCUMENT_LABELS[dialogType.value])
+const dialogTitle = computed(() => {
+  if (dialogType.value === 'custom' && formData.value.title) return formData.value.title
+  return documentsStore.DOCUMENT_LABELS[dialogType.value]
+})
+
 const dialogIcon = computed(() => documentsStore.DOCUMENT_ICONS[dialogType.value])
 const dialogColor = computed(() => documentsStore.DOCUMENT_COLORS[dialogType.value])
 
@@ -393,10 +354,10 @@ const reminderOptions = [
 ]
 
 function getEmptyForm() {
-  return { documentNumber: '', issueDate: '', expiryDate: '', image: null, notes: '', reminderDays: 30 }
+  return { title: '', issueDate: '', expiryDate: '', image: null, notes: '', reminderDays: 30 }
 }
 
-function openAddDialog(type = 'license') {
+function openAddDialog(type = 'custom') {
   editMode.value = false
   dialogType.value = type
   formData.value = getEmptyForm()
@@ -408,7 +369,7 @@ function openEditDialog(doc) {
   dialogType.value = doc.type
   formData.value = {
     id: doc.id,
-    documentNumber: doc.documentNumber || '',
+    title: doc.title || '',
     issueDate: doc.issueDate ? dayjs(doc.issueDate).format('YYYY-MM-DD') : '',
     expiryDate: doc.expiryDate ? dayjs(doc.expiryDate).format('YYYY-MM-DD') : '',
     image: doc.image || null,
@@ -436,10 +397,22 @@ function handleImageUpload(event) {
 
 function saveDocument() {
   const data = { type: dialogType.value, ...formData.value }
+  
+  // Validation for Custom Title
+  if (dialogType.value === 'custom' && !data.title) {
+    showSnackbar('يرجى إدخال اسم الوثيقة', 'error')
+    return
+  }
+
   if (editMode.value) {
     documentsStore.updateDocument(formData.value.id, data)
     showSnackbar('تم تحديث الوثيقة بنجاح')
   } else {
+    // If standard type, ensure no duplicates (although store logic handles it, explicit check is good ui)
+    if (dialogType.value !== 'custom' && getDocument(dialogType.value)) {
+       showSnackbar('هذه الوثيقة موجودة بالفعل', 'warning')
+       return
+    }
     documentsStore.addDocument(data)
     showSnackbar('تم إضافة الوثيقة بنجاح')
   }

@@ -6,25 +6,33 @@ import dayjs from 'dayjs'
 const DOCUMENT_TYPES = {
     LICENSE: 'license',
     REGISTRATION: 'registration',
-    INSURANCE: 'insurance'
+    FAHAS: 'fahas',
+    INSURANCE: 'insurance',
+    CUSTOM: 'custom'
 }
 
 const DOCUMENT_LABELS = {
     [DOCUMENT_TYPES.LICENSE]: 'رخصة القيادة',
     [DOCUMENT_TYPES.REGISTRATION]: 'استمارة السيارة',
-    [DOCUMENT_TYPES.INSURANCE]: 'التأمين'
+    [DOCUMENT_TYPES.FAHAS]: 'الفحص الدوري',
+    [DOCUMENT_TYPES.INSURANCE]: 'التأمين',
+    [DOCUMENT_TYPES.CUSTOM]: 'وثيقة مخصصة'
 }
 
 const DOCUMENT_ICONS = {
     [DOCUMENT_TYPES.LICENSE]: 'mdi-card-account-details',
     [DOCUMENT_TYPES.REGISTRATION]: 'mdi-file-document',
-    [DOCUMENT_TYPES.INSURANCE]: 'mdi-shield-car'
+    [DOCUMENT_TYPES.FAHAS]: 'mdi-car-wrench',
+    [DOCUMENT_TYPES.INSURANCE]: 'mdi-shield-car',
+    [DOCUMENT_TYPES.CUSTOM]: 'mdi-file-edit'
 }
 
 const DOCUMENT_COLORS = {
     [DOCUMENT_TYPES.LICENSE]: 'primary',
     [DOCUMENT_TYPES.REGISTRATION]: 'info',
-    [DOCUMENT_TYPES.INSURANCE]: 'success'
+    [DOCUMENT_TYPES.FAHAS]: 'purple',
+    [DOCUMENT_TYPES.INSURANCE]: 'success',
+    [DOCUMENT_TYPES.CUSTOM]: 'grey-darken-1'
 }
 
 const STATUS = {
@@ -77,7 +85,7 @@ export const useDocumentsStore = defineStore('documents', () => {
         return documents.value.map(doc => ({
             ...doc,
             statusInfo: getDocumentStatus(doc.expiryDate),
-            typeLabel: DOCUMENT_LABELS[doc.type] || doc.type,
+            typeLabel: doc.type === DOCUMENT_TYPES.CUSTOM ? (doc.title || 'وثيقة مخصصة') : (DOCUMENT_LABELS[doc.type] || doc.type),
             typeIcon: DOCUMENT_ICONS[doc.type] || 'mdi-file',
             typeColor: DOCUMENT_COLORS[doc.type] || 'grey'
         }))
@@ -87,6 +95,55 @@ export const useDocumentsStore = defineStore('documents', () => {
         return documentsWithStatus.value.filter(
             doc => doc.statusInfo.status !== STATUS.VALID
         ).sort((a, b) => (a.statusInfo.daysLeft || 0) - (b.statusInfo.daysLeft || 0))
+    })
+
+    // Smart Regulatory Logic
+    const regulatoryStatus = computed(() => {
+        const istimara = documentsWithStatus.value.find(d => d.type === DOCUMENT_TYPES.REGISTRATION)
+        const fahas = documentsWithStatus.value.find(d => d.type === DOCUMENT_TYPES.FAHAS)
+
+        // Default safe state
+        const result = {
+            isTechnicalViolation: false,
+            isRenewalBlocked: false,
+            hasAlert: false,
+            message: '',
+            color: 'success',
+            icon: 'mdi-check-circle'
+        }
+
+        if (!istimara) return result // Need Istimara to make judgements
+
+        const istimaraExpired = istimara.statusInfo.status === STATUS.EXPIRED || istimara.statusInfo.status === STATUS.EXPIRING_SOON
+        const fahasExpired = !fahas || fahas.statusInfo.status === STATUS.EXPIRED
+
+        // Case 2: Istimara Expired/Expiring AND Fahas Expired/Missing -> CRITICAL
+        if (istimaraExpired && fahasExpired) {
+            return {
+                isTechnicalViolation: false,
+                isRenewalBlocked: true,
+                hasAlert: true,
+                message: 'يجب إجراء الفحص الدوري أولاً لتجديد الاستمارة!',
+                description: 'لا يمكنك تجديد الاستمارة المنتهية حالياً إلا بعد صدور نتيجة فحص دوري سارية المفعول.',
+                color: 'error',
+                icon: 'mdi-alert-octagon'
+            }
+        }
+
+        // Case 1: Istimara Valid AND Fahas Expired/Missing -> WARNING
+        if (!istimaraExpired && fahasExpired) {
+            return {
+                isTechnicalViolation: true,
+                isRenewalBlocked: false,
+                hasAlert: true,
+                message: 'تنبيه: الفحص الدوري منتهٍ - مخالفة فنية',
+                description: 'المركبة تُعد مخالفة فنياً وقد تسجل ضدك مخالفة مرورية، كما لن تتمكن من تجديد الاستمارة لاحقاً.',
+                color: 'warning',
+                icon: 'mdi-alert'
+            }
+        }
+
+        return result
     })
 
     const stats = computed(() => {
@@ -103,7 +160,7 @@ export const useDocumentsStore = defineStore('documents', () => {
         return {
             id: row.id,
             type: row.type,
-            documentNumber: row.document_number,
+            title: row.title, // New field
             issueDate: row.issue_date,
             expiryDate: row.expiry_date,
             image: row.image,
@@ -117,7 +174,7 @@ export const useDocumentsStore = defineStore('documents', () => {
     function mapToDb(doc) {
         return {
             type: doc.type,
-            document_number: doc.documentNumber || '',
+            title: doc.title || DOCUMENT_LABELS[doc.type] || '', // Save default title if not custom
             issue_date: doc.issueDate || null,
             expiry_date: doc.expiryDate || null,
             image: doc.image || null,
@@ -187,7 +244,7 @@ export const useDocumentsStore = defineStore('documents', () => {
         try {
             const dbUpdates = {}
             if (updates.type !== undefined) dbUpdates.type = updates.type
-            if (updates.documentNumber !== undefined) dbUpdates.document_number = updates.documentNumber
+            if (updates.title !== undefined) dbUpdates.title = updates.title
             if (updates.issueDate !== undefined) dbUpdates.issue_date = updates.issueDate
             if (updates.expiryDate !== undefined) dbUpdates.expiry_date = updates.expiryDate
             if (updates.image !== undefined) dbUpdates.image = updates.image
@@ -263,6 +320,7 @@ export const useDocumentsStore = defineStore('documents', () => {
         fetchDocuments,
         getDocumentByType,
         getDocumentStatus,
+        regulatoryStatus,
         addDocument,
         updateDocument,
         deleteDocument,
