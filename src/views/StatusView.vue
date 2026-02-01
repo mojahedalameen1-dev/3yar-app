@@ -34,10 +34,7 @@
             <h1 class="text-h2 font-weight-black text-white mb-2 brand-font text-wrap">
               {{ car.make }} {{ car.model }}
             </h1>
-            <div class="d-flex align-center gap-2 opacity-100">
-              <v-icon color="cyan-accent-3" size="small">mdi-shield-check</v-icon>
-              <span class="text-subtitle-1 font-weight-bold">جواز السيارة الرقمي - موثق</span>
-            </div>
+
           </div>
         </v-img>
       </div>
@@ -118,29 +115,7 @@
           <p class="text-body-2">سجل الصيانة لهذه المركبة نظيف حالياً</p>
         </div>
         
-        <!-- Documents Section (Safe View) -->
-        <div class="mt-8" v-if="documents.length > 0">
-           <div class="text-h5 font-weight-bold mb-4 d-flex align-center">
-            <v-icon color="cyan-accent-3" class="me-2">mdi-file-certificate</v-icon>
-            حالة الوثائق
-          </div>
-          
-          <v-row>
-            <v-col cols="12" md="4" v-for="doc in documents" :key="doc.id">
-              <v-card class="passport-card doc-card">
-                <v-card-text class="d-flex align-center pa-4">
-                  <v-icon :color="getDocStatusColor(doc)" size="32" class="me-4 opacity-80">{{ getDocIcon(doc.type) }}</v-icon>
-                  <div>
-                    <div class="text-subtitle-1 font-weight-bold">{{ getDocLabel(doc.type) }}</div>
-                    <div class="text-caption" :class="`text-${getDocStatusColor(doc)}`">
-                      {{ getDocStatus(doc) }}
-                    </div>
-                  </div>
-                </v-card-text>
-              </v-card>
-            </v-col>
-          </v-row>
-        </div>
+
 
         <!-- Footer -->
         <div class="text-center mt-12 mb-6 opacity-50">
@@ -167,7 +142,7 @@ const route = useRoute()
 // State
 const car = ref(null)
 const tasks = ref([])
-const documents = ref([])
+
 const loading = ref(true)
 const error = ref(null)
 
@@ -208,15 +183,7 @@ onMounted(async () => {
       tasks.value = tasksData
     }
 
-    // Fetch documents for this car
-    const { data: docsData } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('car_id', carData.id)
 
-    if (docsData) {
-      documents.value = docsData
-    }
 
   } catch (err) {
     error.value = 'حدث خطأ في تحميل البيانات'
@@ -281,60 +248,7 @@ function getTaskMetrics(task) {
   }
 }
 
-function getDocLabel(type) {
-  const labels = {
-    license: 'رخصة القيادة',
-    registration: 'استمارة السيارة',
-    insurance: 'التأمين'
-  }
-  return labels[type] || type
-}
 
-function getDocIcon(type) {
-  const icons = {
-    license: 'mdi-card-account-details',
-    registration: 'mdi-file-document',
-    insurance: 'mdi-shield-car'
-  }
-  return icons[type] || 'mdi-file'
-}
-
-function getDocStatus(doc) {
-  if (!doc.expiry_date) return 'لا يوجد تاريخ انتهاء'
-  const expiry = dayjs(doc.expiry_date)
-  const today = dayjs()
-  const daysLeft = expiry.diff(today, 'day')
-  
-  if (daysLeft < 0) {
-    return `منتهية منذ ${Math.abs(daysLeft)} يوم`
-  } else if (daysLeft === 0) {
-    return 'تنتهي اليوم'
-  } else {
-    return `تنتهي خلال ${daysLeft} يوم`
-  }
-}
-
-function getDocStatusLabel(doc) {
-  if (!doc.expiry_date) return 'غير محدد'
-  const expiry = dayjs(doc.expiry_date)
-  const today = dayjs()
-  const daysLeft = expiry.diff(today, 'day')
-  
-  if (daysLeft < 0) return 'منتهية'
-  if (daysLeft <= 30) return 'قريبة'
-  return 'سارية'
-}
-
-function getDocStatusColor(doc) {
-  if (!doc.expiry_date) return 'grey'
-  const expiry = dayjs(doc.expiry_date)
-  const today = dayjs()
-  const daysLeft = expiry.diff(today, 'day')
-  
-  if (daysLeft < 0) return 'error'
-  if (daysLeft <= 30) return 'warning'
-  return 'success'
-}
 
 function formatDate(date) {
   if (!date) return 'غير محدد'
