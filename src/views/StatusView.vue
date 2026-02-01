@@ -157,7 +157,7 @@ onMounted(async () => {
   }
 
   try {
-    // Fetch car by share token
+    // 1. Fetch car by share token
     const { data: carData, error: carError } = await supabase
       .from('cars')
       .select('*')
@@ -166,6 +166,7 @@ onMounted(async () => {
       .maybeSingle()
 
     if (carError || !carData) {
+      console.error('Car Fetch Error:', carError)
       error.value = 'لم يتم العثور على السيارة أو المشاركة غير مفعلة'
       loading.value = false
       return
@@ -173,16 +174,25 @@ onMounted(async () => {
 
     car.value = carData
     
-    // Sort tasks by logic (Late -> Recent) if needed, otherwise use default order
-    if (carData.maintenance_tasks && carData.maintenance_tasks.length > 0) {
-       tasks.value = carData.maintenance_tasks.sort((a, b) => {
-         // Sort by priority or ID for stable view
-         return b.id - a.id 
-       })
-       console.log('Tasks loaded:', tasks.value)
+    // 2. Fetch tasks separately using car_id
+    // This relies on the RLS policy: "Public view of maintenance tasks" being active
+    const { data: tasksData, error: tasksError } = await supabase
+      .from('maintenance_tasks')
+      .select('*')
+      .eq('car_id', carData.id)
+      .order('id', { ascending: false })
+
+    if (tasksError) {
+      console.error('Tasks Fetch Error:', tasksError)
+      // Don't block the page, just show empty tasks but log error
+    }
+
+    if (tasksData) {
+       console.log('Tasks loaded (Separate Fetch):', tasksData)
+       tasks.value = tasksData
     } else {
-       console.warn('No maintenance tasks found embedded in car data')
-       tasks.value = [] // Ensure empty array
+       console.warn('No maintenance tasks found (or RLS blocked)')
+       tasks.value = []
     }
 
   } catch (err) {
