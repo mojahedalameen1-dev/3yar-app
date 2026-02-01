@@ -436,6 +436,8 @@
       </v-row>
     </template>
 
+
+
     <!-- Add Car Dialog -->
     <v-dialog v-model="showCarDialog" max-width="600" persistent>
       <v-card class="rounded-xl">
@@ -679,12 +681,7 @@
     <!-- Onboarding Wizard -->
     <OnboardingWizard v-model="showWizard" @finished="onWizardFinished" />
 
-    <!-- QR Share Dialog -->
-    <QRShareDialog 
-      v-model="showQRDialog" 
-      :car="carStore.car" 
-      @updated="handleShareUpdate"
-    />
+
   </div>
 </template>
 
@@ -891,12 +888,8 @@ function confirmRecord() {
 
 // Navigation
 const router = useRouter()
-// Methods for modal handling
 function openShareDialog() {
-  // Force reactivity update
-  nextTick(() => {
-    showQRDialog.value = true
-  })
+  showQRDialog.value = true
 }
 
 function goToAddMaintenance() {
