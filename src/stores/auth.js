@@ -152,7 +152,6 @@ export const useAuthStore = defineStore('auth', () => {
                     redirectTo: `${window.location.origin}/dashboard`,
                     queryParams: {
                         access_type: 'offline',
-                        prompt: 'consent',
                     },
                 }
             })
