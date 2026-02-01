@@ -74,7 +74,14 @@ const routes = [
         path: '/control-tower-iyar',
         name: 'control-tower',
         component: () => import('@/views/ControlTowerView.vue'),
-        meta: { title: 'مركز التحكم', requiresAuth: true, requiresAdmin: true }
+        meta: { title: 'مركز التحكم', requiresAdmin: true }
+    },
+    // Admin Login (Exclusive Access)
+    {
+        path: '/admin-login',
+        name: 'admin-login',
+        component: () => import('@/views/AdminLoginView.vue'),
+        meta: { title: 'دخول الإدارة', public: true, hidden: true }
     },
 
     // Catch-all redirect
@@ -102,9 +109,14 @@ router.beforeEach(async (to, from, next) => {
     // Check if user is authenticated using Supabase
     const { data: { session } } = await supabase.auth.getSession()
 
-    // If user is logged in and trying to access landing/login/register
+    // If user is logged in and trying to access landing/login/register, check car setup
     if (session && (to.name === 'landing' || to.name === 'login' || to.name === 'register')) {
-        // Check if user has a car
+        // If heading to admin login, allow it even if logged in
+        if (to.name === 'admin-login') {
+            next()
+            return
+        }
+
         const { data: cars } = await supabase
             .from('cars')
             .select('id')
@@ -127,6 +139,11 @@ router.beforeEach(async (to, from, next) => {
 
     // Check auth for protected routes
     if (!session) {
+        // If trying to access control tower without login, send to admin login
+        if (to.name === 'control-tower') {
+            next({ name: 'admin-login' })
+            return
+        }
         next({ name: 'login', query: { redirect: to.fullPath } })
         return
     }
@@ -161,6 +178,14 @@ router.beforeEach(async (to, from, next) => {
 
     // Check admin requirement for control tower
     if (to.meta.requiresAdmin) {
+        // 1. Check Session Storage Lock (Fastest check for explicit login)
+        const isAdminSession = sessionStorage.getItem('adminKey') === 'valid'
+
+        if (isAdminSession) {
+            next()
+            return
+        }
+
         console.log('[Router Guard] Checking admin access for user:', session.user.id)
 
         const { data: profile, error: profileError } = await supabase
@@ -179,24 +204,27 @@ router.beforeEach(async (to, from, next) => {
             return
         }
 
-        if (!profile || profile.role !== 'admin') {
-            console.log('[Router Guard] Access denied - user is not admin, redirecting to dashboard')
-            next({ name: 'dashboard' })
+        // 2. Check Database Role (If they are already admin in DB)
+        if (profile?.role === 'admin') {
+            // Sync role to profile store for UI updates
+            try {
+                const profileStore = useProfileStore()
+                profileStore.setRole(profile.role)
+                console.log('[Router Guard] Admin access granted (DB Role), synced to store')
+            } catch (e) {
+                console.log('[Router Guard] Could not sync to store:', e)
+            }
+            next()
             return
         }
 
-        // Sync role to profile store for UI updates
-        try {
-            const profileStore = useProfileStore()
-            profileStore.setRole(profile.role)
-            console.log('[Router Guard] Admin access granted, role synced to store')
-        } catch (e) {
-            console.log('[Router Guard] Could not sync to store (might be fine):', e)
-        }
+        // 3. Reject Access -> Send to Admin Login
+        console.log('[Router Guard] Access denied - redirecting to admin login')
+        next({ name: 'admin-login' })
+        return
     }
 
     next()
 })
 
 export default router
-
