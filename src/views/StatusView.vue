@@ -67,48 +67,56 @@
           حالة الصيانة
         </div>
         
-        <v-row>
-          <v-col cols="12" sm="6" v-for="task in statusCards" :key="task.title">
-            <v-card class="passport-card h-100" hover>
-              <v-card-text class="pa-5">
-                <div class="d-flex justify-space-between align-start mb-4">
-                  <div class="d-flex align-center">
-                    <div class="icon-box me-3" :class="`bg-${task.color}-darken`">
-                      <v-icon :color="task.color">{{ task.icon }}</v-icon>
+        <template v-if="statusCards.length > 0">
+          <v-row>
+            <v-col cols="12" sm="6" v-for="task in statusCards" :key="task.title">
+              <v-card class="passport-card h-100" hover>
+                <v-card-text class="pa-5">
+                  <div class="d-flex justify-space-between align-start mb-4">
+                    <div class="d-flex align-center">
+                      <div class="icon-box me-3" :class="`bg-${task.color}-darken`">
+                        <v-icon :color="task.color">{{ task.icon }}</v-icon>
+                      </div>
+                      <div>
+                        <div class="text-h6 font-weight-bold">{{ task.title }}</div>
+                        <div class="text-caption opacity-60">{{ task.name }}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div class="text-h6 font-weight-bold">{{ task.title }}</div>
-                      <div class="text-caption opacity-60">{{ task.name }}</div>
+                    <v-chip :color="task.color" size="small" variant="flat" class="font-weight-bold">
+                      {{ task.label }}
+                    </v-chip>
+                  </div>
+                  
+                  <div class="status-metrics mt-4 pt-4 border-t">
+                    <div class="d-flex justify-space-between text-body-2 mb-2">
+                      <span class="opacity-70">آخر تغيير:</span>
+                      <span class="font-weight-medium font-number">{{ task.lastKm.toLocaleString() }} كم</span>
                     </div>
+                    <div class="d-flex justify-space-between text-body-2">
+                      <span class="opacity-70">المتبقي:</span>
+                      <span class="font-weight-bold font-number" :class="`text-${task.color}`">
+                        {{ task.remainingKm > 0 ? task.remainingKm.toLocaleString() : 0 }} كم
+                      </span>
+                    </div>
+                    <v-progress-linear
+                      :model-value="task.progress"
+                      :color="task.color"
+                      height="4"
+                      rounded
+                      class="mt-3"
+                    ></v-progress-linear>
                   </div>
-                  <v-chip :color="task.color" size="small" variant="flat" class="font-weight-bold">
-                    {{ task.label }}
-                  </v-chip>
-                </div>
-                
-                <div class="status-metrics mt-4 pt-4 border-t">
-                  <div class="d-flex justify-space-between text-body-2 mb-2">
-                    <span class="opacity-70">آخر تغيير:</span>
-                    <span class="font-weight-medium font-number">{{ task.lastKm.toLocaleString() }} كم</span>
-                  </div>
-                  <div class="d-flex justify-space-between text-body-2">
-                    <span class="opacity-70">المتبقي:</span>
-                    <span class="font-weight-bold font-number" :class="`text-${task.color}`">
-                      {{ task.remainingKm > 0 ? task.remainingKm.toLocaleString() : 0 }} كم
-                    </span>
-                  </div>
-                  <v-progress-linear
-                    :model-value="task.progress"
-                    :color="task.color"
-                    height="4"
-                    rounded
-                    class="mt-3"
-                  ></v-progress-linear>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+        </template>
+        
+        <div v-else class="text-center py-12 opacity-60">
+          <v-icon size="64" color="grey" class="mb-4">mdi-clipboard-text-off-outline</v-icon>
+          <div class="text-h6">لا توجد مهام صيانة مجدولة</div>
+          <p class="text-body-2">سجل الصيانة لهذه المركبة نظيف حالياً</p>
+        </div>
         
         <!-- Documents Section (Safe View) -->
         <div class="mt-8" v-if="documents.length > 0">
@@ -219,25 +227,29 @@ onMounted(async () => {
 })
 
 const statusCards = computed(() => {
-  const getTask = (keyword) => tasks.value.find(t => t.name?.includes(keyword))
-  
-  const cards = [
-    { title: 'الزيت', keyword: 'زيت', icon: 'mdi-oil' },
-    { title: 'الفرامل', keyword: 'فرامل', icon: 'mdi-car-brake-abs' },
-    { title: 'الإطارات', keyword: 'إطار', icon: 'mdi-tire' },
-    { title: 'الفلتر', keyword: 'فلتر', icon: 'mdi-air-filter' }
-  ]
-
-  return cards.map(card => {
-    const task = getTask(card.keyword)
+  return tasks.value.map(task => {
     return {
-      title: card.title,
-      icon: card.icon,
-      name: task?.name || card.title,
+      title: task.name,
+      icon: getTaskIcon(task.name),
+      name: task.name,
       ...getTaskMetrics(task)
     }
   })
 })
+
+function getTaskIcon(name) {
+  if (!name) return 'mdi-wrench'
+  const n = name.toLowerCase()
+  if (n.includes('زيت') || n.includes('oil')) return 'mdi-oil'
+  if (n.includes('فرامل') || n.includes('brake')) return 'mdi-car-brake-abs'
+  if (n.includes('إطار') || n.includes('كفر') || n.includes('tire')) return 'mdi-tire'
+  if (n.includes('فلتر') || n.includes('filter')) return 'mdi-air-filter'
+  if (n.includes('بطارية') || n.includes('battery')) return 'mdi-car-battery'
+  if (n.includes('سيور') || n.includes('belt')) return 'mdi-engine-belt'
+  if (n.includes('بواجي') || n.includes('spark')) return 'mdi-car-spark-plug'
+  if (n.includes('فحص') || n.includes('check')) return 'mdi-car-wrench'
+  return 'mdi-wrench-clock'
+}
 
 function getTaskMetrics(task) {
   if (!task) {
