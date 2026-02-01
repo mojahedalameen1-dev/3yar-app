@@ -38,7 +38,10 @@
           ></v-text-field>
 
           <div class="d-flex gap-2">
-            <v-btn color="primary" block prepend-icon="mdi-share-variant" @click="shareNative">
+            <v-btn color="secondary" variant="tonal" class="flex-grow-1" prepend-icon="mdi-printer" @click="printQR">
+              طباعة
+            </v-btn>
+            <v-btn color="primary" class="flex-grow-1" prepend-icon="mdi-share-variant" @click="shareNative">
               مشاركة
             </v-btn>
           </div>
@@ -76,6 +79,13 @@ const shareUrl = computed(() => {
 
 watch(() => props.modelValue, (val) => {
   if (val) {
+    initialize()
+  }
+})
+
+// Initialize immediately on mount
+onMounted(() => {
+  if (props.modelValue) {
     initialize()
   }
 })
@@ -123,6 +133,49 @@ async function generateQR() {
 
 function copyLink() {
   navigator.clipboard.writeText(shareUrl.value)
+}
+
+function printQR() {
+  const printWindow = window.open('', '_blank')
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>QR Code - ${props.car.make} ${props.car.model}</title>
+        <style>
+          body { 
+            font-family: sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+          }
+          .card { 
+            text-align: center; 
+            padding: 20px; 
+            border: 2px solid #000; 
+            border-radius: 12px;
+            width: 300px;
+          }
+          img { width: 200px; height: 200px; }
+          h2 { margin: 10px 0 5px; font-size: 20px; }
+          p { margin: 0; font-size: 16px; color: #555; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <img src="${qrCodeUrl.value}" />
+          <h2>${props.car.make} ${props.car.model}</h2>
+          <p>${props.car.year}</p>
+          <p style="margin-top: 10px; font-size: 12px; color: #888;">Powered by Ayar</p>
+        </div>
+        <script>
+          window.onload = function() { window.print(); window.close(); }
+        </script>
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
 }
 
 async function shareNative() {
