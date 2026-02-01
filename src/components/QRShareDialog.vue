@@ -8,7 +8,8 @@
         size="small"
         color="grey-darken-1"
         class="close-btn-absolute"
-        @click.stop="close"
+        style="z-index: 9999 !important; pointer-events: auto !important; cursor: pointer !important;"
+        @click.prevent.stop="close"
         elevation="2"
       ></v-btn>
 
@@ -147,10 +148,21 @@ const shareUrl = computed(() => {
 
 // Initialize on open
 watch(() => props.modelValue, async (isOpen) => {
-  if (isOpen && props.car) {
+  if (isOpen) {
+    await initialize()
+  }
+})
+
+onMounted(async () => {
+  if (props.modelValue) {
+    await initialize()
+  }
+})
+
+async function initialize() {
+  if (props.car) {
     loading.value = true
     try {
-      // Always ensure share is enabled
       if (!props.car.publicShareEnabled || !props.car.shareToken) {
         await enableShare()
       } else {
@@ -163,7 +175,7 @@ watch(() => props.modelValue, async (isOpen) => {
       loading.value = false
     }
   }
-})
+}
 
 // Enable Share Logic
 async function enableShare() {
@@ -258,6 +270,7 @@ async function shareNative() {
 }
 
 function close() {
+  console.log('Close button clicked')
   dialogVisible.value = false
 }
 </script>

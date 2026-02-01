@@ -122,7 +122,7 @@
                   variant="tonal"
                   class="flex-grow-1"
                   prepend-icon="mdi-qrcode"
-                  @click="showQRDialog = true"
+                  @click="openShareDialog"
                 >
                   مشاركة
                 </v-btn>
@@ -689,7 +689,7 @@
 </template>
 
 <script setup>
-import { ref, computed, inject, defineAsyncComponent, onMounted } from 'vue'
+import { ref, computed, inject, defineAsyncComponent, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCarStore } from '@/stores/car'
 import { useOdometerStore } from '@/stores/odometer'
@@ -891,13 +891,21 @@ function confirmRecord() {
 
 // Navigation
 const router = useRouter()
+// Methods for modal handling
+function openShareDialog() {
+  // Force reactivity update
+  nextTick(() => {
+    showQRDialog.value = true
+  })
+}
+
 function goToAddMaintenance() {
   router.push('/tasks')
 }
 
 function handleShareUpdate(updates) {
   if (carStore.car) {
-    carStore.updateCarLocal(updates)
+    carStore.car = { ...carStore.car, ...updates }
     showSnackbar(updates.publicShareEnabled ? 'تم تفعيل المشاركة' : 'تم إيقاف المشاركة')
   }
 }
