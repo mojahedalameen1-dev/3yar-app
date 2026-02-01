@@ -18,41 +18,31 @@
       <v-divider></v-divider>
 
       <v-card-text class="pa-5">
-        <!-- Share Toggle -->
-        <v-card variant="tonal" :color="shareEnabled ? 'success' : 'grey'" class="mb-5">
-          <v-card-text class="d-flex align-center justify-space-between pa-4">
-            <div>
-              <div class="text-subtitle-2 font-weight-bold">
-                {{ shareEnabled ? 'المشاركة مفعلة' : 'المشاركة متوقفة' }}
-              </div>
-              <div class="text-caption">
-                {{ shareEnabled ? 'يمكن للآخرين رؤية حالة سيارتك' : 'فقط أنت يمكنك رؤية البيانات' }}
+        <!-- Loading State -->
+        <div v-if="loading" class="text-center py-5">
+          <v-progress-circular indeterminate color="primary"></v-progress-circular>
+          <p class="text-caption mt-2">جاري إعداد رابط المشاركة...</p>
+        </div>
+
+        <!-- QR Content -->
+        <div v-else class="qr-section text-center">
+          <!-- Printable Area -->
+          <div id="print-area" class="print-area mb-4">
+            <div class="qr-container mx-auto">
+              <img 
+                v-if="qrCodeUrl" 
+                :src="qrCodeUrl" 
+                alt="QR Code" 
+                class="qr-image"
+              />
+            </div>
+            <div class="print-only text-center mt-4">
+              <h2 class="text-h4 font-weight-bold mb-2">{{ car.make }} {{ car.model }}</h2>
+              <p class="text-h6">{{ car.year }}</p>
+              <div class="power-by mt-4 text-medium-emphasis">
+                <small>Powered by Ayar</small>
               </div>
             </div>
-            <v-switch
-              v-model="shareEnabled"
-              color="success"
-              hide-details
-              :loading="loading"
-              @update:model-value="toggleShare"
-            ></v-switch>
-          </v-card-text>
-        </v-card>
-
-        <!-- QR Code -->
-        <div v-if="shareEnabled" class="qr-section text-center">
-          <div class="qr-container mx-auto mb-4">
-            <img 
-              v-if="qrCodeUrl" 
-              :src="qrCodeUrl" 
-              alt="QR Code" 
-              class="qr-image"
-            />
-            <v-progress-circular 
-              v-else 
-              indeterminate 
-              color="primary"
-            ></v-progress-circular>
           </div>
 
           <v-text-field
@@ -63,6 +53,7 @@
             density="compact"
             dir="ltr"
             class="mb-3"
+            bg-color="rgba(var(--v-theme-surface-variant), 0.1)"
           >
             <template #append-inner>
               <v-btn 
@@ -71,27 +62,29 @@
                 size="small" 
                 @click="copyLink"
               >
-                <v-icon>{{ copied ? 'mdi-check' : 'mdi-content-copy' }}</v-icon>
+                <v-icon :color="copied ? 'success' : undefined">{{ copied ? 'mdi-check' : 'mdi-content-copy' }}</v-icon>
               </v-btn>
             </template>
           </v-text-field>
 
-          <div class="d-flex gap-2 justify-center">
+          <div class="d-flex gap-2 justify-center flex-wrap">
             <v-btn 
               color="primary" 
-              variant="tonal"
-              prepend-icon="mdi-download"
-              @click="downloadQR"
+              variant="flat"
+              prepend-icon="mdi-printer"
+              @click="printQR"
+              class="flex-grow-1"
             >
-              تحميل QR
+              طباعة الباركود
             </v-btn>
             <v-btn 
               color="info" 
               variant="tonal"
               prepend-icon="mdi-share-variant"
               @click="shareNative"
+              class="flex-grow-1"
             >
-              مشاركة
+              مشاركة الرابط
             </v-btn>
           </div>
         </div>
@@ -102,15 +95,17 @@
           variant="tonal" 
           class="mt-4"
           density="compact"
+          icon="mdi-shield-check"
         >
           <template #text>
             <div class="text-caption">
-              <strong>ملاحظة:</strong> الصفحة العامة تعرض فقط المعلومات التقنية (العداد، حالة الصيانة، الوثائق). لا يتم عرض التكاليف أو المعلومات الشخصية.
+              <strong>آمن ومحمي:</strong> هذا الرابط يعرض فقط عداد السيارة وحالة الصيانة. لا يتم عرض أي بيانات شخصية أو تكاليف.
             </div>
           </template>
         </v-alert>
       </v-card-text>
     </v-card>
+  </v-dialog>
   </v-dialog>
 </template>
 
@@ -133,10 +128,9 @@ const dialogVisible = computed({
 })
 
 // State
-const shareEnabled = ref(false)
 const shareToken = ref('')
 const qrCodeUrl = ref('')
-const loading = ref(false)
+const loading = ref(true)
 const copied = ref(false)
 
 // Share URL
@@ -145,75 +139,101 @@ const shareUrl = computed(() => {
   return `${window.location.origin}/status/${shareToken.value}`
 })
 
-// Initialize on dialog open
+// Initialize on open
 watch(() => props.modelValue, async (isOpen) => {
   if (isOpen && props.car) {
-    shareEnabled.value = props.car.publicShareEnabled || false
-    shareToken.value = props.car.shareToken || ''
-    
-    if (shareEnabled.value && shareToken.value) {
-      await generateQR()
+    loading.value = true
+    try {
+      // Always ensure share is enabled
+      if (!props.car.publicShareEnabled || !props.car.shareToken) {
+        await enableShare()
+      } else {
+        shareToken.value = props.car.shareToken
+        await generateQR()
+      }
+    } catch (e) {
+      console.error('Error initializing share:', e)
+    } finally {
+      loading.value = false
     }
   }
 })
 
-// Toggle share
-async function toggleShare(enabled) {
-  loading.value = true
-  try {
-    const { error } = await supabase
-      .from('cars')
-      .update({ public_share_enabled: enabled })
-      .eq('id', props.car.id)
+// Enable Share Logic
+async function enableShare() {
+  // Generate token if missing (though backend usually handles this)
+  const updates = { public_share_enabled: true }
+  
+  // If we were using backend logic for token generation, triggering update might work.
+  // Assuming frontend needs to handle this update or just get value.
+  // For now we rely on Supabase returning the updated row.
+  
+  const { data, error } = await supabase
+    .from('cars')
+    .update(updates)
+    .eq('id', props.car.id)
+    .select()
+    .single()
 
-    if (error) throw error
-
-    if (enabled && shareToken.value) {
-      await generateQR()
-    }
-
-    emit('updated', { publicShareEnabled: enabled })
-  } catch (err) {
-    console.error('Error toggling share:', err)
-    shareEnabled.value = !enabled // Revert
-  } finally {
-    loading.value = false
+  if (error) throw error
+  if (data) {
+    shareToken.value = data.share_token
+    emit('updated', { publicShareEnabled: true, shareToken: data.share_token })
+    await generateQR()
   }
 }
 
-// Generate QR code
+// Generate QR
 async function generateQR() {
   if (!shareUrl.value) return
-  
   try {
     qrCodeUrl.value = await QRCode.toDataURL(shareUrl.value, {
-      width: 200,
+      width: 300,
       margin: 2,
-      color: {
-        dark: '#1976D2',
-        light: '#FFFFFF'
-      }
+      color: { dark: '#000000', light: '#FFFFFF' }
     })
   } catch (err) {
     console.error('Error generating QR:', err)
   }
 }
 
-// Copy link
+// Copy
 function copyLink() {
   navigator.clipboard.writeText(shareUrl.value)
   copied.value = true
   setTimeout(() => { copied.value = false }, 2000)
 }
 
-// Download QR
-function downloadQR() {
-  if (!qrCodeUrl.value) return
-  
-  const link = document.createElement('a')
-  link.download = `ayar-car-status-${props.car.make}-${props.car.model}.png`
-  link.href = qrCodeUrl.value
-  link.click()
+// Print QR
+function printQR() {
+  const printWindow = window.open('', '_blank')
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>QR Code - ${props.car.make} ${props.car.model}</title>
+        <style>
+          body { font-family: sans-serif; text-align: center; padding: 40px; }
+          .container { border: 2px solid #000; display: inline-block; padding: 20px; border-radius: 10px; }
+          img { width: 250px; height: 250px; }
+          h1 { margin: 10px 0 5px; font-size: 24px; }
+          p { margin: 0; font-size: 18px; color: #555; }
+          .footer { margin-top: 20px; font-size: 12px; color: #888; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <img src="${qrCodeUrl.value}" />
+          <h1>${props.car.make} ${props.car.model}</h1>
+          <p>${props.car.year}</p>
+          <div class="footer">Ayar App - Digital Passport</div>
+        </div>
+        <script>
+          window.onload = function() { window.print(); window.close(); }
+        <\/script>
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
 }
 
 // Native share
@@ -225,9 +245,7 @@ async function shareNative() {
         text: 'شاهد حالة سيارتي على عيار',
         url: shareUrl.value
       })
-    } catch (err) {
-      // User cancelled or error
-    }
+    } catch (_) {}
   } else {
     copyLink()
   }
@@ -265,5 +283,12 @@ function close() {
   width: 200px;
   height: 200px;
   border-radius: 8px;
+}
+
+.print-only { display: none; }
+
+@media print {
+  .print-area { display: block !important; }
+  .print-only { display: block !important; }
 }
 </style>

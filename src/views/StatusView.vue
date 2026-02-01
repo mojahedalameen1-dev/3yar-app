@@ -1,134 +1,147 @@
-<template>
   <div class="status-page">
+    <div class="status-gradient-bg"></div>
+    
     <!-- Loading State -->
     <div v-if="loading" class="loading-state">
-      <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
-      <p class="text-body-1 mt-4">جاري تحميل البيانات...</p>
+      <div class="loader-content text-center">
+        <v-progress-circular indeterminate color="cyan-accent-3" size="64" width="6"></v-progress-circular>
+        <p class="text-h6 mt-6 font-weight-light text-cyan-accent-1">جاري تحميل الجواز الرقمي...</p>
+      </div>
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="error-state text-center">
-      <div class="error-icon mx-auto mb-4">
-        <v-icon size="64" color="error">mdi-alert-circle</v-icon>
-      </div>
-      <h2 class="text-h5 font-weight-bold mb-2">عذراً!</h2>
-      <p class="text-body-1 text-medium-emphasis mb-6">{{ error }}</p>
-      <v-btn color="primary" to="/">العودة للصفحة الرئيسية</v-btn>
+    <div v-else-if="error" class="error-container d-flex flex-column align-center justify-center h-100 pa-6">
+      <v-icon size="80" color="red-accent-2" class="mb-4">mdi-shield-alert-outline</v-icon>
+      <h2 class="text-h4 font-weight-bold mb-2">الرابط غير صالح</h2>
+      <p class="text-body-1 opacity-70 text-center mb-6">لا يمكن الوصول لبيانات السيارة. قد يكون الرابط منتهياً أو غير صحيح.</p>
     </div>
 
-    <!-- Status Content -->
-    <div v-else-if="car" class="status-content">
-      <!-- Header -->
-      <div class="status-header text-center pa-6">
-        <div class="car-badge mx-auto mb-4">
-          <v-icon size="40" color="white">mdi-car</v-icon>
-        </div>
-        <h1 class="text-h4 font-weight-bold text-white mb-2">
-          {{ car.make }} {{ car.model }}
-        </h1>
-        <v-chip color="primary" variant="flat" size="large" class="px-4">
-          {{ car.year }}
-        </v-chip>
+    <!-- Digital Passport Content -->
+    <v-main v-else-if="car" class="passport-content pa-0">
+      <!-- Hero Section -->
+      <div class="hero-section">
+        <v-img
+          :src="car.image || 'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=2070&auto=format&fit=crop'"
+          cover
+          height="400"
+          class="hero-image"
+          gradient="to bottom, rgba(10,25,41,0.3), rgba(10,25,41,1)"
+        >
+          <div class="hero-content d-flex flex-column justify-end h-100 pa-6 pb-12">
+            <v-chip color="cyan-accent-3" variant="flat" class="align-self-start mb-4 font-weight-bold">
+              {{ car.year }}
+            </v-chip>
+            <h1 class="text-h2 font-weight-black text-white mb-2 brand-font">
+              {{ car.make }} {{ car.model }}
+            </h1>
+            <div class="d-flex align-center gap-2 opacity-80">
+              <v-icon color="cyan-accent-3" size="small">mdi-shield-check</v-icon>
+              <span class="text-subtitle-1">جواز السيارة الرقمي - موثق</span>
+            </div>
+          </div>
+        </v-img>
       </div>
 
-      <!-- Odometer Card -->
-      <v-container class="pa-4">
-        <v-card class="odometer-card mb-4">
-          <v-card-text class="text-center pa-6">
-            <v-icon size="32" color="primary" class="mb-2">mdi-speedometer</v-icon>
-            <div class="text-h3 font-weight-bold text-primary mb-1">
-              {{ car.current_odometer?.toLocaleString() || 0 }}
+      <v-container class="content-container mt-n12 position-relative z-index-2">
+        <!-- Odometer Hero Card -->
+        <v-card class="passport-card hero-stat-card mb-6" elevation="10">
+          <v-card-text class="d-flex align-center justify-space-between pa-6 pa-md-8">
+            <div>
+              <div class="text-overline text-cyan-accent-1 mb-1">عداد المسافات الحالي</div>
+              <div class="d-flex align-baseline">
+                <span class="text-h3 font-weight-black text-white me-2 font-number">
+                  {{ car.current_odometer?.toLocaleString() || 0 }}
+                </span>
+                <span class="text-h6 opacity-70">كم</span>
+              </div>
             </div>
-            <div class="text-body-2 text-medium-emphasis">كيلومتر</div>
+            <div class="hero-icon-wrapper">
+              <v-icon size="48" color="cyan-accent-3">mdi-speedometer</v-icon>
+            </div>
           </v-card-text>
         </v-card>
 
-        <!-- Status Cards Grid -->
+        <!-- Maintenance Grid -->
+        <div class="text-h5 font-weight-bold mb-4 d-flex align-center">
+          <v-icon color="cyan-accent-3" class="me-2">mdi-wrench-clock</v-icon>
+          حالة الصيانة
+        </div>
+        
         <v-row>
-          <v-col v-for="status in statusCards" :key="status.title" cols="6">
-            <v-card 
-              class="status-card h-100" 
-              :class="`border-${status.color}`"
-            >
-              <v-card-text class="text-center pa-4">
-                <div 
-                  class="status-icon mx-auto mb-2"
-                  :class="`bg-${status.color}`"
-                >
-                  <v-icon color="white" size="20">{{ status.icon }}</v-icon>
+          <v-col cols="12" sm="6" v-for="task in statusCards" :key="task.title">
+            <v-card class="passport-card h-100" hover>
+              <v-card-text class="pa-5">
+                <div class="d-flex justify-space-between align-start mb-4">
+                  <div class="d-flex align-center">
+                    <div class="icon-box me-3" :class="`bg-${task.color}-darken`">
+                      <v-icon :color="task.color">{{ task.icon }}</v-icon>
+                    </div>
+                    <div>
+                      <div class="text-h6 font-weight-bold">{{ task.title }}</div>
+                      <div class="text-caption opacity-60">{{ task.name }}</div>
+                    </div>
+                  </div>
+                  <v-chip :color="task.color" size="small" variant="flat" class="font-weight-bold">
+                    {{ task.label }}
+                  </v-chip>
                 </div>
-                <div class="text-body-2 font-weight-bold mb-1">{{ status.title }}</div>
-                <v-chip 
-                  :color="status.color" 
-                  size="small" 
-                  variant="tonal"
-                >
-                  {{ status.label }}
-                </v-chip>
+                
+                <div class="status-metrics mt-4 pt-4 border-t">
+                  <div class="d-flex justify-space-between text-body-2 mb-2">
+                    <span class="opacity-70">آخر تغيير:</span>
+                    <span class="font-weight-medium font-number">{{ task.lastKm.toLocaleString() }} كم</span>
+                  </div>
+                  <div class="d-flex justify-space-between text-body-2">
+                    <span class="opacity-70">المتبقي:</span>
+                    <span class="font-weight-bold font-number" :class="`text-${task.color}`">
+                      {{ task.remainingKm > 0 ? task.remainingKm.toLocaleString() : 0 }} كم
+                    </span>
+                  </div>
+                  <v-progress-linear
+                    :model-value="task.progress"
+                    :color="task.color"
+                    height="4"
+                    rounded
+                    class="mt-3"
+                  ></v-progress-linear>
+                </div>
               </v-card-text>
             </v-card>
           </v-col>
         </v-row>
+        
+        <!-- Documents Section (Safe View) -->
+        <div class="mt-8" v-if="documents.length > 0">
+           <div class="text-h5 font-weight-bold mb-4 d-flex align-center">
+            <v-icon color="cyan-accent-3" class="me-2">mdi-file-certificate</v-icon>
+            حالة الوثائق
+          </div>
+          
+          <v-row>
+            <v-col cols="12" md="4" v-for="doc in documents" :key="doc.id">
+              <v-card class="passport-card doc-card">
+                <v-card-text class="d-flex align-center pa-4">
+                  <v-icon :color="getDocStatusColor(doc)" size="32" class="me-4 opacity-80">{{ getDocIcon(doc.type) }}</v-icon>
+                  <div>
+                    <div class="text-subtitle-1 font-weight-bold">{{ getDocLabel(doc.type) }}</div>
+                    <div class="text-caption" :class="`text-${getDocStatusColor(doc)}`">
+                      {{ getDocStatus(doc) }}
+                    </div>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+        </div>
 
-        <!-- Documents Status -->
-        <v-card class="mt-4" v-if="documents.length > 0">
-          <v-card-title class="pa-4">
-            <v-icon color="info" class="me-2">mdi-file-document-multiple</v-icon>
-            الوثائق
-          </v-card-title>
-          <v-divider></v-divider>
-          <v-list class="bg-transparent">
-            <v-list-item 
-              v-for="doc in documents" 
-              :key="doc.id"
-              class="px-4"
-            >
-              <template #prepend>
-                <v-avatar :color="getDocStatusColor(doc)" size="36" variant="tonal">
-                  <v-icon size="18">{{ getDocIcon(doc.type) }}</v-icon>
-                </v-avatar>
-              </template>
-              <v-list-item-title class="font-weight-medium">
-                {{ getDocLabel(doc.type) }}
-              </v-list-item-title>
-              <v-list-item-subtitle>
-                {{ getDocStatus(doc) }}
-              </v-list-item-subtitle>
-              <template #append>
-                <v-chip 
-                  :color="getDocStatusColor(doc)" 
-                  size="x-small" 
-                  variant="flat"
-                >
-                  {{ getDocStatusLabel(doc) }}
-                </v-chip>
-              </template>
-            </v-list-item>
-          </v-list>
-        </v-card>
-
-        <!-- Last Updated -->
-        <div class="last-updated text-center mt-6 mb-4">
-          <v-icon size="16" class="me-1">mdi-clock-outline</v-icon>
-          <span class="text-caption text-medium-emphasis">
-            آخر تحديث: {{ formatDate(car.updated_at) }}
-          </span>
+        <!-- Footer -->
+        <div class="text-center mt-12 mb-6 opacity-50">
+          <v-img :src="ayarLogo" width="30" class="mx-auto mb-2 opacity-80"></v-img>
+          <p class="text-caption">Ayar Digital Passport</p>
         </div>
       </v-container>
-
-      <!-- Footer -->
-      <div class="status-footer text-center pa-6">
-        <div class="d-flex align-center justify-center gap-2 mb-2">
-          <v-img :src="ayarLogo" width="24" height="24" contain></v-img>
-          <span class="text-body-2 font-weight-bold text-primary">عيار</span>
-        </div>
-        <p class="text-caption text-medium-emphasis">
-          نظام ذكي لإدارة صيانة السيارات
-        </p>
-      </div>
-    </div>
+    </v-main>
   </div>
-</template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
@@ -204,57 +217,54 @@ onMounted(async () => {
   }
 })
 
-// Status cards computed
 const statusCards = computed(() => {
-  const oilTask = tasks.value.find(t => t.name?.includes('زيت'))
-  const brakeTask = tasks.value.find(t => t.name?.includes('فرامل'))
-  const tireTask = tasks.value.find(t => t.name?.includes('إطار'))
-  const airFilter = tasks.value.find(t => t.name?.includes('فلتر'))
-
-  return [
-    {
-      title: 'الزيت',
-      icon: 'mdi-oil',
-      ...getTaskStatus(oilTask)
-    },
-    {
-      title: 'الفرامل',
-      icon: 'mdi-car-brake-abs',
-      ...getTaskStatus(brakeTask)
-    },
-    {
-      title: 'الإطارات',
-      icon: 'mdi-tire',
-      ...getTaskStatus(tireTask)
-    },
-    {
-      title: 'الفلتر',
-      icon: 'mdi-air-filter',
-      ...getTaskStatus(airFilter)
-    }
+  const getTask = (keyword) => tasks.value.find(t => t.name?.includes(keyword))
+  
+  const cards = [
+    { title: 'الزيت', keyword: 'زيت', icon: 'mdi-oil' },
+    { title: 'الفرامل', keyword: 'فرامل', icon: 'mdi-car-brake-abs' },
+    { title: 'الإطارات', keyword: 'إطار', icon: 'mdi-tire' },
+    { title: 'الفلتر', keyword: 'فلتر', icon: 'mdi-air-filter' }
   ]
+
+  return cards.map(card => {
+    const task = getTask(card.keyword)
+    return {
+      title: card.title,
+      icon: card.icon,
+      name: task?.name || card.title,
+      ...getTaskMetrics(task)
+    }
+  })
 })
 
-function getTaskStatus(task) {
+function getTaskMetrics(task) {
   if (!task) {
-    return { label: 'غير محدد', color: 'grey' }
+    return { 
+      label: 'غير متوفر', 
+      color: 'grey',
+      lastKm: 0,
+      remainingKm: 0,
+      progress: 0 
+    }
   }
 
-  // Calculate progress based on last maintenance
   const currentOdometer = car.value?.current_odometer || 0
   const lastOdometer = task.last_maintenance_odometer || 0
   const interval = task.interval_km || 5000
   const kmSinceLast = currentOdometer - lastOdometer
-  const progress = (kmSinceLast / interval) * 100
+  const remaining = interval - kmSinceLast
+  const progress = Math.min((kmSinceLast / interval) * 100, 100)
 
-  if (progress >= 100) {
-    return { label: 'يحتاج صيانة', color: 'error' }
-  } else if (progress >= 90) {
-    return { label: 'قريب', color: 'warning' }
-  } else if (progress >= 75) {
-    return { label: 'متوسط', color: 'amber' }
-  } else {
-    return { label: 'جيد', color: 'success' }
+  let status = { label: 'جيد', color: 'cyan-accent-3' }
+  if (remaining <= 0) status = { label: 'متأخر', color: 'red-accent-2' }
+  else if (remaining <= 1000) status = { label: 'قريب', color: 'amber-accent-3' }
+
+  return {
+    ...status,
+    lastKm: lastOdometer,
+    remainingKm: remaining,
+    progress: progress
   }
 }
 
@@ -319,91 +329,99 @@ function formatDate(date) {
 }
 </script>
 
-<style scoped>
+/* Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap');
+
 .status-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0a1929 0%, #1a2744 50%, #0d2137 100%);
+  background-color: #0A1929;
+  font-family: 'Tajawal', sans-serif;
   color: white;
+  position: relative;
+  overflow-x: hidden;
 }
 
-.loading-state,
-.error-state {
+.brand-font {
+  font-family: 'Tajawal', sans-serif !important;
+}
+
+.font-number {
+  font-family: 'Roboto', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+.loading-state {
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  background: #0A1929;
 }
 
-.status-header {
-  background: linear-gradient(135deg, rgba(25, 118, 210, 0.3), rgba(25, 118, 210, 0.1));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+.hero-section {
+  position: relative;
+  height: 400px;
 }
 
-.car-badge {
+.passport-card {
+  background: rgba(30, 41, 59, 0.7) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08); /* border-slate-700/50 */
+  border-radius: 20px !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.passport-card:hover {
+  border-color: rgba(56, 189, 248, 0.3); /* Cyan border */
+}
+
+/* Hero Stat Card */
+.hero-stat-card {
+  border-left: 4px solid #00E5FF;
+}
+
+.hero-icon-wrapper {
   width: 80px;
   height: 80px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, #1976D2, #1565C0);
+  background: rgba(0, 229, 255, 0.1);
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 32px rgba(25, 118, 210, 0.4);
 }
 
-.odometer-card {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-}
-
-.status-card {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
-}
-
-.status-card.border-success { border-color: rgba(76, 175, 80, 0.5); }
-.status-card.border-warning { border-color: rgba(255, 152, 0, 0.5); }
-.status-card.border-error { border-color: rgba(244, 67, 54, 0.5); }
-.status-card.border-amber { border-color: rgba(255, 193, 7, 0.5); }
-.status-card.border-grey { border-color: rgba(158, 158, 158, 0.5); }
-
-.status-icon {
-  width: 40px;
-  height: 40px;
+/* Icons */
+.icon-box {
+  width: 48px;
+  height: 48px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.status-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.2);
+.bg-cyan-accent-3-darken { background: rgba(0, 229, 255, 0.15); }
+.bg-red-accent-2-darken { background: rgba(255, 82, 82, 0.15); }
+.bg-amber-accent-3-darken { background: rgba(255, 196, 0, 0.15); }
+
+/* Borders */
+.border-t {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.last-updated {
-  color: rgba(255, 255, 255, 0.6);
+/* Doc Card */
+.doc-card {
+  background: rgba(15, 23, 42, 0.6) !important;
 }
 
-:deep(.v-card) {
-  background: rgba(255, 255, 255, 0.05) !important;
-  color: white;
-}
+.text-cyan-accent-3 { color: #00E5FF !important; }
+.text-cyan-accent-1 { color: #84FFFF !important; }
 
-:deep(.v-list) {
-  background: transparent !important;
+/* Responsive */
+@media (max-width: 600px) {
+  .hero-section { height: 320px; }
+  .text-h2 { font-size: 2rem !important; }
+  .content-container { padding: 16px; margin-top: -64px !important; }
 }
-
-:deep(.v-list-item-title),
-:deep(.v-list-item-subtitle) {
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-
-:deep(.v-card-title) {
-  color: white;
-}
-</style>
