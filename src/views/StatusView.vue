@@ -207,15 +207,16 @@ const statusCards = computed(() => {
 function getTaskIcon(name) {
   if (!name) return 'mdi-wrench'
   const n = name.toLowerCase()
+  // User preferred icons
   if (n.includes('زيت') || n.includes('oil')) return 'mdi-oil'
-  if (n.includes('فرامل') || n.includes('brake')) return 'mdi-car-brake-abs'
+  if (n.includes('فرامل') || n.includes('brake')) return 'mdi-disc-alert' // Updated preference
   if (n.includes('إطار') || n.includes('كفر') || n.includes('tire')) return 'mdi-tire'
   if (n.includes('فلتر') || n.includes('filter')) return 'mdi-air-filter'
   if (n.includes('بطارية') || n.includes('battery')) return 'mdi-car-battery'
   if (n.includes('سيور') || n.includes('belt')) return 'mdi-engine-belt'
   if (n.includes('بواجي') || n.includes('spark')) return 'mdi-car-spark-plug'
   if (n.includes('فحص') || n.includes('check')) return 'mdi-car-wrench'
-  return 'mdi-wrench-clock'
+  return 'mdi-wrench'
 }
 
 function getTaskMetrics(task) {
@@ -229,21 +230,37 @@ function getTaskMetrics(task) {
     }
   }
 
+  // --- Dynamic Calculation Logic ---
+  // Formula: (Current Reading at Last Maintenance + Interval) - Current Car Odometer
+  
   const currentOdometer = car.value?.current_odometer || 0
   const lastOdometer = task.last_maintenance_odometer || 0
-  const interval = task.interval_km || 5000
-  const kmSinceLast = currentOdometer - lastOdometer
-  const remaining = interval - kmSinceLast
-  const progress = Math.min((kmSinceLast / interval) * 100, 100)
+  const interval = task.interval_km || 5000 // Default interval if missing
+  
+  // Calculate Next Due Odometer
+  const nextDueOdometer = lastOdometer + interval
+  
+  // Calculate Remaining Distance
+  const remaining = nextDueOdometer - currentOdometer
+  
+  // Calculate Progress Percentage (for the bar)
+  // Distance traveled since last maintenance
+  const distanceTraveled = currentOdometer - lastOdometer
+  const progress = Math.min((distanceTraveled / interval) * 100, 100)
 
+  // Status Logic
   let status = { label: 'جيد', color: 'cyan-accent-3' }
-  if (remaining <= 0) status = { label: 'متأخر', color: 'red-accent-2' }
-  else if (remaining <= 1000) status = { label: 'قريب', color: 'amber-accent-3' }
+  
+  if (remaining < 0) {
+    status = { label: 'متأخر', color: 'red-accent-2' }
+  } else if (remaining <= 1000) {
+    status = { label: 'قريب', color: 'amber-accent-3' }
+  }
 
   return {
     ...status,
     lastKm: lastOdometer,
-    remainingKm: remaining,
+    remainingKm: remaining, // Can be negative effectively showing how late it is
     progress: progress
   }
 }
