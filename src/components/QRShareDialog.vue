@@ -1,15 +1,16 @@
 <template>
-  <v-dialog v-model="dialogVisible" max-width="450" :scrim="true" transition="dialog-bottom-transition">
-    <v-card class="rounded-xl position-relative overflow-hidden" min-height="300">
+  <v-dialog v-model="dialogVisible" max-width="450" :scrim="true" transition="none">
+    <v-card class="rounded-xl position-relative overflow-hidden" min-height="300" :key="componentKey">
       <!-- Absolute Close Button -->
+      <!-- Z-index 99999, absolute position, simple click -->
       <v-btn 
         icon="mdi-close"
         variant="tonal"
         size="small"
         color="grey-darken-1"
-        class="close-btn-absolute"
-        style="z-index: 9999 !important; pointer-events: auto !important; cursor: pointer !important;"
-        @click.prevent.stop="close"
+        class="close-btn-zero-failure"
+        style="position: absolute; top: 10px; left: 10px; z-index: 99999 !important; cursor: pointer !important;"
+        @click="close"
         elevation="2"
       ></v-btn>
 
@@ -117,7 +118,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import QRCode from 'qrcode'
 
@@ -127,6 +128,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue', 'updated'])
+const componentKey = ref(Date.now())
 
 // Dialog visibility
 const dialogVisible = computed({
@@ -146,17 +148,9 @@ const shareUrl = computed(() => {
   return `${window.location.origin}/status/${shareToken.value}`
 })
 
-// Initialize on open
-watch(() => props.modelValue, async (isOpen) => {
-  if (isOpen) {
-    await initialize()
-  }
-})
-
+// Initialize immediately on mount (since we use v-if in parent)
 onMounted(async () => {
-  if (props.modelValue) {
     await initialize()
-  }
 })
 
 async function initialize() {
