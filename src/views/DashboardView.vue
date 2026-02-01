@@ -681,7 +681,6 @@
 
     <!-- QR Share Dialog -->
     <QRShareDialog 
-      v-if="showQRDialog"
       v-model="showQRDialog" 
       :car="carStore.car" 
       @updated="handleShareUpdate"

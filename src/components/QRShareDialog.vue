@@ -148,9 +148,20 @@ const shareUrl = computed(() => {
   return `${window.location.origin}/status/${shareToken.value}`
 })
 
-// Initialize immediately on mount (since we use v-if in parent)
-onMounted(async () => {
+// Initialize on open
+watch(() => props.modelValue, async (isOpen) => {
+  if (isOpen) {
+    // Force component key update to ensure fresh render on re-open
+    componentKey.value = Date.now()
     await initialize()
+  }
+})
+
+// Initialize immediately on mount (fallback)
+onMounted(async () => {
+    if (props.modelValue) {
+        await initialize()
+    }
 })
 
 async function initialize() {
