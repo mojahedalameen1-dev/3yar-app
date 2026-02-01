@@ -29,6 +29,17 @@ export const useProfileStore = defineStore('profile', () => {
         return !!(profile.value?.firstName && profile.value?.lastName)
     })
     const hasProfile = computed(() => profile.value !== null)
+    const role = computed(() => profile.value?.role || 'user')
+    const isAdmin = computed(() => profile.value?.role === 'admin')
+
+    // Set role directly (used by router guard)
+    function setRole(newRole) {
+        if (profile.value) {
+            profile.value = { ...profile.value, role: newRole }
+        } else {
+            profile.value = { role: newRole }
+        }
+    }
 
     // Get current user ID from session
     async function getUserId() {
@@ -44,6 +55,7 @@ export const useProfileStore = defineStore('profile', () => {
             firstName: row.first_name,
             lastName: row.last_name,
             phone: row.phone,
+            role: row.role || 'user',
             createdAt: row.created_at,
             updatedAt: row.updated_at
         }
@@ -136,6 +148,9 @@ export const useProfileStore = defineStore('profile', () => {
         phone,
         isComplete,
         hasProfile,
+        role,
+        isAdmin,
+        setRole,
         fetchProfile,
         updateProfile
     }

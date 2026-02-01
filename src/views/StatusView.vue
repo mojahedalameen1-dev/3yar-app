@@ -174,24 +174,22 @@ onMounted(async () => {
 
     car.value = carData
     
-    // 2. Fetch tasks separately using car_id
-    // This relies on the RLS policy: "Public view of maintenance tasks" being active
+    // 2. Fetch tasks using the Secure RPC Function
+    // This bypasses RLS issues by running a server-side function
+    console.log('Attempting to fetch via RPC with token:', shareToken)
+    
     const { data: tasksData, error: tasksError } = await supabase
-      .from('maintenance_tasks')
-      .select('*')
-      .eq('car_id', carData.id)
-      .order('id', { ascending: false })
+      .rpc('get_public_maintenance_tasks', { p_token: shareToken })
 
     if (tasksError) {
-      console.error('Tasks Fetch Error:', tasksError)
-      // Don't block the page, just show empty tasks but log error
+      console.error('RPC Tasks Error:', tasksError)
     }
 
     if (tasksData) {
-       console.log('Tasks loaded (Separate Fetch):', tasksData)
+       console.log('Tasks loaded via RPC:', tasksData)
        tasks.value = tasksData
     } else {
-       console.warn('No maintenance tasks found (or RLS blocked)')
+       console.warn('No tasks returned from RPC')
        tasks.value = []
     }
 

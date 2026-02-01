@@ -114,6 +114,16 @@
               class="nav-item"
               @click="rail = !rail"
             ></v-list-item>
+            <!-- Admin Panel Link (for admins only) -->
+            <v-list-item
+              v-if="profileStore.isAdmin"
+              to="/control-tower-iyar"
+              prepend-icon="mdi-rocket-launch"
+              :title="rail && !isMobile ? '' : 'مركز التحكم'"
+              rounded="lg"
+              class="nav-item admin-link"
+              @click="isMobile ? drawer = false : null"
+            ></v-list-item>
           </v-list>
           
           <!-- User Profile -->
@@ -199,9 +209,14 @@ const profileStore = useProfileStore()
 // App loading state
 const appLoading = ref(true)
 
-// Show navigation only for protected routes
+// Check if current route is admin panel
+const isAdminRoute = computed(() => {
+  return route.meta.requiresAdmin === true
+})
+
+// Show navigation only for protected routes (but not admin panel)
 const showNavigation = computed(() => {
-  return !route.meta.public && authStore.isAuthenticated
+  return !route.meta.public && authStore.isAuthenticated && !isAdminRoute.value
 })
 
 // Theme Store
@@ -412,6 +427,22 @@ provide('isMobile', isMobile)
 
 .nav-item-active .v-icon {
   color: rgb(var(--v-theme-primary)) !important;
+}
+
+/* Admin Link - Distinct styling */
+.admin-link {
+  margin-top: 8px;
+  background: linear-gradient(135deg, rgba(0, 188, 212, 0.15), rgba(156, 39, 176, 0.1)) !important;
+  border: 1px solid rgba(0, 188, 212, 0.3);
+}
+
+.admin-link:hover {
+  background: linear-gradient(135deg, rgba(0, 188, 212, 0.25), rgba(156, 39, 176, 0.2)) !important;
+  border-color: rgba(0, 188, 212, 0.5);
+}
+
+.admin-link .v-icon {
+  color: #00BCD4 !important;
 }
 
 .app-main {

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { supabase } from '@/lib/supabase'
+import { useProfileStore } from '@/stores/profile'
 
 const routes = [
     // Public routes (no auth required)
@@ -66,6 +67,14 @@ const routes = [
         name: 'settings',
         component: () => import('@/views/SettingsView.vue'),
         meta: { title: 'الإعدادات', requiresAuth: true, requiresCar: true }
+    },
+
+    // Admin-only route (hidden from navigation)
+    {
+        path: '/control-tower-iyar',
+        name: 'control-tower',
+        component: () => import('@/views/ControlTowerView.vue'),
+        meta: { title: 'مركز التحكم', requiresAuth: true, requiresAdmin: true }
     },
 
     // Catch-all redirect
@@ -147,6 +156,42 @@ router.beforeEach(async (to, from, next) => {
         if (cars && cars.length > 0) {
             next({ name: 'dashboard' })
             return
+        }
+    }
+
+    // Check admin requirement for control tower
+    if (to.meta.requiresAdmin) {
+        console.log('[Router Guard] Checking admin access for user:', session.user.id)
+
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .maybeSingle()
+
+        // Debug log the result
+        console.log('[Router Guard] Profile fetch result:', { profile, error: profileError })
+        console.log('[Router Guard] Current User Role:', profile?.role)
+
+        if (profileError) {
+            console.error('[Router Guard] Error fetching profile:', profileError)
+            next({ name: 'dashboard' })
+            return
+        }
+
+        if (!profile || profile.role !== 'admin') {
+            console.log('[Router Guard] Access denied - user is not admin, redirecting to dashboard')
+            next({ name: 'dashboard' })
+            return
+        }
+
+        // Sync role to profile store for UI updates
+        try {
+            const profileStore = useProfileStore()
+            profileStore.setRole(profile.role)
+            console.log('[Router Guard] Admin access granted, role synced to store')
+        } catch (e) {
+            console.log('[Router Guard] Could not sync to store (might be fine):', e)
         }
     }
 
