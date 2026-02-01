@@ -1,7 +1,18 @@
 <template>
-  <v-dialog v-model="dialogVisible" max-width="450" eager>
-    <v-card class="rounded-xl">
-      <v-card-title class="d-flex align-center pa-5 pr-12 position-relative">
+  <v-dialog v-model="dialogVisible" max-width="450" :scrim="true" transition="dialog-bottom-transition">
+    <v-card class="rounded-xl position-relative overflow-hidden" min-height="300">
+      <!-- Absolute Close Button -->
+      <v-btn 
+        icon="mdi-close"
+        variant="tonal"
+        size="small"
+        color="grey-darken-1"
+        class="close-btn-absolute"
+        @click.stop="close"
+        elevation="2"
+      ></v-btn>
+
+      <v-card-title class="d-flex align-center pa-5 pt-8">
         <div class="dialog-icon me-3">
           <v-icon color="primary">mdi-qrcode</v-icon>
         </div>
@@ -9,15 +20,6 @@
           <div class="text-h6">مشاركة حالة السيارة</div>
           <div class="text-caption text-medium-emphasis">شارك رمز QR للوصول السريع</div>
         </div>
-        
-        <v-btn 
-          icon 
-          variant="text" 
-          @click.stop="close"
-          class="close-btn"
-        >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
       </v-card-title>
 
       <v-divider></v-divider>
@@ -25,8 +27,8 @@
       <v-card-text class="pa-5">
         <!-- Loading State -->
         <div v-if="loading" class="text-center py-5">
-          <v-progress-circular indeterminate color="primary"></v-progress-circular>
-          <p class="text-caption mt-2">جاري إعداد رابط المشاركة...</p>
+          <v-progress-circular indeterminate color="primary" size="48"></v-progress-circular>
+          <p class="text-caption mt-4">جاري إعداد رابط المشاركة...</p>
         </div>
 
         <!-- QR Content -->
@@ -296,10 +298,10 @@ function close() {
   .print-only { display: block !important; }
 }
 
-.close-btn {
+.close-btn-absolute {
   position: absolute;
-  left: 16px;
-  top: 16px;
-  z-index: 10;
+  left: 14px;
+  top: 14px;
+  z-index: 9999;
 }
 </style>
