@@ -172,18 +172,18 @@ onMounted(async () => {
     }
 
     car.value = carData
-
-    // Fetch tasks for this car
-    const { data: tasksData } = await supabase
-      .from('maintenance_tasks')
-      .select('*')
-      .eq('car_id', carData.id)
-
-    if (tasksData) {
-      tasks.value = tasksData
+    
+    // Sort tasks by logic (Late -> Recent) if needed, otherwise use default order
+    if (carData.maintenance_tasks && carData.maintenance_tasks.length > 0) {
+       tasks.value = carData.maintenance_tasks.sort((a, b) => {
+         // Sort by priority or ID for stable view
+         return b.id - a.id 
+       })
+       console.log('Tasks loaded:', tasks.value)
+    } else {
+       console.warn('No maintenance tasks found embedded in car data')
+       tasks.value = [] // Ensure empty array
     }
-
-
 
   } catch (err) {
     error.value = 'حدث خطأ في تحميل البيانات'
