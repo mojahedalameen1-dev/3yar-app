@@ -771,6 +771,8 @@ const statsCards = computed(() => [
 
 // Wizard
 const showWizard = ref(false)
+const showQRDialog = ref(false)
+
 function onWizardFinished() {
   showSnackbar('تم إعداد حسابك بنجاح! 🎉')
 }
@@ -890,6 +892,7 @@ function confirmRecord() {
 const router = useRouter()
 function openShareDialog() {
   showQRDialog.value = true
+  console.log("Modal state updated to:", showQRDialog.value);
 }
 
 function goToAddMaintenance() {
