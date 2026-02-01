@@ -383,8 +383,18 @@
                   </template>
                   <template v-else>
                     <div class="text-center py-4">
-                      <v-icon size="40" color="grey-lighten-1" class="mb-2">mdi-clipboard-outline</v-icon>
-                      <p class="text-body-2 text-medium-emphasis">لا توجد سجلات بعد</p>
+                      <v-icon size="40" color="grey-lighten-1" class="mb-2">mdi-clipboard-plus-outline</v-icon>
+                      <p class="text-body-2 text-medium-emphasis mb-3">لا توجد سجلات بعد</p>
+                      <v-btn
+                        color="primary"
+                        variant="tonal"
+                        size="small"
+                        prepend-icon="mdi-plus"
+                        @click="goToAddMaintenance"
+                        class="px-4"
+                      >
+                        أضف أول صيانة
+                      </v-btn>
                     </div>
                   </template>
                 </v-card-text>
@@ -680,6 +690,7 @@
 
 <script setup>
 import { ref, computed, inject, defineAsyncComponent, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useCarStore } from '@/stores/car'
 import { useOdometerStore } from '@/stores/odometer'
 import { useTasksStore } from '@/stores/tasks'
@@ -876,6 +887,19 @@ function confirmRecord() {
     spread: 70,
     origin: { y: 0.6 }
   })
+}
+
+// Navigation
+const router = useRouter()
+function goToAddMaintenance() {
+  router.push('/tasks')
+}
+
+function handleShareUpdate(updates) {
+  if (carStore.car) {
+    carStore.updateCarLocal(updates)
+    showSnackbar(updates.publicShareEnabled ? 'تم تفعيل المشاركة' : 'تم إيقاف المشاركة')
+  }
 }
 
 // Helpers
