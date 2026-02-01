@@ -1,7 +1,7 @@
 <template>
-  <v-dialog v-model="dialogVisible" max-width="450" persistent>
+  <v-dialog v-model="dialogVisible" max-width="450" eager>
     <v-card class="rounded-xl">
-      <v-card-title class="d-flex align-center pa-5">
+      <v-card-title class="d-flex align-center pa-5 pr-12 position-relative">
         <div class="dialog-icon me-3">
           <v-icon color="primary">mdi-qrcode</v-icon>
         </div>
@@ -9,8 +9,13 @@
           <div class="text-h6">مشاركة حالة السيارة</div>
           <div class="text-caption text-medium-emphasis">شارك رمز QR للوصول السريع</div>
         </div>
-        <v-spacer></v-spacer>
-        <v-btn icon variant="text" @click="close">
+        
+        <v-btn 
+          icon 
+          variant="text" 
+          @click.stop="close"
+          class="close-btn"
+        >
           <v-icon>mdi-close</v-icon>
         </v-btn>
       </v-card-title>
@@ -289,5 +294,12 @@ function close() {
 @media print {
   .print-area { display: block !important; }
   .print-only { display: block !important; }
+}
+
+.close-btn {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  z-index: 10;
 }
 </style>

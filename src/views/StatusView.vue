@@ -19,31 +19,30 @@
 
     <!-- Digital Passport Content -->
     <v-main v-else-if="car" class="passport-content pa-0">
-      <!-- Hero Section -->
       <div class="hero-section">
         <v-img
           :src="car.image || 'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=2070&auto=format&fit=crop'"
           cover
-          height="400"
+          height="100%"
           class="hero-image"
-          gradient="to bottom, rgba(10,25,41,0.3), rgba(10,25,41,1)"
         >
-          <div class="hero-content d-flex flex-column justify-end h-100 pa-6 pb-12">
+          <div class="hero-overlay"></div>
+          <div class="hero-content d-flex flex-column justify-end h-100 pa-6 pb-12 position-relative">
             <v-chip color="cyan-accent-3" variant="flat" class="align-self-start mb-4 font-weight-bold">
               {{ car.year }}
             </v-chip>
-            <h1 class="text-h2 font-weight-black text-white mb-2 brand-font">
+            <h1 class="text-h2 font-weight-black text-white mb-2 brand-font text-wrap">
               {{ car.make }} {{ car.model }}
             </h1>
-            <div class="d-flex align-center gap-2 opacity-80">
+            <div class="d-flex align-center gap-2 opacity-100">
               <v-icon color="cyan-accent-3" size="small">mdi-shield-check</v-icon>
-              <span class="text-subtitle-1">جواز السيارة الرقمي - موثق</span>
+              <span class="text-subtitle-1 font-weight-bold">جواز السيارة الرقمي - موثق</span>
             </div>
           </div>
         </v-img>
       </div>
 
-      <v-container class="content-container mt-n12 position-relative z-index-2">
+      <v-container class="content-container position-relative z-index-2">
         <!-- Odometer Hero Card -->
         <v-card class="passport-card hero-stat-card mb-6" elevation="10">
           <v-card-text class="d-flex align-center justify-space-between pa-6 pa-md-8">
@@ -331,6 +330,7 @@ function formatDate(date) {
 }
 </script>
 
+<style scoped>
 /* Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap');
 
@@ -424,6 +424,33 @@ function formatDate(date) {
 /* Responsive */
 @media (max-width: 600px) {
   .hero-section { height: 320px; }
-  .text-h2 { font-size: 2rem !important; }
-  .content-container { padding: 16px; margin-top: -64px !important; }
+  /* Ensure header text doesn't overflow or too big */
+  .text-h2 { font-size: 1.75rem !important; line-height: 1.2 !important; }
+  /* Adjust container negative margin to be responsive */
+  .content-container { 
+    padding: 16px; 
+    margin-top: -40px !important; 
+  }
 }
+
+@media (min-width: 601px) {
+  .hero-section { height: 400px; }
+  .content-container { 
+    margin-top: -64px !important; 
+  }
+}
+
+.hero-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, rgba(10,25,41,0.2) 0%, rgba(10,25,41,0.6) 50%, rgba(10,25,41,1) 100%);
+  z-index: 1;
+}
+
+.hero-content {
+  z-index: 2;
+}
+</style>
