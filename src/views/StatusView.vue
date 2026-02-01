@@ -1,3 +1,4 @@
+<template>
   <div class="status-page">
     <div class="status-gradient-bg"></div>
     
@@ -142,6 +143,7 @@
       </v-container>
     </v-main>
   </div>
+</template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
