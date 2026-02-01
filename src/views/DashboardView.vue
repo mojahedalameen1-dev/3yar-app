@@ -436,7 +436,15 @@
       </v-row>
     </template>
 
-
+    <!-- QR Share Dialog -->
+    <Teleport to="body">
+      <div v-if="showQRDialog" :key="Date.now()" style="position: relative; z-index: 99999;">
+        <QRShareDialog 
+          v-model="showQRDialog"
+          :car="carStore.car"
+        />
+      </div>
+    </Teleport>
 
     <!-- Add Car Dialog -->
     <v-dialog v-model="showCarDialog" max-width="600" persistent>
