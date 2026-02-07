@@ -455,6 +455,7 @@
     <v-dialog v-model="userDialog.show" max-width="500">
       <v-card :title="userDialog.isEdit ? 'تعديل المستخدم' : 'إضافة مستخدم جديد'" color="#1e1e24">
         <v-card-text>
+          <v-text-field v-model="userDialog.data.user_id" label="User ID (من سوبابيس)" hint="قم بنسخ الـ ID من لوحة تحكم Supabase Auth" persistent-hint class="mb-2" v-if="!userDialog.isEdit"></v-text-field>
           <v-row dense>
              <v-col cols="6">
                <v-text-field v-model="userDialog.data.first_name" label="الاسم الأول"></v-text-field>
@@ -881,7 +882,7 @@ async function saveUser() {
         showSnack(userDialog.value.isEdit ? 'تم تحديث البيانات' : 'تم إضافة المستخدم')
         userDialog.value.show = false
     } else {
-        showSnack('حدث خطأ', 'error')
+        showSnack(res.error || 'حدث خطأ', 'error')
     }
 }
 
@@ -902,7 +903,7 @@ async function saveCar() {
         showSnack('تم حفظ السيارة بنجاح')
         carDialog.value.show = false
     } else {
-        showSnack('حدث خطأ', 'error')
+        showSnack(res.error || 'حدث خطأ', 'error')
     }
 }
 
@@ -977,7 +978,7 @@ async function executeDelete() {
   deleteDialog.value.show = false
 
   if (res.success) showSnack('تم الحذف بنجاح')
-  else showSnack('فشلت عملية الحذف', 'error')
+  else showSnack(res.error || 'فشلت عملية الحذف', 'error')
 }
 
 // --- SYSTEM ---

@@ -352,26 +352,30 @@ export const useAdminStore = defineStore('admin', () => {
     // CRUD ACTIONS
     // =====================================================
 
-    // Create User
+    // Create User (Profile)
     async function createUser(userData) {
         try {
-            console.warn('Creating users directly from client is restricted. Mocking success for UI.')
-
-            // Mock response
-            const newUser = {
-                user_id: `new-${Date.now()}`,
-                ...userData,
-                created_at: new Date().toISOString(),
+            // NOTE: Client-side Auth user creation is restricted.
+            // This function creates the profile for a user that should be created in Supabase Auth first.
+            const { error: err } = await supabase.rpc('create_user_profile_admin', {
+                new_user_id: userData.user_id, // Admin must provide the ID from Auth
+                first_name: userData.first_name,
+                last_name: userData.last_name,
+                phone: userData.phone,
+                email: userData.email,
                 role: userData.role || 'user'
-            }
+            })
 
-            users.value.unshift(newUser)
+            if (err) throw err
+
+            // Refresh users list to get the real data
+            await fetchAllUsers()
             analytics.value.totalUsers++
-            return { success: true, data: newUser }
+            return { success: true }
 
         } catch (err) {
-            console.error('Error creating user:', err)
-            return { success: false, error: err.message }
+            console.error('Error creating user profile:', err)
+            return { success: false, error: err.message || 'فشل إنشاء الملف الشخصي. تأكد من صحة معرف المستخدم (User ID).' }
         }
     }
 
@@ -413,7 +417,7 @@ export const useAdminStore = defineStore('admin', () => {
             const { data, error: err } = await supabase
                 .from('maintenance_records')
                 .insert([{
-                    user_id: recordData.user_id, // Need to fetch from car if not provided
+                    user_id: recordData.user_id,
                     car_id: recordData.car_id,
                     task_name: recordData.task_name,
                     cost: recordData.cost,
@@ -449,7 +453,7 @@ export const useAdminStore = defineStore('admin', () => {
                 const filePath = `documents/${fileName}`
 
                 const { error: uploadError } = await supabase.storage
-                    .from('images') // Using existing bucket
+                    .from('images')
                     .upload(filePath, file)
 
                 if (uploadError) throw uploadError
@@ -509,19 +513,18 @@ export const useAdminStore = defineStore('admin', () => {
         }
     }
 
-    // Delete User (This will cascade delete all related data due to DB constraints)
+    // Delete User Entirely
     async function deleteUser(userId) {
         try {
-            const { error: err } = await supabase
-                .from('profiles')
-                .delete()
-                .eq('user_id', userId)
+            // Use the RPC to ensure cascade deletion and permission bypass
+            const { error: err } = await supabase.rpc('delete_user_by_admin', {
+                target_user_id: userId
+            })
 
             if (err) throw err
 
             // Update local state
             users.value = users.value.filter(u => u.user_id !== userId)
-            // Filter out related data from local state
             cars.value = cars.value.filter(c => c.user_id !== userId)
             records.value = records.value.filter(r => r.user_id !== userId)
             documents.value = documents.value.filter(d => d.user_id !== userId)
@@ -529,7 +532,7 @@ export const useAdminStore = defineStore('admin', () => {
             return { success: true }
         } catch (err) {
             console.error('Error deleting user:', err)
-            return { success: false, error: err.message }
+            return { success: false, error: err.message || 'فشل حذف المستخدم. قد يكون هناك قيود في قاعدة البيانات.' }
         }
     }
 
