@@ -349,119 +349,11 @@ export const useAdminStore = defineStore('admin', () => {
     }
 
     // =====================================================
-    // REAL-TIME SUBSCRIPTIONS
+    // CRUD ACTIONS
     // =====================================================
 
-    let activitySubscription = null
-
-    function subscribeToActivity() {
-        if (activitySubscription) return
-
-        activitySubscription = supabase
-            .channel('activity-feed')
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'activity_logs' },
-                async (payload) => {
-                    // Fetch the new activity with profile info
-                    const { data } = await supabase
-                        .from('activity_logs')
-                        .select(`
-                            *,
-                            profiles:user_id (first_name, last_name)
-                        `)
-                        .eq('id', payload.new.id)
-                        .single()
-
-                    if (data) {
-                        activityFeed.value.unshift(data)
-                        // Keep only last 50
-                        if (activityFeed.value.length > 50) {
-                            activityFeed.value.pop()
-                        }
-                    }
-                }
-            )
-            .subscribe()
-    }
-
-    function unsubscribeFromActivity() {
-        if (activitySubscription) {
-            supabase.removeChannel(activitySubscription)
-            activitySubscription = null
-        }
-    }
-
-    // =====================================================
-    // COMPUTED HELPERS
-    // =====================================================
-
-    const formattedTotalCost = computed(() => {
-        return analytics.value.totalCost.toLocaleString('ar-SA')
-    })
-
-    // Get user details by ID
-    function getUserById(userId) {
-        return users.value.find(u => u.user_id === userId)
-    }
-
-    // Get cars for a specific user
-    function getCarsForUser(userId) {
-        return cars.value.filter(c => c.user_id === userId)
-    }
-
-    // Get records for a specific user
-    function getRecordsForUser(userId) {
-        return records.value.filter(r => r.user_id === userId)
-    }
-
-    // Get documents for a specific user
-    function getDocumentsForUser(userId) {
-        return documents.value.filter(d => d.user_id === userId)
-    }
-
-    return {
-        // State
-        users,
-        cars,
-        records,
-        documents,
-        announcements,
-        activityFeed,
-        templates,
-        analytics,
-        loading,
-        error,
-
-        // Actions
-        $reset,
-        fetchAllUsers,
-        fetchAllCars,
-        fetchAllRecords,
-        fetchAllDocuments,
-        fetchAnnouncements,
-        fetchActivityFeed,
-        fetchTemplates,
-        fetchAnalytics,
-        postAnnouncement,
-        toggleAnnouncement,
-        updateTemplate,
-        subscribeToActivity,
-        unsubscribeFromActivity,
-
-        // Helpers
-        formattedTotalCost,
-        getUserById,
-        getCarsForUser,
-        getRecordsForUser,
-        getDocumentsForUser,
-
-        // =====================================================
-        // CRUD ACTIONS
-        // =====================================================
-
-        // Update User Profile
-        async function updateUser(userId, updates) {
+    // Update User Profile
+    async function updateUser(userId, updates) {
         try {
             const { data, error: err } = await supabase
                 .from('profiles')
@@ -487,13 +379,6 @@ export const useAdminStore = defineStore('admin', () => {
     // Delete User (This will cascade delete all related data due to DB constraints)
     async function deleteUser(userId) {
         try {
-            // First delete from auth.users (requires service role / admin API usually)
-            // BUT since we are using Supabase client, we can only delete from public tables if permitted.
-            // Deleting from 'profiles' might not delete the auth user depending on setup.
-            // COMPLETE DELETION via Client usually requires Edge Function if deleting from auth.users is needed.
-            // FOR NOW: We will delete from 'profiles' and let the UI know.
-            // NOTE: If RLS allows, we can delete from public.profiles.
-
             const { error: err } = await supabase
                 .from('profiles')
                 .delete()
@@ -619,6 +504,78 @@ export const useAdminStore = defineStore('admin', () => {
         }
     }
 
+    // =====================================================
+    // REAL-TIME SUBSCRIPTIONS
+    // =====================================================
+
+    let activitySubscription = null
+
+    function subscribeToActivity() {
+        if (activitySubscription) return
+
+        activitySubscription = supabase
+            .channel('activity-feed')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'activity_logs' },
+                async (payload) => {
+                    // Fetch the new activity with profile info
+                    const { data } = await supabase
+                        .from('activity_logs')
+                        .select(`
+                            *,
+                            profiles:user_id (first_name, last_name)
+                        `)
+                        .eq('id', payload.new.id)
+                        .single()
+
+                    if (data) {
+                        activityFeed.value.unshift(data)
+                        // Keep only last 50
+                        if (activityFeed.value.length > 50) {
+                            activityFeed.value.pop()
+                        }
+                    }
+                }
+            )
+            .subscribe()
+    }
+
+    function unsubscribeFromActivity() {
+        if (activitySubscription) {
+            supabase.removeChannel(activitySubscription)
+            activitySubscription = null
+        }
+    }
+
+    // =====================================================
+    // COMPUTED HELPERS
+    // =====================================================
+
+    const formattedTotalCost = computed(() => {
+        return analytics.value.totalCost.toLocaleString('ar-SA')
+    })
+
+    // Get user details by ID
+    function getUserById(userId) {
+        return users.value.find(u => u.user_id === userId)
+    }
+
+    // Get cars for a specific user
+    function getCarsForUser(userId) {
+        return cars.value.filter(c => c.user_id === userId)
+    }
+
+    // Get records for a specific user
+    function getRecordsForUser(userId) {
+        return records.value.filter(r => r.user_id === userId)
+    }
+
+    // Get documents for a specific user
+    function getDocumentsForUser(userId) {
+        return documents.value.filter(d => d.user_id === userId)
+    }
+
     return {
         // State
         users,
@@ -664,5 +621,4 @@ export const useAdminStore = defineStore('admin', () => {
         getRecordsForUser,
         getDocumentsForUser
     }
-}
 })
