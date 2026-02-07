@@ -1,3 +1,4 @@
+<!-- Redesigned Management Portal v1.1 - Added Security & Sidebar -->
 <template>
   <div class="management-portal rtl-layout">
     <v-layout class="full-height">

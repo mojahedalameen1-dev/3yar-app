@@ -117,7 +117,7 @@
             <!-- Admin Panel Link (for admins only) -->
             <v-list-item
               v-if="profileStore.isAdmin"
-              to="/control-tower-iyar"
+              to="/admin-login"
               prepend-icon="mdi-rocket-launch"
               :title="rail && !isMobile ? '' : 'مركز التحكم'"
               rounded="lg"

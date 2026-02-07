@@ -178,7 +178,7 @@ router.beforeEach(async (to, from, next) => {
 
     // Check admin requirement for control tower
     if (to.meta.requiresAdmin) {
-        // 1. Check Session Storage Lock (Fastest check for explicit login)
+        // STRICT CHECK: Only allow access if they have the explicit session key from AdminLoginView
         const isAdminSession = sessionStorage.getItem('adminKey') === 'valid'
 
         if (isAdminSession) {
@@ -186,40 +186,7 @@ router.beforeEach(async (to, from, next) => {
             return
         }
 
-        console.log('[Router Guard] Checking admin access for user:', session.user.id)
-
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .maybeSingle()
-
-        // Debug log the result
-        console.log('[Router Guard] Profile fetch result:', { profile, error: profileError })
-        console.log('[Router Guard] Current User Role:', profile?.role)
-
-        if (profileError) {
-            console.error('[Router Guard] Error fetching profile:', profileError)
-            next({ name: 'dashboard' })
-            return
-        }
-
-        // 2. Check Database Role (If they are already admin in DB)
-        if (profile?.role === 'admin') {
-            // Sync role to profile store for UI updates
-            try {
-                const profileStore = useProfileStore()
-                profileStore.setRole(profile.role)
-                console.log('[Router Guard] Admin access granted (DB Role), synced to store')
-            } catch (e) {
-                console.log('[Router Guard] Could not sync to store:', e)
-            }
-            next()
-            return
-        }
-
-        // 3. Reject Access -> Send to Admin Login
-        console.log('[Router Guard] Access denied - redirecting to admin login')
+        console.log('[Router Guard] Admin session not found - redirecting to admin login')
         next({ name: 'admin-login' })
         return
     }
