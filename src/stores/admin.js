@@ -270,28 +270,29 @@ export const useAdminStore = defineStore('admin', () => {
     // MUTATION FUNCTIONS
     // =====================================================
 
-    // Post a new system announcement
     async function postAnnouncement(announcement) {
         try {
+            console.log('📤 Posting announcement to database:', announcement)
             const { data, error: err } = await supabase
                 .from('announcements')
                 .insert({
                     title: announcement.title,
                     message: announcement.message,
-                    type: announcement.type || 'info',
-                    expires_at: announcement.expiresAt || null
+                    type: announcement.type || 'info'
                 })
                 .select()
                 .single()
 
             if (err) throw err
+            console.log('✅ Announcement posted successfully:', data)
             announcements.value.unshift(data)
             return { success: true, data }
         } catch (err) {
-            console.error('Error posting announcement:', err)
+            console.error('❌ Error posting announcement:', err)
             return { success: false, error: err.message }
         }
     }
+
 
     // Toggle announcement active status
     async function toggleAnnouncement(id, isActive) {
