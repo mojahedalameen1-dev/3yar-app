@@ -6,7 +6,8 @@
       <v-navigation-drawer
         v-model="drawer"
         location="right"
-        permanent
+        :permanent="!isMobile"
+        :temporary="isMobile"
         width="280"
         class="admin-sidebar"
         elevation="0"
@@ -64,9 +65,9 @@
         <v-container fluid class="pa-6 fill-height align-start">
           
           <!-- Section Header -->
-          <div class="section-header mb-6 d-flex align-center justify-space-between">
-            <div>
-              <h2 class="text-h4 font-weight-bold text-white mb-1">
+          <div class="section-header mb-6 d-flex flex-wrap align-center justify-space-between gap-4">
+            <div class="flex-shrink-1" style="min-width: 0;">
+              <h2 class="text-h4 font-weight-bold text-white mb-1 text-truncate">
                 {{ currentMenuItem.title }}
               </h2>
               <p class="text-body-2 text-medium-emphasis">
@@ -75,7 +76,7 @@
             </div>
             
             <!-- Global Actions / Filters -->
-            <div v-if="activeTab !== 'analytics'" class="d-flex gap-3 align-center">
+            <div v-if="activeTab !== 'analytics'" class="d-flex gap-3 align-center flex-shrink-0 flex-wrap">
                <v-text-field
                 v-model="globalSearch"
                 prepend-inner-icon="mdi-magnify"
@@ -85,7 +86,7 @@
                 hide-details
                 class="search-bar"
                 bg-color="rgba(255,255,255,0.05)"
-                style="width: 300px"
+                style="max-width: 300px; min-width: 200px"
               ></v-text-field>
 
               <!-- Create Buttons based on active tab -->
@@ -163,7 +164,7 @@
               <div class="glass-panel table-container">
                 <!-- Empty State -->
                 <div v-if="!filteredUsers.length" class="empty-state">
-                  <v-icon size="64" color="grey-darken-2">mdi-account-off</v-icon>
+                  <v-icon size="64" color="grey-darken-2" aria-label="لا يوجد مستخدمين">mdi-account-off</v-icon>
                   <p class="text-body-1 text-grey mt-2">لا يوجد مستخدمين لعرضهم</p>
                 </div>
 
@@ -609,6 +610,7 @@
             <v-spacer></v-spacer>
             <v-btn color="primary" variant="text" :href="docViewer.url" target="_blank" prepend-icon="mdi-download">تحميل</v-btn>
          </v-toolbar>
+         <v-progress-linear v-if="docViewer.loading" indeterminate color="cyan-accent-3" absolute bottom></v-progress-linear>
          <div class="d-flex align-center justify-center fill-height bg-grey-darken-4 pa-4">
              <!-- PDF Viewer Check -->
              <iframe 
@@ -617,8 +619,15 @@
                width="100%" 
                height="100%" 
                frameborder="0"
+               @load="docViewer.loading = false"
              ></iframe>
-             <v-img v-else :src="docViewer.url" contain max-height="90vh"></v-img>
+             <v-img 
+                v-else 
+                :src="docViewer.url" 
+                contain 
+                max-height="90vh"
+                @load="docViewer.loading = false"
+             ></v-img>
          </div>
        </v-card>
     </v-dialog>
@@ -636,10 +645,19 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
-import { Line, Doughnut } from 'vue-chartjs'
+import { Doughnut, Line } from 'vue-chartjs'
+import { useDisplay } from 'vuetify'
 import {
-  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, 
-  ArcElement, Title, Tooltip, Legend
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Filler
 } from 'chart.js'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -647,13 +665,15 @@ import 'dayjs/locale/ar'
 
 dayjs.extend(relativeTime)
 dayjs.locale('ar')
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend)
+ChartJS.register(Title, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, PointElement, LineElement, Filler)
 
 const router = useRouter()
 const adminStore = useAdminStore()
+const { mobile } = useDisplay()
 
-// --- State ---
-const drawer = ref(true)
+const isMobile = computed(() => mobile.value)
+// State
+const drawer = ref(true) // Sidebar toggle
 const activeTab = ref('analytics')
 const globalSearch = ref('')
 const chartsReady = ref(false)
@@ -951,7 +971,7 @@ function getDocColor(type) {
 }
 
 function viewDocument(doc) {
-  docViewer.value = { show: true, url: doc.image }
+  docViewer.value = { show: true, url: doc.image, loading: true }
 }
 
 function isPdf(url) {
@@ -1023,8 +1043,9 @@ onMounted(async () => {
 }
 
 /* Sidebar Styles */
+/* Sidebar Styles */
 .admin-sidebar {
-  background: #1e293b !important; /* Slate 800 */
+  background: #1e293b; /* Slate 800 */
   border-left: 1px solid rgba(255,255,255,0.05);
 }
 
@@ -1045,9 +1066,15 @@ onMounted(async () => {
   color: #94a3b8; /* Slate 400 */
 }
 
+/* Sidebar Styles */
+.admin-sidebar {
+  background: #1e293b; /* Slate 800 */
+  border-left: 1px solid rgba(255,255,255,0.05);
+}
+
 .menu-item--active {
-  background: rgba(6, 182, 212, 0.1) !important;
-  color: #22d3ee !important; /* Cyan 400 */
+  background: rgba(6, 182, 212, 0.1);
+  color: #22d3ee; /* Cyan 400 */
 }
 
 .sidebar-footer {
@@ -1100,30 +1127,30 @@ onMounted(async () => {
 .trend-badge.positive { color: #4ade80; background: rgba(74, 222, 128, 0.1); }
 .trend-badge.negative { color: #f87171; background: rgba(248, 113, 113, 0.1); }
 
-/* Table Styles */
-.table-container {
-  overflow: hidden;
-}
-
-.admin-table {
-  background: transparent !important;
-  color: #e2e8f0;
-}
-
-.admin-table :deep(th) {
-  background: rgba(30, 41, 59, 0.9) !important;
-  color: #94a3b8 !important;
-  font-weight: 600 !important;
-  border-bottom: 1px solid rgba(255,255,255,0.1) !important;
-}
-
-.admin-table :deep(td) {
-  border-bottom: 1px solid rgba(255,255,255,0.05) !important;
-}
-
-.admin-table :deep(tr:hover) {
-  background: rgba(255,255,255,0.03) !important;
-}
+  /* Table Styles */
+  .table-container {
+    overflow: hidden;
+  }
+  
+  .admin-table {
+    background: transparent;
+    color: #e2e8f0;
+  }
+  
+  .admin-table :deep(th) {
+    background: rgba(30, 41, 59, 0.9);
+    color: #94a3b8;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  
+  .admin-table :deep(td) {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  
+  .admin-table :deep(tr:hover) {
+    background: rgba(255,255,255,0.03);
+  }
 
 .empty-state {
   display: flex;

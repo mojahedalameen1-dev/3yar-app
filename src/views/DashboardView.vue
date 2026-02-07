@@ -900,7 +900,7 @@ function confirmRecord() {
 const router = useRouter()
 function openShareDialog() {
   showQRDialog.value = true
-  console.log("Modal state updated to:", showQRDialog.value);
+  // console.log("Modal state updated to:", showQRDialog.value);
 }
 
 function goToAddMaintenance() {

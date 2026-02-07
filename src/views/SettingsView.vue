@@ -408,7 +408,7 @@ async function saveCar() {
   const oldCarData = { ...carStore.car }
   
   try {
-    console.log('Saving car data:', carData)
+    // console.log('Saving car data:', carData)
     await carStore.updateCar(carData)
     
     // Re-fetch to ensure UI is synced

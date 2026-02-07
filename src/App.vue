@@ -141,11 +141,13 @@
       </div>
       
       <v-container v-else fluid :class="showNavigation ? 'pa-4 pa-md-6' : 'pa-0'">
-        <router-view v-slot="{ Component }">
-          <transition name="slide-fade" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
+        <ErrorBoundary>
+          <router-view v-slot="{ Component }">
+            <transition name="slide-fade" mode="out-in">
+              <component :is="Component" />
+            </transition>
+          </router-view>
+        </ErrorBoundary>
       </v-container>
     </v-main>
 
@@ -194,6 +196,7 @@ import { useProfileStore } from '@/stores/profile'
 import { useThemeStore } from '@/stores/theme'
 import UserProfile from '@/components/UserProfile.vue'
 import ProfileSetup from '@/components/ProfileSetup.vue'
+import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import ayarLogo from '@/assets/ayar-logo.png'
 
 const route = useRoute()

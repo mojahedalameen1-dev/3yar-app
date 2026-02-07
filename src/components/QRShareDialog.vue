@@ -171,7 +171,7 @@ function printQR() {
         </div>
         <script>
           window.onload = function() { window.print(); window.close(); }
-        <\/script>
+        ` + '<' + '/script>' + `
       </body>
     </html>
   `)
@@ -179,7 +179,17 @@ function printQR() {
 }
 
 async function shareNative() {
-  if (navigator.share) {
+  if (/Android/i.test(navigator.userAgent)) {
+    try {
+      await navigator.share({
+        title: 'مشاركة حالة السيارة',
+        text: `شاهد حالة سيارتي ${props.car.make} ${props.car.model}`,
+        url: shareUrl.value
+      })
+    } catch (e) {
+        // ignore share cancellation
+    }
+  } else if (navigator.share) {
     try {
       await navigator.share({
         title: 'مشاركة حالة السيارة',

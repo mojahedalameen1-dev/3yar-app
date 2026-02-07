@@ -186,7 +186,7 @@ router.beforeEach(async (to, from, next) => {
             return
         }
 
-        console.log('[Router Guard] Admin session not found - redirecting to admin login')
+        // console.log('[Router Guard] Admin session not found - redirecting to admin login')
         next({ name: 'admin-login' })
         return
     }

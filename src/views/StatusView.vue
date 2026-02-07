@@ -176,7 +176,7 @@ onMounted(async () => {
     
     // 2. Fetch tasks using the Secure RPC Function
     // This bypasses RLS issues by running a server-side function
-    console.log('Attempting to fetch via RPC with token:', shareToken)
+    // console.log('Attempting to fetch via RPC with token:', shareToken)
     
     const { data: tasksData, error: tasksError } = await supabase
       .rpc('get_public_maintenance_tasks', { p_token: shareToken })
@@ -186,7 +186,7 @@ onMounted(async () => {
     }
 
     if (tasksData) {
-       console.log('Tasks loaded via RPC:', tasksData)
+       // console.log('Tasks loaded via RPC:', tasksData)
        tasks.value = tasksData
     } else {
        console.warn('No tasks returned from RPC')
