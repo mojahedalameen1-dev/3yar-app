@@ -120,7 +120,7 @@ export const useAdminStore = defineStore('admin', () => {
     async function fetchAnnouncements() {
         try {
             const { data, error: err } = await supabase
-                .from('system_announcements')
+                .from('announcements')
                 .select('*')
                 .order('created_at', { ascending: false })
 
@@ -274,12 +274,11 @@ export const useAdminStore = defineStore('admin', () => {
     async function postAnnouncement(announcement) {
         try {
             const { data, error: err } = await supabase
-                .from('system_announcements')
+                .from('announcements')
                 .insert({
                     title: announcement.title,
                     message: announcement.message,
                     type: announcement.type || 'info',
-                    is_active: true,
                     expires_at: announcement.expiresAt || null
                 })
                 .select()
@@ -298,8 +297,8 @@ export const useAdminStore = defineStore('admin', () => {
     async function toggleAnnouncement(id, isActive) {
         try {
             const { error: err } = await supabase
-                .from('system_announcements')
-                .update({ is_active: isActive })
+                .from('announcements')
+                .delete()
                 .eq('id', id)
 
             if (err) throw err

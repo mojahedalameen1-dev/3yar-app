@@ -194,6 +194,7 @@ import { useRecordsStore } from '@/stores/records'
 import { useOdometerStore } from '@/stores/odometer'
 import { useProfileStore } from '@/stores/profile'
 import { useThemeStore } from '@/stores/theme'
+import { useNotificationsStore } from '@/stores/notifications'
 import UserProfile from '@/components/UserProfile.vue'
 import ProfileSetup from '@/components/ProfileSetup.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
@@ -208,6 +209,7 @@ const documentsStore = useDocumentsStore()
 const recordsStore = useRecordsStore()
 const odometerStore = useOdometerStore()
 const profileStore = useProfileStore()
+const notificationsStore = useNotificationsStore()
 
 // App loading state
 const appLoading = ref(true)
@@ -275,8 +277,11 @@ async function initializeData() {
         tasksStore.fetchTasks(),
         documentsStore.fetchDocuments(),
         recordsStore.fetchRecords(),
-        odometerStore.fetchReadings()
+        odometerStore.fetchReadings(),
+        notificationsStore.fetchAnnouncements(),
+        notificationsStore.fetchReadHistory()
       ])
+      notificationsStore.subscribeToAnnouncements()
     }
   } catch (error) {
     console.error('Error initializing data:', error)
@@ -324,6 +329,13 @@ const navItems = computed(() => [
     route: '/records', 
     name: 'records',
     badge: 0
+  },
+  {
+    title: 'الإشعارات',
+    icon: 'mdi-bell',
+    route: '/notifications',
+    name: 'notifications',
+    badge: notificationsStore.unreadCount
   },
   { 
     title: 'وثائق السيارة', 

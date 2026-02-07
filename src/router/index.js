@@ -68,6 +68,12 @@ const routes = [
         component: () => import('@/views/SettingsView.vue'),
         meta: { title: 'الإعدادات', requiresAuth: true, requiresCar: true }
     },
+    {
+        path: '/notifications',
+        name: 'notifications',
+        component: () => import('@/views/NotificationsView.vue'),
+        meta: { title: 'الإشعارات', requiresAuth: true }
+    },
 
     // Admin-only route (hidden from navigation)
     {

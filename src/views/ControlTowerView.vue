@@ -11,6 +11,7 @@
         width="280"
         class="admin-sidebar"
         elevation="0"
+        border="0"
       >
         <!-- Header -->
         <div class="sidebar-header">
@@ -50,8 +51,9 @@
           <v-divider class="mb-4 border-opacity-10"></v-divider>
           <v-btn
             block
-            variant="outlined"
-            class="return-btn"
+            variant="tonal"
+            color="cyan-accent-1"
+            class="return-btn font-weight-bold"
             @click="returnToApp"
           >
             <v-icon start>mdi-arrow-right</v-icon>
@@ -109,9 +111,9 @@
             <v-window-item value="analytics">
               <div class="analytics-dashboard">
                 <!-- KPI Cards -->
-                <v-row class="mb-4">
+                <v-row class="mb-4" dense>
                   <v-col v-for="stat in kpiStats" :key="stat.title" cols="12" sm="6" lg="3">
-                    <div class="kpi-card glass-panel">
+                    <div class="kpi-card glass-panel h-100">
                       <div class="d-flex justify-space-between align-start mb-4">
                         <div class="kpi-icon-box" :class="stat.colorClass">
                           <v-icon color="white" size="24">{{ stat.icon }}</v-icon>
@@ -1043,10 +1045,22 @@ onMounted(async () => {
 }
 
 /* Sidebar Styles */
-/* Sidebar Styles */
 .admin-sidebar {
-  background: #1e293b; /* Slate 800 */
-  border-left: 1px solid rgba(255,255,255,0.05);
+  background: #1e293b !important; /* Slate 800 */
+  border-left: 1px solid rgba(255,255,255,0.05) !important;
+  position: fixed !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+}
+
+.sidebar-menu {
+  height: calc(100vh - 180px);
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+}
+
+.sidebar-menu::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 .sidebar-header {
@@ -1066,12 +1080,6 @@ onMounted(async () => {
   color: #94a3b8; /* Slate 400 */
 }
 
-/* Sidebar Styles */
-.admin-sidebar {
-  background: #1e293b; /* Slate 800 */
-  border-left: 1px solid rgba(255,255,255,0.05);
-}
-
 .menu-item--active {
   background: rgba(6, 182, 212, 0.1);
   color: #22d3ee; /* Cyan 400 */
@@ -1085,6 +1093,14 @@ onMounted(async () => {
 /* Content Area */
 .admin-content {
   background: #0f172a;
+  min-height: 100vh;
+  transition: padding-right 0.3s ease;
+}
+
+@media (min-width: 960px) {
+  .admin-content {
+    padding-right: 280px !important;
+  }
 }
 
 /* Glass Panel Utilities */
