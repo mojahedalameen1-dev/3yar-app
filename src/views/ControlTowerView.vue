@@ -378,23 +378,31 @@
                     <v-form @submit.prevent="sendAnnouncement">
                       <v-text-field
                         v-model="announcementForm.title"
-                        label="عنوان الإشعار"
+                        label="عنوان الإشعار *"
                         variant="outlined"
                         bg-color="rgba(255,255,255,0.03)"
+                        :rules="[v => !!v || 'العنوان مطلوب']"
+                        required
                       ></v-text-field>
                       <v-textarea
                         v-model="announcementForm.message"
-                        label="نص الرسالة"
+                        label="نص الرسالة *"
                         rows="3"
                         variant="outlined"
                         bg-color="rgba(255,255,255,0.03)"
+                        :rules="[v => !!v || 'نص الرسالة مطلوب']"
+                        required
                       ></v-textarea>
                       <v-select
                         v-model="announcementForm.type"
-                        :items="announcementTypes"
-                        label="نوع التنبيه"
+                        :items="announcementTypeOptions"
+                        item-title="label"
+                        item-value="value"
+                        label="نوع التنبيه *"
                         variant="outlined"
                         bg-color="rgba(255,255,255,0.03)"
+                        :rules="[v => !!v || 'نوع التنبيه مطلوب']"
+                        required
                       ></v-select>
                       <v-btn color="red-accent-2" block size="large" type="submit" :loading="sendingAnnouncement">
                         إرسال للجميع
@@ -692,7 +700,12 @@ const docViewer = ref({ show: false, url: null })
 
 // Announcement Form
 const announcementForm = ref({ title: '', message: '', type: 'info' })
-const announcementTypes = ['info', 'warning', 'success', 'error']
+const announcementTypeOptions = [
+  { value: 'info', label: 'تنبيه' },
+  { value: 'warning', label: 'تحذير' },
+  { value: 'success', label: 'نجاح' },
+  { value: 'error', label: 'خطأ' }
+]
 
 // --- Navigation ---
 const menuItems = [
@@ -1005,14 +1018,30 @@ async function executeDelete() {
 
 // --- SYSTEM ---
 async function sendAnnouncement() {
+  console.log('🔔 sendAnnouncement called with:', announcementForm.value)
+
+  // Validation: All fields are mandatory
+  if (!announcementForm.value.title || !announcementForm.value.message || !announcementForm.value.type) {
+    console.error('❌ Validation failed - missing fields')
+    showSnack('جميع الحقول إلزامية: العنوان، الرسالة، ونوع التنبيه', 'error')
+    return
+  }
+
+  console.log('✅ Validation passed, sending to admin store...')
   sendingAnnouncement.value = true
+  
   const res = await adminStore.postAnnouncement(announcementForm.value)
+  
+  console.log('📡 Response from postAnnouncement:', res)
   sendingAnnouncement.value = false
+  
   if (res.success) {
-    showSnack('تم إرسال البث بنجاح')
+    console.log('✅ Broadcast sent successfully!')
+    showSnack('تم إرسال الإشعار بنجاح للجميع ✅')
     announcementForm.value = { title: '', message: '', type: 'info' }
   } else {
-    showSnack('فشل الإرسال', 'error')
+    console.error('❌ Broadcast failed:',  res.error)
+    showSnack(res.error || 'فشل إرسال الإشعار. يرجى المحاولة مرة أخرى', 'error')
   }
 }
 
