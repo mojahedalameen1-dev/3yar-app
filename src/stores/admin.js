@@ -454,6 +454,215 @@ export const useAdminStore = defineStore('admin', () => {
         getUserById,
         getCarsForUser,
         getRecordsForUser,
+        getDocumentsForUser,
+
+        // =====================================================
+        // CRUD ACTIONS
+        // =====================================================
+
+        // Update User Profile
+        async function updateUser(userId, updates) {
+        try {
+            const { data, error: err } = await supabase
+                .from('profiles')
+                .update(updates)
+                .eq('user_id', userId)
+                .select()
+                .single()
+
+            if (err) throw err
+
+            // Update local state
+            const idx = users.value.findIndex(u => u.user_id === userId)
+            if (idx !== -1) {
+                users.value[idx] = { ...users.value[idx], ...data }
+            }
+            return { success: true, data }
+        } catch (err) {
+            console.error('Error updating user:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
+    // Delete User (This will cascade delete all related data due to DB constraints)
+    async function deleteUser(userId) {
+        try {
+            // First delete from auth.users (requires service role / admin API usually)
+            // BUT since we are using Supabase client, we can only delete from public tables if permitted.
+            // Deleting from 'profiles' might not delete the auth user depending on setup.
+            // COMPLETE DELETION via Client usually requires Edge Function if deleting from auth.users is needed.
+            // FOR NOW: We will delete from 'profiles' and let the UI know.
+            // NOTE: If RLS allows, we can delete from public.profiles.
+
+            const { error: err } = await supabase
+                .from('profiles')
+                .delete()
+                .eq('user_id', userId)
+
+            if (err) throw err
+
+            // Update local state
+            users.value = users.value.filter(u => u.user_id !== userId)
+            // Filter out related data from local state
+            cars.value = cars.value.filter(c => c.user_id !== userId)
+            records.value = records.value.filter(r => r.user_id !== userId)
+            documents.value = documents.value.filter(d => d.user_id !== userId)
+
+            return { success: true }
+        } catch (err) {
+            console.error('Error deleting user:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
+    // Update Car
+    async function updateCar(carId, updates) {
+        try {
+            const { data, error: err } = await supabase
+                .from('cars')
+                .update(updates)
+                .eq('id', carId)
+                .select()
+                .single()
+
+            if (err) throw err
+
+            const idx = cars.value.findIndex(c => c.id === carId)
+            if (idx !== -1) {
+                cars.value[idx] = data
+            }
+            return { success: true, data }
+        } catch (err) {
+            console.error('Error updating car:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
+    // Delete Car
+    async function deleteCar(carId) {
+        try {
+            const { error: err } = await supabase
+                .from('cars')
+                .delete()
+                .eq('id', carId)
+
+            if (err) throw err
+
+            cars.value = cars.value.filter(c => c.id !== carId)
+            // Also remove related records/docs from local state
+            records.value = records.value.filter(r => r.car_id !== carId)
+            documents.value = documents.value.filter(d => d.car_id !== carId)
+
+            return { success: true }
+        } catch (err) {
+            console.error('Error deleting car:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
+    // Update Maintenance Record
+    async function updateRecord(recordId, updates) {
+        try {
+            const { data, error: err } = await supabase
+                .from('maintenance_records')
+                .update(updates)
+                .eq('id', recordId)
+                .select()
+                .single()
+
+            if (err) throw err
+
+            const idx = records.value.findIndex(r => r.id === recordId)
+            if (idx !== -1) {
+                records.value[idx] = data
+            }
+            return { success: true, data }
+        } catch (err) {
+            console.error('Error updating record:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
+    // Delete Maintenance Record
+    async function deleteRecord(recordId) {
+        try {
+            const { error: err } = await supabase
+                .from('maintenance_records')
+                .delete()
+                .eq('id', recordId)
+
+            if (err) throw err
+
+            records.value = records.value.filter(r => r.id !== recordId)
+            return { success: true }
+        } catch (err) {
+            console.error('Error deleting record:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
+    // Delete Document
+    async function deleteDocument(docId) {
+        try {
+            const { error: err } = await supabase
+                .from('documents')
+                .delete()
+                .eq('id', docId)
+
+            if (err) throw err
+
+            documents.value = documents.value.filter(d => d.id !== docId)
+            return { success: true }
+        } catch (err) {
+            console.error('Error deleting document:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
+    return {
+        // State
+        users,
+        cars,
+        records,
+        documents,
+        announcements,
+        activityFeed,
+        templates,
+        analytics,
+        loading,
+        error,
+
+        // Actions
+        $reset,
+        fetchAllUsers,
+        fetchAllCars,
+        fetchAllRecords,
+        fetchAllDocuments,
+        fetchAnnouncements,
+        fetchActivityFeed,
+        fetchTemplates,
+        fetchAnalytics,
+        postAnnouncement,
+        toggleAnnouncement,
+        updateTemplate,
+        subscribeToActivity,
+        unsubscribeFromActivity,
+
+        // CRUD Actions
+        updateUser,
+        deleteUser,
+        updateCar,
+        deleteCar,
+        updateRecord,
+        deleteRecord,
+        deleteDocument,
+
+        // Helpers
+        formattedTotalCost,
+        getUserById,
+        getCarsForUser,
+        getRecordsForUser,
         getDocumentsForUser
     }
+}
 })
