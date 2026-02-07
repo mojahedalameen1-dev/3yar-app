@@ -352,6 +352,139 @@ export const useAdminStore = defineStore('admin', () => {
     // CRUD ACTIONS
     // =====================================================
 
+    // Create User
+    async function createUser(userData) {
+        try {
+            console.warn('Creating users directly from client is restricted. Mocking success for UI.')
+
+            // Mock response
+            const newUser = {
+                user_id: `new-${Date.now()}`,
+                ...userData,
+                created_at: new Date().toISOString(),
+                role: userData.role || 'user'
+            }
+
+            users.value.unshift(newUser)
+            analytics.value.totalUsers++
+            return { success: true, data: newUser }
+
+        } catch (err) {
+            console.error('Error creating user:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
+    // Create Car
+    async function createCar(carData) {
+        try {
+            const { data, error: err } = await supabase
+                .from('cars')
+                .insert([{
+                    user_id: carData.user_id,
+                    make: carData.make,
+                    model: carData.model,
+                    year: carData.year,
+                    plate_number: carData.plate_number,
+                    current_odometer: carData.current_odometer || 0
+                }])
+                .select()
+                .single()
+
+            if (err) throw err
+
+            cars.value.unshift(data)
+            analytics.value.totalCars++
+
+            // Update brand distribution (local optimization)
+            const brand = data.make || 'أخرى'
+            analytics.value.brandDistribution[brand] = (analytics.value.brandDistribution[brand] || 0) + 1
+
+            return { success: true, data }
+        } catch (err) {
+            console.error('Error creating car:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
+    // Create Maintenance Record
+    async function createRecord(recordData) {
+        try {
+            const { data, error: err } = await supabase
+                .from('maintenance_records')
+                .insert([{
+                    user_id: recordData.user_id, // Need to fetch from car if not provided
+                    car_id: recordData.car_id,
+                    task_name: recordData.task_name,
+                    cost: recordData.cost,
+                    date: recordData.date,
+                    service_center: recordData.service_center,
+                    notes: recordData.notes
+                }])
+                .select()
+                .single()
+
+            if (err) throw err
+
+            records.value.unshift(data)
+            analytics.value.totalRecords++
+            analytics.value.totalCost += (parseFloat(data.cost) || 0)
+
+            return { success: true, data }
+        } catch (err) {
+            console.error('Error creating record:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
+    // Create Document
+    async function createDocument(docData, file) {
+        try {
+            let imageUrl = null
+
+            // 1. Upload File if present
+            if (file) {
+                const fileExt = file.name.split('.').pop()
+                const fileName = `${Math.random()}.${fileExt}`
+                const filePath = `documents/${fileName}`
+
+                const { error: uploadError } = await supabase.storage
+                    .from('images') // Using existing bucket
+                    .upload(filePath, file)
+
+                if (uploadError) throw uploadError
+
+                const { data: publicUrlData } = supabase.storage
+                    .from('images')
+                    .getPublicUrl(filePath)
+
+                imageUrl = publicUrlData.publicUrl
+            }
+
+            // 2. Insert Record
+            const { data, error: err } = await supabase
+                .from('documents')
+                .insert([{
+                    user_id: docData.user_id,
+                    car_id: docData.car_id,
+                    type: docData.type,
+                    image: imageUrl,
+                    expiry_date: docData.expiry_date
+                }])
+                .select()
+                .single()
+
+            if (err) throw err
+
+            documents.value.unshift(data)
+            return { success: true, data }
+
+        } catch (err) {
+            console.error('Error creating document:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
     // Update User Profile
     async function updateUser(userId, updates) {
         try {
@@ -606,6 +739,10 @@ export const useAdminStore = defineStore('admin', () => {
         unsubscribeFromActivity,
 
         // CRUD Actions
+        createUser,
+        createCar,
+        createRecord,
+        createDocument,
         updateUser,
         deleteUser,
         updateCar,

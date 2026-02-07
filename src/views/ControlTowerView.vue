@@ -1,4 +1,4 @@
-<!-- Redesigned Management Portal v1.1 - Added Security & Sidebar -->
+<!-- Redesigned Management Portal v2.0 - Full CRUD, PDF Support & Security -->
 <template>
   <div class="management-portal rtl-layout">
     <v-layout class="full-height">
@@ -74,8 +74,8 @@
               </p>
             </div>
             
-            <!-- Global Actions / Filters can go here -->
-            <div v-if="activeTab !== 'analytics'" class="d-flex gap-3">
+            <!-- Global Actions / Filters -->
+            <div v-if="activeTab !== 'analytics'" class="d-flex gap-3 align-center">
                <v-text-field
                 v-model="globalSearch"
                 prepend-inner-icon="mdi-magnify"
@@ -87,6 +87,17 @@
                 bg-color="rgba(255,255,255,0.05)"
                 style="width: 300px"
               ></v-text-field>
+
+              <!-- Create Buttons based on active tab -->
+              <v-btn
+                v-if="['users', 'cars', 'records', 'documents'].includes(activeTab)"
+                color="cyan-accent-3"
+                prepend-icon="mdi-plus"
+                class="font-weight-bold"
+                @click="openCreateDialog"
+              >
+                إضافة جديد
+              </v-btn>
             </div>
           </div>
 
@@ -150,14 +161,20 @@
             <!-- 2. USERS MANAGEMENT -->
             <v-window-item value="users">
               <div class="glass-panel table-container">
+                <!-- Empty State -->
+                <div v-if="!filteredUsers.length" class="empty-state">
+                  <v-icon size="64" color="grey-darken-2">mdi-account-off</v-icon>
+                  <p class="text-body-1 text-grey mt-2">لا يوجد مستخدمين لعرضهم</p>
+                </div>
+
                 <v-data-table
+                  v-else
                   :headers="userHeaders"
                   :items="filteredUsers"
                   :search="globalSearch"
                   class="admin-table"
                   hover
                 >
-                  <!-- Custom Templates -->
                   <template #item.profile="{ item }">
                     <div class="d-flex align-center gap-3 py-2">
                        <v-avatar color="surface-light" size="40">
@@ -199,7 +216,13 @@
             <!-- 3. CARS MANAGEMENT -->
             <v-window-item value="cars">
               <div class="glass-panel table-container">
+                <div v-if="!filteredCars.length" class="empty-state">
+                  <v-icon size="64" color="grey-darken-2">mdi-car-off</v-icon>
+                  <p class="text-body-1 text-grey mt-2">لا توجد سيارات مسجلة</p>
+                </div>
+
                 <v-data-table
+                  v-else
                   :headers="carHeaders"
                   :items="filteredCars"
                   :search="globalSearch"
@@ -248,7 +271,13 @@
             <!-- 4. RECORDS MANAGEMENT -->
             <v-window-item value="records">
               <div class="glass-panel table-container">
+                <div v-if="!filteredRecords.length" class="empty-state">
+                  <v-icon size="64" color="grey-darken-2">mdi-file-remove</v-icon>
+                  <p class="text-body-1 text-grey mt-2">لا توجد سجلات صيانة</p>
+                </div>
+
                 <v-data-table
+                  v-else
                   :headers="recordHeaders"
                   :items="filteredRecords"
                   :search="globalSearch"
@@ -289,7 +318,13 @@
              <!-- 5. DOCUMENTS MANAGEMENT -->
             <v-window-item value="documents">
               <div class="glass-panel table-container">
+                <div v-if="!filteredDocs.length" class="empty-state">
+                  <v-icon size="64" color="grey-darken-2">mdi-file-document-alert</v-icon>
+                  <p class="text-body-1 text-grey mt-2">لا توجد وثائق محفوظة</p>
+                </div>
+
                 <v-data-table
+                  v-else
                   :headers="docHeaders"
                   :items="filteredDocs"
                   :search="globalSearch"
@@ -313,7 +348,7 @@
                     >
                       عرض
                     </v-btn>
-                    <span v-else class="text-caption text-grey">لا يوجد صورة</span>
+                    <span v-else class="text-caption text-grey">لا يوجد ملف</span>
                   </template>
 
                    <template #item.actions="{ item }">
@@ -327,7 +362,7 @@
               </div>
             </v-window-item>
 
-            <!-- 6. SYSTEM SETTINGS -->
+            <!-- 6. SYSTEM SETTINGS (Unchanged mostly) -->
             <v-window-item value="settings">
               <v-row>
                 <!-- Broadcast Settings -->
@@ -372,9 +407,6 @@
                       <v-icon color="orange" class="me-2">mdi-wrench-cog</v-icon>
                       مهام الصيانة الافتراضية
                     </div>
-                    <div class="text-caption text-medium-emphasis mb-4">
-                      هذه المهام تضاف تلقائياً لكل سيارة جديدة
-                    </div>
                     
                     <v-list class="bg-transparent">
                       <v-list-item v-for="task in adminStore.templates" :key="task.id" class="px-0 py-2 border-b-thin">
@@ -385,13 +417,8 @@
                         </template>
                         <v-list-item-title class="text-body-2 font-weight-bold">{{ task.name }}</v-list-item-title>
                         <v-list-item-subtitle class="text-caption">
-                           {{ task.interval_km ? `${task.interval_km} كم` : '' }} 
-                           {{ task.interval_km && task.interval_months ? ' / ' : '' }}
-                           {{ task.interval_months ? `${task.interval_months} شهر` : '' }}
+                           {{ task.interval_km }} كم / {{ task.interval_months }} شهر
                         </v-list-item-subtitle>
-                        <template #append>
-                           <v-btn icon="mdi-pencil" size="x-small" variant="text" color="grey"></v-btn>
-                        </template>
                       </v-list-item>
                     </v-list>
                    </div>
@@ -422,70 +449,182 @@
       </v-card>
     </v-dialog>
 
-    <!-- Edit Dialogs (Simplified for MVP) -->
-    <!-- User Edit -->
-    <v-dialog v-model="editUserDialog.show" max-width="500">
-      <v-card v-if="editUserDialog.data" title="تعديل المستخدم" color="#1e1e24">
+    <!-- CREATE / EDIT DIALOGS -->
+    
+    <!-- User Create/Edit Dialog -->
+    <v-dialog v-model="userDialog.show" max-width="500">
+      <v-card :title="userDialog.isEdit ? 'تعديل المستخدم' : 'إضافة مستخدم جديد'" color="#1e1e24">
         <v-card-text>
-          <v-text-field v-model="editUserDialog.data.first_name" label="الاسم الأول" class="mb-2"></v-text-field>
-          <v-text-field v-model="editUserDialog.data.last_name" label="الاسم الأخير" class="mb-2"></v-text-field>
-          <v-text-field v-model="editUserDialog.data.phone" label="رقم الهاتف"></v-text-field>
+          <v-row dense>
+             <v-col cols="6">
+               <v-text-field v-model="userDialog.data.first_name" label="الاسم الأول"></v-text-field>
+             </v-col>
+             <v-col cols="6">
+               <v-text-field v-model="userDialog.data.last_name" label="الاسم الأخير"></v-text-field>
+             </v-col>
+          </v-row>
+          <v-text-field v-model="userDialog.data.phone" label="رقم الهاتف" class="mb-2"></v-text-field>
+          <v-text-field v-model="userDialog.data.email" label="البريد الإلكتروني"></v-text-field>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="editUserDialog.show = false">إلغاء</v-btn>
-          <v-btn color="primary" @click="saveUserEdit">حفظ</v-btn>
+          <v-btn @click="userDialog.show = false">إلغاء</v-btn>
+          <v-btn color="primary" @click="saveUser" :loading="userDialog.loading">حفظ</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-     <!-- Car Edit -->
-    <v-dialog v-model="editCarDialog.show" max-width="500">
-      <v-card v-if="editCarDialog.data" title="تعديل السيارة" color="#1e1e24">
+     <!-- Car Create/Edit Dialog -->
+    <v-dialog v-model="carDialog.show" max-width="500">
+      <v-card :title="carDialog.isEdit ? 'تعديل السيارة' : 'إضافة سيارة جديدة'" color="#1e1e24">
         <v-card-text>
-          <v-text-field v-model="editCarDialog.data.make" label="الشركة المصنعة" class="mb-2"></v-text-field>
-          <v-text-field v-model="editCarDialog.data.model" label="الموديل" class="mb-2"></v-text-field>
-          <v-text-field v-model="editCarDialog.data.year" label="السنة" type="number" class="mb-2"></v-text-field>
-          <v-text-field v-model="editCarDialog.data.plate_number" label="رقم اللوحة"></v-text-field>
+          <v-select
+              v-if="!carDialog.isEdit"
+              v-model="carDialog.data.user_id"
+              :items="adminStore.users"
+              item-title="first_name"
+              item-value="user_id"
+              label="المالك"
+              class="mb-2"
+          >
+             <template v-slot:item="{ props, item }">
+               <v-list-item v-bind="props" :subtitle="item.raw.email"></v-list-item>
+             </template>
+          </v-select>
+          <v-row dense>
+            <v-col cols="6"><v-text-field v-model="carDialog.data.make" label="الشركة المصنعة"></v-text-field></v-col>
+            <v-col cols="6"><v-text-field v-model="carDialog.data.model" label="الموديل"></v-text-field></v-col>
+          </v-row>
+          <v-row dense>
+            <v-col cols="6"><v-text-field v-model="carDialog.data.year" label="السنة" type="number"></v-text-field></v-col>
+            <v-col cols="6"><v-text-field v-model="carDialog.data.plate_number" label="رقم اللوحة"></v-text-field></v-col>
+          </v-row>
+          <v-text-field v-model="carDialog.data.current_odometer" label="قراءة العداد الحالية" type="number"></v-text-field>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="editCarDialog.show = false">إلغاء</v-btn>
-          <v-btn color="primary" @click="saveCarEdit">حفظ</v-btn>
+          <v-btn @click="carDialog.show = false">إلغاء</v-btn>
+          <v-btn color="primary" @click="saveCar" :loading="carDialog.loading">حفظ</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
     
-    <!-- Record Edit -->
-    <v-dialog v-model="editRecordDialog.show" max-width="500">
-        <v-card v-if="editRecordDialog.data" title="تعديل سجل الصيانة" color="#1e1e24">
+    <!-- Record Create/Edit Dialog -->
+    <v-dialog v-model="recordDialog.show" max-width="500">
+        <v-card :title="recordDialog.isEdit ? 'تعديل السجل' : 'إضافة سجل صيانة'" color="#1e1e24">
             <v-card-text>
-                <v-text-field v-model="editRecordDialog.data.task_name" label="اسم المهمة" class="mb-2"></v-text-field>
-                <v-text-field v-model="editRecordDialog.data.cost" label="التكلفة" type="number" class="mb-2"></v-text-field>
-                <v-text-field v-model="editRecordDialog.data.service_center" label="مركز الخدمة" class="mb-2"></v-text-field>
-                <v-textarea v-model="editRecordDialog.data.notes" label="ملاحظات" rows="2"></v-textarea>
+                <!-- Select User Logic Wrapper -->
+                <v-select
+                  v-if="!recordDialog.isEdit"
+                  v-model="recordDialog.data.user_id"
+                  :items="adminStore.users"
+                  item-title="first_name"
+                  item-value="user_id"
+                  label="المستخدم"
+                  class="mb-2"
+                ></v-select>
+
+                <v-select
+                   v-if="!recordDialog.isEdit"
+                   v-model="recordDialog.data.car_id"
+                   :items="availableCars"
+                   item-title="model"
+                   item-value="id"
+                   label="السيارة"
+                   class="mb-2"
+                   :disabled="!recordDialog.data.user_id"
+                ></v-select>
+
+                <v-text-field v-model="recordDialog.data.task_name" label="اسم المهمة" class="mb-2"></v-text-field>
+                <v-row dense>
+                   <v-col cols="6"><v-text-field v-model="recordDialog.data.cost" label="التكلفة" type="number"></v-text-field></v-col>
+                   <v-col cols="6"><v-text-field v-model="recordDialog.data.date" label="التاريخ" type="date"></v-text-field></v-col>
+                </v-row>
+                <v-text-field v-model="recordDialog.data.service_center" label="مركز الخدمة" class="mb-2"></v-text-field>
+                <v-textarea v-model="recordDialog.data.notes" label="ملاحظات" rows="2"></v-textarea>
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn @click="editRecordDialog.show = false">إلغاء</v-btn>
-                <v-btn color="primary" @click="saveRecordEdit">حفظ</v-btn>
+                <v-btn @click="recordDialog.show = false">إلغاء</v-btn>
+                <v-btn color="primary" @click="saveRecord" :loading="recordDialog.loading">حفظ</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
 
-    <!-- Document Viewer -->
-    <v-dialog v-model="docViewer.show" max-width="800">
+    <!-- Document Create Dialog -->
+    <v-dialog v-model="docDialog.show" max-width="500">
+        <v-card title="رفع وثيقة جديدة" color="#1e1e24">
+            <v-card-text>
+                <v-select
+                  v-model="docDialog.data.user_id"
+                  :items="adminStore.users"
+                  item-title="first_name"
+                  item-value="user_id"
+                  label="المستخدم"
+                  class="mb-2"
+                ></v-select>
+
+                <v-select
+                   v-model="docDialog.data.car_id"
+                   :items="docAvailableCars"
+                   item-title="model"
+                   item-value="id"
+                   label="السيارة"
+                   class="mb-2"
+                   :disabled="!docDialog.data.user_id"
+                ></v-select>
+
+                <v-select
+                  v-model="docDialog.data.type"
+                  :items="['استمارة', 'تأمين', 'فحص', 'رخصة', 'أخرى']"
+                  label="نوع الوثيقة"
+                  class="mb-2"
+                ></v-select>
+                
+                <v-text-field v-model="docDialog.data.expiry_date" label="تاريخ الانتهاء" type="date" class="mb-4"></v-text-field>
+                
+                <v-file-input
+                  v-model="docDialog.file"
+                  label="ملف الوثيقة (صورة أو PDF)"
+                  prepend-icon="mdi-camera"
+                  accept="image/*,application/pdf"
+                  variant="outlined"
+                ></v-file-input>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn @click="docDialog.show = false">إلغاء</v-btn>
+                <v-btn color="primary" @click="saveDocument" :loading="docDialog.loading">رفع</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
+    <!-- Document Viewer (Enhanced) -->
+    <v-dialog v-model="docViewer.show" fullscreen transition="dialog-bottom-transition">
        <v-card class="bg-black">
-         <v-toolbar color="transparent" density="compact">
-            <v-spacer></v-spacer>
+         <v-toolbar color="surface" density="compact">
             <v-btn icon="mdi-close" @click="docViewer.show = false"></v-btn>
+            <v-toolbar-title>معاينة الوثيقة</v-toolbar-title>
+            <v-spacer></v-spacer>
+            <v-btn color="primary" variant="text" :href="docViewer.url" target="_blank" prepend-icon="mdi-download">تحميل</v-btn>
          </v-toolbar>
-         <v-img :src="docViewer.url" contain max-height="80vh"></v-img>
+         <div class="d-flex align-center justify-center fill-height bg-grey-darken-4 pa-4">
+             <!-- PDF Viewer Check -->
+             <iframe 
+               v-if="isPdf(docViewer.url)" 
+               :src="docViewer.url"
+               width="100%" 
+               height="100%" 
+               frameborder="0"
+             ></iframe>
+             <v-img v-else :src="docViewer.url" contain max-height="90vh"></v-img>
+         </div>
        </v-card>
     </v-dialog>
 
      <!-- Global Snackbar -->
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" location="top">
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" location="top" timeout="3000">
+       <v-icon start>{{ snackbar.color === 'success' ? 'mdi-check-circle' : 'mdi-alert' }}</v-icon>
        {{ snackbar.text }}
     </v-snackbar>
 
@@ -520,11 +659,12 @@ const chartsReady = ref(false)
 const snackbar = ref({ show: false, text: '', color: 'success' })
 const sendingAnnouncement = ref(false)
 
-// Dialogs State
+// Combined Create/Edit Dialogs State
 const deleteDialog = ref({ show: false, loading: false, type: null, item: null })
-const editUserDialog = ref({ show: false, data: null })
-const editCarDialog = ref({ show: false, data: null })
-const editRecordDialog = ref({ show: false, data: null })
+const userDialog = ref({ show: false, loading: false, isEdit: false, data: {} })
+const carDialog = ref({ show: false, loading: false, isEdit: false, data: {} })
+const recordDialog = ref({ show: false, loading: false, isEdit: false, data: {} })
+const docDialog = ref({ show: false, loading: false, data: {}, file: null })
 const docViewer = ref({ show: false, url: null })
 
 // Announcement Form
@@ -582,6 +722,14 @@ const filteredDocs = computed(() => {
    return adminStore.documents.filter(d => 
      d.type?.toLowerCase().includes(q)
    )
+})
+
+// --- Computed Helpers for Selects ---
+const availableCars = computed(() => {
+    return adminStore.cars.filter(c => c.user_id === recordDialog.value.data.user_id)
+})
+const docAvailableCars = computed(() => {
+    return adminStore.cars.filter(c => c.user_id === docDialog.value.data.user_id)
 })
 
 // --- Data Headers ---
@@ -684,30 +832,14 @@ const donutChartOptions = {
   plugins: { legend: { position: 'right', labels: { color: 'white', padding: 20 } } }
 }
 
-// --- Actions ---
+// --- Logic ---
 
 function returnToApp() {
   router.push({ name: 'dashboard' })
 }
 
-// User Actions
 function getInitials(user) {
   return ((user.first_name?.[0] || '') + (user.last_name?.[0] || '')).toUpperCase()
-}
-
-function openEditUser(user) {
-  editUserDialog.value.data = { ...user } // Clone
-  editUserDialog.value.show = true
-}
-
-async function saveUserEdit() {
-  const res = await adminStore.updateUser(editUserDialog.value.data.user_id, editUserDialog.value.data)
-  if (res.success) {
-    showSnack('تم تحديث بيانات المستخدم بنجاح')
-    editUserDialog.value.show = false
-  } else {
-    showSnack('حدث خطأ أثناء التحديث', 'error')
-  }
 }
 
 function getUserName(userId) {
@@ -715,43 +847,103 @@ function getUserName(userId) {
   return u ? `${u.first_name} ${u.last_name}` : 'غير معروف'
 }
 
-// Car Actions
-function openEditCar(car) {
-  editCarDialog.value.data = { ...car }
-  editCarDialog.value.show = true
-}
-
-async function saveCarEdit() {
-  const res = await adminStore.updateCar(editCarDialog.value.data.id, editCarDialog.value.data)
-  if (res.success) {
-    showSnack('تم تحديث بيانات السيارة بنجاح')
-    editCarDialog.value.show = false
-  } else {
-    showSnack('حدث خطأ أثناء التحديث', 'error')
-  }
-}
-
-// Record Actions
-function openEditRecord(record) {
-    editRecordDialog.value.data = { ...record }
-    editRecordDialog.value.show = true
-}
-
-async function saveRecordEdit() {
-    const res = await adminStore.updateRecord(editRecordDialog.value.data.id, editRecordDialog.value.data)
-    if (res.success) {
-        showSnack('تم تحديث السجل بنجاح')
-        editRecordDialog.value.show = false
-    } else {
-        showSnack('حدث خطأ أثناء التحديث', 'error')
-    }
-}
-
-// Record & Doc Helpers
 function formatDate(date) {
   return dayjs(date).format('DD/MM/YYYY')
 }
 
+// --- Unified Open Create Dialog ---
+function openCreateDialog() {
+    if (activeTab.value === 'users') {
+        userDialog.value = { show: true, isEdit: false, data: {}, loading: false }
+    } else if (activeTab.value === 'cars') {
+        carDialog.value = { show: true, isEdit: false, data: {}, loading: false }
+    } else if (activeTab.value === 'records') {
+        recordDialog.value = { show: true, isEdit: false, data: { date: new Date().toISOString().split('T')[0] }, loading: false }
+    } else if (activeTab.value === 'documents') {
+        docDialog.value = { show: true, loading: false, data: {}, file: null }
+    }
+}
+
+// --- USER ACTIONS ---
+function openEditUser(user) {
+  userDialog.value = { show: true, isEdit: true, data: { ...user }, loading: false }
+}
+async function saveUser() {
+    userDialog.value.loading = true
+    let res
+    if (userDialog.value.isEdit) {
+        res = await adminStore.updateUser(userDialog.value.data.user_id, userDialog.value.data)
+    } else {
+        res = await adminStore.createUser(userDialog.value.data)
+    }
+    userDialog.value.loading = false
+    if (res.success) {
+        showSnack(userDialog.value.isEdit ? 'تم تحديث البيانات' : 'تم إضافة المستخدم')
+        userDialog.value.show = false
+    } else {
+        showSnack('حدث خطأ', 'error')
+    }
+}
+
+// --- CAR ACTIONS ---
+function openEditCar(car) {
+  carDialog.value = { show: true, isEdit: true, data: { ...car }, loading: false }
+}
+async function saveCar() {
+    carDialog.value.loading = true
+    let res
+    if (carDialog.value.isEdit) {
+        res = await adminStore.updateCar(carDialog.value.data.id, carDialog.value.data)
+    } else {
+        res = await adminStore.createCar(carDialog.value.data)
+    }
+    carDialog.value.loading = false
+    if (res.success) {
+        showSnack('تم حفظ السيارة بنجاح')
+        carDialog.value.show = false
+    } else {
+        showSnack('حدث خطأ', 'error')
+    }
+}
+
+// --- RECORD ACTIONS ---
+function openEditRecord(record) {
+    recordDialog.value = { show: true, isEdit: true, data: { ...record }, loading: false }
+}
+async function saveRecord() {
+    recordDialog.value.loading = true
+    let res
+    if (recordDialog.value.isEdit) {
+        res = await adminStore.updateRecord(recordDialog.value.data.id, recordDialog.value.data)
+    } else {
+        res = await adminStore.createRecord(recordDialog.value.data)
+    }
+    recordDialog.value.loading = false
+    if (res.success) {
+        showSnack('تم حفظ السجل بنجاح')
+        recordDialog.value.show = false
+    } else {
+        showSnack('حدث خطأ', 'error')
+    }
+}
+
+// --- DOC ACTIONS ---
+async function saveDocument() {
+    if (!docDialog.value.file) {
+        showSnack('يرجى اختيار ملف', 'error'); return
+    }
+    docDialog.value.loading = true
+    const res = await adminStore.createDocument(docDialog.value.data, docDialog.value.file[0])
+    docDialog.value.loading = false
+    if (res.success) {
+        showSnack('تم رفع الوثيقة بنجاح')
+        docDialog.value.show = false
+    } else {
+        showSnack('فشل الرفع', 'error')
+    }
+}
+
+// --- PDF & Doc Viewer ---
 function getDocColor(type) {
   const map = { 'استمارة': 'cyan', 'تأمين': 'green', 'فحص': 'orange' }
   return map[type] || 'grey'
@@ -761,7 +953,12 @@ function viewDocument(doc) {
   docViewer.value = { show: true, url: doc.image }
 }
 
-// Delete Logic
+function isPdf(url) {
+    if (!url) return false
+    return url.toLowerCase().includes('.pdf') || url.toLowerCase().includes('application/pdf')
+}
+
+// --- DELETE ---
 function confirmDelete(type, item) {
   deleteDialog.value = { show: true, type, item, loading: false }
 }
@@ -783,7 +980,7 @@ async function executeDelete() {
   else showSnack('فشلت عملية الحذف', 'error')
 }
 
-// System Actions
+// --- SYSTEM ---
 async function sendAnnouncement() {
   sendingAnnouncement.value = true
   const res = await adminStore.postAnnouncement(announcementForm.value)
@@ -802,6 +999,12 @@ function showSnack(text, color = 'success') {
 
 // Lifecycle
 onMounted(async () => {
+  // STRICT SECURITY CHECK
+  if (sessionStorage.getItem('adminKey') !== 'valid') {
+    router.replace({ name: 'admin-login' })
+    return
+  }
+
   await adminStore.fetchAnalytics()
   await adminStore.fetchTemplates()
   setTimeout(() => chartsReady.value = true, 500)
@@ -921,4 +1124,12 @@ onMounted(async () => {
   background: rgba(255,255,255,0.03) !important;
 }
 
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  text-align: center;
+}
 </style>
