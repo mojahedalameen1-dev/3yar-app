@@ -4,8 +4,8 @@
     <!-- Show navigation only for authenticated routes -->
     <template v-if="showNavigation">
       <!-- Mobile App Bar (Premium Style) -->
-      <v-app-bar v-if="isMobile" class="app-bar-mobile-premium px-4" elevation="0" flat border="b">
-        <div class="d-flex align-center w-100 justify-space-between">
+      <v-app-bar v-if="isMobile" class="app-bar-mobile-premium px-4 pt-safe" elevation="0" flat border="b">
+        <div class="d-flex align-center w-100 justify-space-between pt-2">
           <div>
             <div class="text-caption text-medium-emphasis mb-n1">أهلاً،</div>
             <div class="text-h6 font-weight-bold">{{ profileStore.firstName || 'مستخدم' }}</div>
@@ -423,7 +423,7 @@ provide('isMobile', isMobile)
   background: rgba(0, 0, 0, 0.8) !important;
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-  height: 70px !important;
+  height: 90px !important; /* Increased for safe area + content */
 }
 
 .avatar-glow {
@@ -432,11 +432,20 @@ provide('isMobile', isMobile)
 }
 
 .mobile-bottom-nav {
-  height: 75px !important;
+  height: 85px !important;
   background: rgba(0, 0, 0, 0.85) !important;
   backdrop-filter: blur(25px);
   border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
-  padding-bottom: 20px; /* Safe area for home indicator */
+  padding-bottom: env(safe-area-inset-bottom, 20px); /* Safe area for home indicator */
+}
+
+.mobile-bottom-nav :deep(.v-btn) {
+  min-width: auto;
+  font-size: 10px;
+}
+
+.mobile-bottom-nav :deep(.v-btn__content) {
+  margin-top: 4px;
 }
 
 .nav-btn-mobile {

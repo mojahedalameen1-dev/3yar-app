@@ -929,6 +929,7 @@ import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
 import { useThemeStore } from '@/stores/theme'
 import { Doughnut, Line } from 'vue-chartjs'
+import { useTheme } from 'vuetify'
 import { useDisplay } from 'vuetify'
 import {
   Chart as ChartJS,
@@ -957,8 +958,13 @@ const { mobile } = useDisplay()
 
 const isMobile = computed(() => mobile.value)
 
+// Theme Logic
+const theme = useTheme()
+
 function toggleTheme() {
   themeStore.toggleTheme()
+  // Force update to ensure reactivity if store lags
+  theme.global.name.value = themeStore.currentTheme
 }
 // State
 const drawer = ref(true) // Sidebar toggle
@@ -1507,7 +1513,30 @@ onMounted(async () => {
   .mobile-admin-bottom-nav {
     border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
     backdrop-filter: blur(20px);
-    height: 64px !important;
+    height: 80px !important;
+    padding-bottom: env(safe-area-inset-bottom, 20px) !important;
+    z-index: 1000;
+  }
+  
+  .mobile-admin-bottom-nav :deep(.v-btn) {
+    height: 100% !important;
+    min-width: auto !important;
+    font-size: 10px !important;
+    letter-spacing: 0 !important;
+  }
+
+  .mobile-admin-bottom-nav :deep(.v-btn__content) {
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .mobile-admin-bottom-nav :deep(.v-btn--active) {
+    color: cyan !important;
+  }
+
+  .mobile-admin-bottom-nav :deep(.v-btn--active .v-icon) {
+    filter: drop-shadow(0 0 5px cyan);
   }
 }
 </style>

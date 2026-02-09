@@ -447,3 +447,41 @@ body {
   padding: 6px 12px;
   border-radius: var(--radius-sm);
 }
+
+/* --- Mobile UX Polish --- */
+
+/* 1. Prevent Horizontal Scroll */
+.v-application,
+body {
+  overflow-x: hidden !important;
+}
+
+/* 2. Premium Input Fields */
+.v-field--variant-outlined .v-field__outline {
+  --v-field-border-opacity: 0.2 !important;
+  color: #2a2a2a !important;
+}
+
+.v-field--focused .v-field__outline {
+  --v-field-border-opacity: 1 !important;
+  color: var(--electric-blue) !important;
+}
+
+.v-field__input {
+  background: #121212 !important;
+  /* Slightly lighter than #000000 */
+  border-radius: var(--radius-md);
+}
+
+.v-text-field .v-input__details {
+  padding-inline-start: 4px !important;
+}
+
+/* 3. Safe Area Utilities */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 20px) !important;
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 20px) !important;
+}

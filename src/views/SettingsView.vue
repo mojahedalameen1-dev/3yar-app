@@ -1,9 +1,9 @@
 <template>
   <div class="settings-view">
     <!-- Header -->
-    <div class="d-flex justify-space-between align-center mb-6">
+    <div class="d-flex justify-space-between align-center mb-6" :class="{ 'mb-2': isMobile }">
       <div>
-        <h1 class="text-h4 font-weight-bold mb-1">الإعدادات</h1>
+        <h1 class="font-weight-bold mb-1" :class="isMobile ? 'text-h5' : 'text-h4'">الإعدادات</h1>
         <p class="text-body-2 text-medium-emphasis">إدارة بيانات السيارة وإعدادات التطبيق</p>
       </div>
     </div>
@@ -346,6 +346,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 
 const showSnackbar = inject('showSnackbar')
+const isMobile = inject('isMobile')
 const themeStore = useThemeStore()
 
 const carStore = useCarStore()
