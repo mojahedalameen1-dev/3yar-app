@@ -9,13 +9,13 @@
         :permanent="!isMobile"
         :temporary="isMobile"
         width="280"
-        class="admin-sidebar"
+        class="admin-sidebar d-flex flex-column"
         elevation="0"
         border="0"
       >
         <!-- Header -->
         <div class="sidebar-header">
-          <div class="d-flex align-center gap-3 mb-6">
+          <div class="d-flex align-center gap-3">
             <div class="logo-box">
               <v-icon size="24" color="white">mdi-shield-crown</v-icon>
             </div>
@@ -27,7 +27,7 @@
         </div>
 
         <!-- Navigation Menu -->
-        <v-list nav class="sidebar-menu">
+        <v-list nav class="sidebar-menu flex-grow-1">
           <v-list-item
             v-for="item in menuItems"
             :key="item.id"
@@ -45,6 +45,9 @@
             </v-list-item-title>
           </v-list-item>
         </v-list>
+
+        <!-- Spacer to push footer to bottom -->
+        <v-spacer></v-spacer>
 
         <!-- Footer Actions -->
         <div class="sidebar-footer">
@@ -64,7 +67,7 @@
 
       <!-- Main Content Area -->
       <v-main class="admin-content">
-        <v-container fluid class="pa-6 pb-16 fill-height align-start">
+        <v-container fluid class="pa-6 pb-6">
           
           <!-- Section Header -->
           <div class="section-header mb-6 d-flex flex-wrap align-center justify-space-between gap-4">
@@ -1059,15 +1062,23 @@ onMounted(async () => {
 .admin-sidebar {
   background: #1e293b !important; /* Slate 800 */
   border-left: 1px solid rgba(255,255,255,0.05) !important;
-  position: fixed !important;
   height: 100vh !important;
+  max-height: 100vh !important;
   overflow: hidden !important;
 }
 
+.admin-sidebar :deep(.v-navigation-drawer__content) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
 .sidebar-menu {
-  height: calc(100vh - 180px);
   overflow-y: auto;
   scrollbar-width: none; /* Firefox */
+  flex-shrink: 1;
+  min-height: 0;
 }
 
 .sidebar-menu::-webkit-scrollbar {
@@ -1076,6 +1087,7 @@ onMounted(async () => {
 
 .sidebar-header {
   padding: 24px;
+  flex-shrink: 0;
 }
 
 .logo-box {
@@ -1098,7 +1110,7 @@ onMounted(async () => {
 
 .sidebar-footer {
   padding: 20px;
-  margin-top: auto;
+  flex-shrink: 0;
 }
 
 /* Content Area */
