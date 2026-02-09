@@ -64,7 +64,7 @@
 
       <!-- Main Content Area -->
       <v-main class="admin-content">
-        <v-container fluid class="pa-6 fill-height align-start">
+        <v-container fluid class="pa-6 pb-16 fill-height align-start">
           
           <!-- Section Header -->
           <div class="section-header mb-6 d-flex flex-wrap align-center justify-space-between gap-4">
@@ -369,7 +369,7 @@
             <v-window-item value="settings">
               <v-row>
                 <!-- Broadcast Settings -->
-                <v-col cols="12" md="6">
+                <v-col cols="12" md="8" class="mx-auto">
                   <div class="glass-panel pa-6">
                     <div class="panel-title mb-4">
                       <v-icon color="red" class="me-2">mdi-broadcast</v-icon>
@@ -382,6 +382,7 @@
                         variant="outlined"
                         bg-color="rgba(255,255,255,0.03)"
                         :rules="[v => !!v || 'العنوان مطلوب']"
+                        class="mb-4"
                         required
                       ></v-text-field>
                       <v-textarea
@@ -391,6 +392,7 @@
                         variant="outlined"
                         bg-color="rgba(255,255,255,0.03)"
                         :rules="[v => !!v || 'نص الرسالة مطلوب']"
+                        class="mb-4"
                         required
                       ></v-textarea>
                       <v-select
@@ -402,38 +404,19 @@
                         variant="outlined"
                         bg-color="rgba(255,255,255,0.03)"
                         :rules="[v => !!v || 'نوع التنبيه مطلوب']"
+                        class="mb-6"
                         required
                       ></v-select>
-                      <v-btn color="red-accent-2" block size="large" type="submit" :loading="sendingAnnouncement">
-                        إرسال للجميع
-                      </v-btn>
+                      
+                      <v-card-actions class="pa-0">
+                        <v-btn color="red-accent-2" block size="large" type="submit" :loading="sendingAnnouncement" class="font-weight-bold">
+                          إرسال للجميع
+                        </v-btn>
+                      </v-card-actions>
                     </v-form>
                   </div>
                 </v-col>
 
-                <!-- Default Maintenance Tasks -->
-                <v-col cols="12" md="6">
-                   <div class="glass-panel pa-6">
-                    <div class="panel-title mb-4">
-                      <v-icon color="orange" class="me-2">mdi-wrench-cog</v-icon>
-                      مهام الصيانة الافتراضية
-                    </div>
-                    
-                    <v-list class="bg-transparent">
-                      <v-list-item v-for="task in adminStore.templates" :key="task.id" class="px-0 py-2 border-b-thin">
-                        <template #prepend>
-                          <v-avatar color="orange-darken-4" size="32" variant="tonal">
-                            <v-icon size="16">{{ task.icon || 'mdi-wrench' }}</v-icon>
-                          </v-avatar>
-                        </template>
-                        <v-list-item-title class="text-body-2 font-weight-bold">{{ task.name }}</v-list-item-title>
-                        <v-list-item-subtitle class="text-caption">
-                           {{ task.interval_km }} كم / {{ task.interval_months }} شهر
-                        </v-list-item-subtitle>
-                      </v-list-item>
-                    </v-list>
-                   </div>
-                </v-col>
               </v-row>
             </v-window-item>
 
@@ -1058,7 +1041,6 @@ onMounted(async () => {
   }
 
   await adminStore.fetchAnalytics()
-  await adminStore.fetchTemplates()
   setTimeout(() => chartsReady.value = true, 500)
 })
 </script>

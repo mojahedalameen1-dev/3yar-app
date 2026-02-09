@@ -10,7 +10,6 @@ export const useAdminStore = defineStore('admin', () => {
     const documents = ref([])
     const announcements = ref([])
     const activityFeed = ref([])
-    const templates = ref([])
     const loading = ref(false)
     const error = ref(null)
 
@@ -35,7 +34,6 @@ export const useAdminStore = defineStore('admin', () => {
         documents.value = []
         announcements.value = []
         activityFeed.value = []
-        templates.value = []
         loading.value = false
         error.value = null
     }
@@ -156,23 +154,6 @@ export const useAdminStore = defineStore('admin', () => {
         }
     }
 
-    // Fetch default maintenance templates
-    async function fetchTemplates() {
-        try {
-            const { data, error: err } = await supabase
-                .from('default_maintenance_templates')
-                .select('*')
-                .order('sort_order', { ascending: true })
-
-            if (err) throw err
-            templates.value = data || []
-            return data
-        } catch (err) {
-            console.error('Error fetching templates:', err)
-            error.value = err.message
-            return []
-        }
-    }
 
     // =====================================================
     // ANALYTICS FUNCTIONS
@@ -316,37 +297,6 @@ export const useAdminStore = defineStore('admin', () => {
         }
     }
 
-    // Update a maintenance template
-    async function updateTemplate(id, updates) {
-        try {
-            const { data, error: err } = await supabase
-                .from('default_maintenance_templates')
-                .update({
-                    name: updates.name,
-                    type: updates.type,
-                    interval_km: updates.intervalKm,
-                    interval_months: updates.intervalMonths,
-                    priority: updates.priority,
-                    icon: updates.icon,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', id)
-                .select()
-                .single()
-
-            if (err) throw err
-
-            const idx = templates.value.findIndex(t => t.id === id)
-            if (idx !== -1) {
-                templates.value[idx] = data
-            }
-
-            return { success: true, data }
-        } catch (err) {
-            console.error('Error updating template:', err)
-            return { success: false, error: err.message }
-        }
-    }
 
     // =====================================================
     // CRUD ACTIONS
@@ -720,7 +670,6 @@ export const useAdminStore = defineStore('admin', () => {
         documents,
         announcements,
         activityFeed,
-        templates,
         analytics,
         loading,
         error,
@@ -733,11 +682,9 @@ export const useAdminStore = defineStore('admin', () => {
         fetchAllDocuments,
         fetchAnnouncements,
         fetchActivityFeed,
-        fetchTemplates,
         fetchAnalytics,
         postAnnouncement,
         toggleAnnouncement,
-        updateTemplate,
         subscribeToActivity,
         unsubscribeFromActivity,
 
