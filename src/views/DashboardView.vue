@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard">
     <!-- Greeting Header -->
-    <div class="d-flex flex-wrap justify-space-between align-center mb-6">
+    <div class="d-flex flex-wrap justify-space-between align-center mb-6 px-1 animate-slide-up" v-if="!isMobile">
       <div>
         <h1 class="text-h4 font-weight-bold mb-1">{{ greeting }}</h1>
         <p class="text-body-2 text-medium-emphasis">
@@ -50,15 +50,15 @@
 
     <!-- Main Dashboard -->
     <template v-else>
-      <v-row>
+      <v-row :class="{ 'gap-6': isMobile }">
         <!-- Car Card with Image -->
         <v-col cols="12" lg="4">
-          <v-card class="car-card glass-card h-100">
+          <v-card :class="['car-card animate-slide-up', isMobile ? 'surface-card' : 'glass-card h-100']">
             <div class="car-image-wrapper" @click="triggerImageUpload">
               <v-img
                 v-if="carStore.car.image"
                 :src="carStore.car.image"
-                height="200"
+                :height="isMobile ? 240 : 200"
                 cover
                 class="car-image"
                 loading="eager"
@@ -70,7 +70,7 @@
                   </div>
                 </div>
               </v-img>
-              <div v-else class="car-placeholder d-flex flex-column align-center justify-center">
+              <div v-else class="car-placeholder d-flex flex-column align-center justify-center" :style="{ height: isMobile ? '240px' : '200px' }">
                 <div class="upload-icon-wrapper mb-3">
                   <v-icon size="36" color="white">mdi-car-side</v-icon>
                 </div>
@@ -90,7 +90,7 @@
                 <h3 class="text-h5 font-weight-bold">
                   {{ carStore.car.make }} {{ carStore.car.model }}
                 </h3>
-                <v-chip size="small" color="primary" variant="tonal">
+                <v-chip size="small" color="primary" variant="tonal" class="rounded-lg">
                   {{ carStore.car.year }}
                 </v-chip>
               </div>
@@ -101,14 +101,14 @@
               </p>
               
               <!-- Odometer Display -->
-              <div class="odometer-card pa-4 rounded-xl text-center">
+              <div :class="['pa-4 rounded-xl text-center', isMobile ? 'bg-black-lighten-1' : 'odometer-card']">
                 <v-icon size="28" color="primary" class="mb-2">mdi-speedometer</v-icon>
-                <div class="text-h3 font-weight-bold text-primary mb-1">
+                <div :class="['font-weight-bold primary--text mb-1', isMobile ? 'stat-value-large' : 'text-h3']">
                   {{ formattedOdometer }}
                 </div>
                 <div class="text-body-2 text-medium-emphasis">كيلومتر</div>
                 <div v-if="odometerStore.averageDailyKm > 0" class="mt-2">
-                  <v-chip size="x-small" color="info" variant="tonal">
+                  <v-chip size="x-small" color="info" variant="tonal" class="rounded-pill">
                     <v-icon start size="12">mdi-trending-up</v-icon>
                     {{ odometerStore.averageDailyKm }} كم/يوم
                   </v-chip>
@@ -116,21 +116,25 @@
               </div>
               
               <!-- Share & Update Buttons -->
-              <div class="d-flex gap-2 mt-4">
+              <div class="d-flex gap-3 mt-4">
                 <v-btn
                   color="info"
                   variant="tonal"
-                  class="flex-grow-1"
+                  class="flex-grow-1 action-btn-mobile"
                   prepend-icon="mdi-qrcode"
                   @click="openShareDialog"
+                  :height="isMobile ? 52 : 40"
+                  rounded="xl"
                 >
                   مشاركة
                 </v-btn>
                 <v-btn
                   color="primary"
-                  class="flex-grow-1"
+                  class="flex-grow-1 action-btn-mobile"
                   prepend-icon="mdi-plus-circle"
                   @click="showOdometerDialog = true"
+                  :height="isMobile ? 52 : 40"
+                  rounded="xl"
                 >
                   تحديث العداد
                 </v-btn>
@@ -175,8 +179,7 @@
             <v-col cols="12">
               <v-card 
                 v-if="nextMaintenance"
-                class="next-maintenance-card"
-                :class="`status-${nextMaintenance.statusInfo.status}`"
+                :class="['next-maintenance-card animate-slide-up', isMobile ? 'surface-card' : `status-${nextMaintenance.statusInfo.status}`]"
               >
                 <v-card-text class="pa-5">
                   <div class="d-flex align-center justify-space-between flex-wrap gap-4">
@@ -195,6 +198,7 @@
                             :color="getStatusColor(nextMaintenance.statusInfo.status)" 
                             size="small"
                             variant="flat"
+                            class="rounded-lg"
                           >
                             {{ tasksStore.STATUS_LABELS[nextMaintenance.statusInfo.status] }}
                           </v-chip>
@@ -210,21 +214,18 @@
                           >
                             يجب التغيير الآن
                           </span>
-                          <span v-else class="text-body-2 text-medium-emphasis">
-                            {{ Math.round(nextMaintenance.statusInfo.progress) }}% من الموعد
-                          </span>
-                        </div>
-                        <div v-if="nextMaintenance.statusInfo.estimatedDate" class="text-caption text-medium-emphasis mt-1">
-                          الموعد المتوقع: {{ formatDate(nextMaintenance.statusInfo.estimatedDate) }}
                         </div>
                       </div>
                     </div>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2" :class="{ 'w-100 mt-2': isMobile }">
                       <v-btn
                         color="success"
                         variant="flat"
                         prepend-icon="mdi-check"
                         @click="recordMaintenance(nextMaintenance)"
+                        :class="{ 'flex-grow-1': isMobile }"
+                        :height="isMobile ? 48 : 40"
+                        rounded="xl"
                       >
                         تم
                       </v-btn>
@@ -232,32 +233,38 @@
                         variant="tonal"
                         prepend-icon="mdi-alarm-snooze"
                         @click="snoozeTask(nextMaintenance)"
+                        :class="{ 'flex-grow-1': isMobile }"
+                        :height="isMobile ? 48 : 40"
+                        rounded="xl"
                       >
                         تأجيل
                       </v-btn>
                     </div>
                   </div>
                   <!-- Progress Bar -->
-                  <div class="mt-4">
+                  <div class="mt-4 position-relative">
                     <v-progress-linear
                       :model-value="Math.min(nextMaintenance.statusInfo.progress, 100)"
                       :color="getStatusColor(nextMaintenance.statusInfo.status)"
-                      height="8"
+                      height="6"
                       rounded
                     ></v-progress-linear>
+                    <div v-if="isMobile" class="progress-label-mobile">
+                      {{ Math.round(nextMaintenance.statusInfo.progress) }}%
+                    </div>
                   </div>
                 </v-card-text>
               </v-card>
             </v-col>
 
             <!-- Stats Cards -->
-            <v-col v-for="stat in statsCards" :key="stat.title" cols="6" md="3">
-              <v-card class="stat-card glass-card h-100" :class="stat.class">
+            <v-col v-for="(stat, i) in statsCards" :key="stat.title" cols="6" md="3">
+              <v-card :class="['animate-slide-up', isMobile ? 'surface-card' : 'stat-card glass-card h-100']" :style="{ animationDelay: `${0.1 * (i + 1)}s` }">
                 <v-card-text class="pa-4 text-center">
                   <div class="stat-icon mx-auto mb-2" :class="`bg-${stat.color}`">
                     <v-icon color="white" size="22">{{ stat.icon }}</v-icon>
                   </div>
-                  <div class="text-h4 font-weight-bold mb-1" :class="`text-${stat.color}`">
+                  <div :class="['font-weight-bold mb-1', isMobile ? 'text-white' : `text-${stat.color}`]" :style="{ fontSize: isMobile ? '1.5rem' : '2.125rem' }">
                     {{ stat.value }}
                   </div>
                   <div class="text-caption text-medium-emphasis">{{ stat.title }}</div>
@@ -403,28 +410,28 @@
 
             <!-- Cost Summary -->
             <v-col cols="12" md="6">
-              <v-card class="cost-card h-100">
-                <v-card-text class="pa-5 text-white">
-                  <div class="d-flex align-center justify-space-between mb-4">
+              <v-card :class="['cost-card h-100 animate-slide-up', isMobile ? 'surface-card' : '']" :style="{ background: isMobile ? '#121212' : '' }">
+                <v-card-text class="pa-6 text-white text-center text-md-start">
+                  <div class="d-flex align-center justify-space-between mb-4 flex-column flex-md-row">
                     <div>
-                      <div class="text-overline opacity-80">تكاليف هذا الشهر</div>
-                      <div class="text-h3 font-weight-bold">
+                      <div class="text-overline opacity-80 mb-2">تكاليف هذا الشهر</div>
+                      <div :class="['font-weight-bold mb-1', isMobile ? 'stat-value-large' : 'text-h3']">
                         {{ recordsStore.thisMonthCost.toLocaleString() }}
                       </div>
                       <div class="text-body-2 opacity-80">ريال سعودي</div>
                     </div>
-                    <div class="cost-icon">
+                    <div class="cost-icon mt-4 mt-md-0" v-if="!isMobile">
                       <v-icon size="32" color="white">mdi-cash-multiple</v-icon>
                     </div>
                   </div>
                   <v-divider class="my-3 opacity-20"></v-divider>
-                  <div class="d-flex justify-space-between">
+                  <div class="d-flex justify-space-around justify-md-between">
                     <div class="text-center">
-                      <div class="text-h6 font-weight-bold">{{ recordsStore.stats.totalRecords }}</div>
+                      <div class="text-h5 font-weight-bold">{{ recordsStore.stats.totalRecords }}</div>
                       <div class="text-caption opacity-80">إجمالي الصيانات</div>
                     </div>
                     <div class="text-center">
-                      <div class="text-h6 font-weight-bold">{{ recordsStore.stats.averageCost.toLocaleString() }}</div>
+                      <div class="text-h5 font-weight-bold">{{ recordsStore.stats.averageCost.toLocaleString() }}</div>
                       <div class="text-caption opacity-80">متوسط التكلفة</div>
                     </div>
                   </div>
@@ -1167,5 +1174,43 @@ function formatDate(date) { return dayjs(date).format('DD/MM/YYYY') }
 .glass-card {
   animation: fadeInUp 0.6s ease-out forwards;
   animation-delay: 0.2s;
+}
+
+/* Entry Animations (Unified) */
+.animate-slide-up {
+  opacity: 0;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 960px) {
+  .dashboard {
+    padding-bottom: 100px;
+  }
+  
+  .v-row.gap-6 {
+    gap: 24px !important;
+  }
+
+  .progress-label-mobile {
+    position: absolute;
+    right: 0;
+    top: -24px;
+    background: #222;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: bold;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .bg-black-lighten-1 {
+    background: #1a1a1a !important;
+  }
+
+  .action-btn-mobile :deep(.v-btn__content) {
+    font-size: 16px;
+    font-weight: 700;
+  }
 }
 </style>

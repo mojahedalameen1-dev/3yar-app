@@ -65,9 +65,22 @@
         </div>
       </v-navigation-drawer>
 
+      <!-- Mobile Header (Premium Style) -->
+      <v-app-bar v-if="isMobile" color="#000000" elevation="0" border="b" class="mobile-admin-header px-2">
+        <v-app-bar-nav-icon variant="text" @click="drawer = !drawer"></v-app-bar-nav-icon>
+        <v-toolbar-title class="text-subtitle-1 font-weight-bold">
+          عيار - لوحة الإدارة
+        </v-toolbar-title>
+        <v-spacer></v-spacer>
+        <!-- Theme Toggle -->
+        <v-btn icon variant="text" size="small" color="amber" @click="toggleTheme">
+           <v-icon>mdi-theme-light-dark</v-icon>
+        </v-btn>
+      </v-app-bar>
+
       <!-- Main Content Area -->
-      <v-main class="admin-content">
-        <v-container fluid class="pa-6 pb-6">
+      <v-main class="admin-content" :class="{ 'bg-black': isMobile }">
+        <v-container fluid :class="['fill-height align-start', isMobile ? 'pa-4 pb-16' : 'pa-6 pb-6']">
           
           <!-- Section Header -->
           <div class="section-header mb-6 d-flex flex-wrap align-center justify-space-between gap-4">
@@ -115,8 +128,8 @@
               <div class="analytics-dashboard">
                 <!-- KPI Cards -->
                 <v-row class="mb-4" dense>
-                  <v-col v-for="stat in kpiStats" :key="stat.title" cols="12" sm="6" lg="3">
-                    <div class="kpi-card glass-panel h-100">
+                  <v-col v-for="(stat, i) in kpiStats" :key="stat.title" cols="12" sm="6" lg="3">
+                    <div :class="['animate-slide-up', isMobile ? 'surface-card pa-6' : 'kpi-card glass-panel h-100']" :style="{ animationDelay: `${0.1 * (i + 1)}s` }">
                       <div class="d-flex justify-space-between align-start mb-4">
                         <div class="kpi-icon-box" :class="stat.colorClass">
                           <v-icon color="white" size="24">{{ stat.icon }}</v-icon>
@@ -126,7 +139,7 @@
                           <v-icon size="12">{{ stat.trend >= 0 ? 'mdi-arrow-up' : 'mdi-arrow-down' }}</v-icon>
                         </span>
                       </div>
-                      <div class="kpi-value text-h4 font-weight-bold text-white mb-1">
+                      <div :class="['font-weight-bold text-white mb-1', isMobile ? 'stat-value-large' : 'text-h4']">
                         {{ stat.value }}
                       </div>
                       <div class="kpi-label text-caption text-medium-emphasis">
@@ -137,25 +150,25 @@
                 </v-row>
 
                 <!-- Charts Area -->
-                <v-row>
+                <v-row :class="{ 'gap-6': isMobile }">
                   <v-col cols="12" lg="8">
-                    <div class="glass-panel pa-4 fill-height">
+                    <div :class="['animate-slide-up', isMobile ? 'surface-card pa-6' : 'glass-panel pa-4 fill-height']" style="animation-delay: 0.4s">
                       <div class="panel-title mb-4">
                         <v-icon color="cyan" class="me-2">mdi-chart-line</v-icon>
                         نمو المنصة
                       </div>
-                      <div style="height: 300px">
+                      <div :style="{ height: isMobile ? '250px' : '300px' }">
                          <Line v-if="chartsReady" :data="growthChartData" :options="lineChartOptions" />
                       </div>
                     </div>
                   </v-col>
                   <v-col cols="12" lg="4">
-                    <div class="glass-panel pa-4 fill-height">
+                    <div :class="['animate-slide-up', isMobile ? 'surface-card pa-6' : 'glass-panel pa-4 fill-height']" style="animation-delay: 0.5s">
                       <div class="panel-title mb-4">
                         <v-icon color="pink" class="me-2">mdi-chart-pie</v-icon>
                         توزيع الماركات
                       </div>
-                      <div style="height: 300px">
+                      <div :style="{ height: isMobile ? '250px' : '300px' }">
                         <Doughnut v-if="chartsReady" :data="brandChartData" :options="donutChartOptions" />
                       </div>
                     </div>
@@ -166,15 +179,16 @@
 
             <!-- 2. USERS MANAGEMENT -->
             <v-window-item value="users">
-              <div class="glass-panel table-container">
+              <div :class="['table-container', isMobile ? '' : 'glass-panel']">
                 <!-- Empty State -->
                 <div v-if="!filteredUsers.length" class="empty-state">
                   <v-icon size="64" color="grey-darken-2" aria-label="لا يوجد مستخدمين">mdi-account-off</v-icon>
                   <p class="text-body-1 text-grey mt-2">لا يوجد مستخدمين لعرضهم</p>
                 </div>
 
+                <!-- Desktop Table -->
                 <v-data-table
-                  v-else
+                  v-else-if="!isMobile"
                   :headers="userHeaders"
                   :items="filteredUsers"
                   :search="globalSearch"
@@ -216,19 +230,96 @@
                     </div>
                   </template>
                 </v-data-table>
+
+                <!-- Mobile List Cards with Pagination -->
+                <v-data-iterator
+                  v-else
+                  :items="filteredUsers"
+                  :items-per-page="5"
+                  :search="globalSearch"
+                >
+                  <template v-slot:default="{ items }">
+                    <div class="d-flex flex-column gap-4">
+                      <div v-for="item in items" :key="item.raw.user_id" class="surface-card pa-4 animate-slide-up">
+                        <div class="d-flex align-center justify-space-between mb-3">
+                          <div class="d-flex align-center gap-3">
+                            <v-avatar color="grey-darken-3" size="48">
+                              <span class="text-h6 font-weight-bold text-white">{{ getInitials(item.raw) }}</span>
+                            </v-avatar>
+                            <div>
+                              <div class="text-h6 font-weight-bold text-white">
+                                {{ item.raw.first_name }} {{ item.raw.last_name }}
+                              </div>
+                              <v-chip
+                                :color="item.raw.role === 'admin' ? 'purple' : 'cyan'"
+                                size="x-small"
+                                variant="tonal"
+                                class="mt-1"
+                              >
+                                {{ item.raw.role === 'admin' ? 'مدير نظام' : 'مستخدم' }}
+                              </v-chip>
+                            </div>
+                          </div>
+                          <!-- Actions Menu -->
+                          <v-menu>
+                            <template v-slot:activator="{ props }">
+                              <v-btn icon="mdi-dots-vertical" variant="text" color="grey" v-bind="props"></v-btn>
+                            </template>
+                            <v-list density="compact" class="bg-grey-darken-3">
+                              <v-list-item @click="openEditUser(item.raw)" prepend-icon="mdi-pencil" title="تعديل"></v-list-item>
+                              <v-list-item @click="confirmDelete('user', item.raw)" prepend-icon="mdi-delete" class="text-red" title="حذف"></v-list-item>
+                            </v-list>
+                          </v-menu>
+                        </div>
+                        
+                        <div class="d-flex flex-column gap-2 mb-3">
+                          <div class="d-flex align-center text-caption text-medium-emphasis">
+                            <v-icon size="small" class="me-2">mdi-email</v-icon>
+                            {{ item.raw.email || 'No Email' }}
+                          </div>
+                          <div class="d-flex align-center text-caption text-medium-emphasis">
+                            <v-icon size="small" class="me-2">mdi-phone</v-icon>
+                            {{ item.raw.phone || 'غير مسجل' }}
+                          </div>
+                        </div>
+
+                        <v-btn
+                          v-if="item.raw.phone"
+                          block
+                          color="success"
+                          variant="tonal"
+                          prepend-icon="mdi-whatsapp"
+                          target="_blank"
+                          :href="`https://wa.me/${item.raw.phone.replace(/\+/g, '')}`"
+                          class="rounded-xl"
+                        >
+                          مراسلة واتساب
+                        </v-btn>
+                      </div>
+                    </div>
+                  </template>
+                  <template v-slot:footer="{ page, pageCount, prevPage, nextPage }">
+                    <div class="d-flex align-center justify-center gap-4 mt-4 text-white">
+                      <v-btn icon="mdi-chevron-right" variant="text" :disabled="page === 1" @click="prevPage"></v-btn>
+                      <span class="text-caption font-weight-bold">صفحة {{ page }} من {{ pageCount }}</span>
+                      <v-btn icon="mdi-chevron-left" variant="text" :disabled="page === pageCount" @click="nextPage"></v-btn>
+                    </div>
+                  </template>
+                </v-data-iterator>
               </div>
             </v-window-item>
 
             <!-- 3. CARS MANAGEMENT -->
             <v-window-item value="cars">
-              <div class="glass-panel table-container">
+              <div :class="['table-container', isMobile ? '' : 'glass-panel']">
                 <div v-if="!filteredCars.length" class="empty-state">
                   <v-icon size="64" color="grey-darken-2">mdi-car-off</v-icon>
                   <p class="text-body-1 text-grey mt-2">لا توجد سيارات مسجلة</p>
                 </div>
 
+                <!-- Desktop Table -->
                 <v-data-table
-                  v-else
+                  v-else-if="!isMobile"
                   :headers="carHeaders"
                   :items="filteredCars"
                   :search="globalSearch"
@@ -271,19 +362,81 @@
                     </div>
                   </template>
                 </v-data-table>
+
+                <!-- Mobile List Cards with Pagination -->
+                <v-data-iterator
+                  v-else
+                  :items="filteredCars"
+                  :items-per-page="5"
+                  :search="globalSearch"
+                >
+                  <template v-slot:default="{ items }">
+                    <div class="d-flex flex-column gap-4">
+                      <div v-for="item in items" :key="item.raw.id" class="surface-card pa-0 overflow-hidden animate-slide-up">
+                        <v-img
+                          :src="item.raw.image || 'https://via.placeholder.com/300x150?text=No+Image'"
+                          height="150"
+                          cover
+                          class="bg-grey-darken-4"
+                        >
+                          <div class="d-flex justify-end pa-2">
+                            <v-menu>
+                              <template v-slot:activator="{ props }">
+                                <v-btn icon="mdi-dots-vertical" variant="tonal" color="white" size="small" v-bind="props" class="glass-panel"></v-btn>
+                              </template>
+                              <v-list density="compact" class="bg-grey-darken-3">
+                                <v-list-item @click="openEditCar(item.raw)" prepend-icon="mdi-pencil" title="تعديل"></v-list-item>
+                                <v-list-item @click="confirmDelete('car', item.raw)" prepend-icon="mdi-delete" class="text-red" title="حذف"></v-list-item>
+                              </v-list>
+                            </v-menu>
+                          </div>
+                        </v-img>
+                        
+                        <div class="pa-4">
+                          <div class="d-flex justify-space-between align-center mb-2">
+                            <h3 class="text-h6 font-weight-bold text-white">{{ item.raw.make }} {{ item.raw.model }}</h3>
+                            <v-chip size="small" color="primary">{{ item.raw.year }}</v-chip>
+                          </div>
+                          
+                          <div class="d-flex align-center gap-2 mb-3">
+                            <v-chip size="small" variant="outlined" color="grey">{{ item.raw.plate_number }}</v-chip>
+                            <div class="text-caption text-cyan-lighten-2 font-weight-bold">
+                               {{ (item.raw.current_odometer || 0).toLocaleString() }} كم
+                            </div>
+                          </div>
+
+                          <v-divider class="mb-3 border-opacity-10"></v-divider>
+                          
+                          <div class="d-flex align-center text-caption text-medium-emphasis">
+                            <v-icon size="small" class="me-2">mdi-account</v-icon>
+                            المالك: {{ getUserName(item.raw.user_id) }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                  <template v-slot:footer="{ page, pageCount, prevPage, nextPage }">
+                     <div class="d-flex align-center justify-center gap-4 mt-4 text-white">
+                      <v-btn icon="mdi-chevron-right" variant="text" :disabled="page === 1" @click="prevPage"></v-btn>
+                      <span class="text-caption font-weight-bold">صفحة {{ page }} من {{ pageCount }}</span>
+                      <v-btn icon="mdi-chevron-left" variant="text" :disabled="page === pageCount" @click="nextPage"></v-btn>
+                    </div>
+                  </template>
+                </v-data-iterator>
               </div>
             </v-window-item>
 
             <!-- 4. RECORDS MANAGEMENT -->
             <v-window-item value="records">
-              <div class="glass-panel table-container">
+              <div :class="['table-container', isMobile ? '' : 'glass-panel']">
                 <div v-if="!filteredRecords.length" class="empty-state">
                   <v-icon size="64" color="grey-darken-2">mdi-file-remove</v-icon>
                   <p class="text-body-1 text-grey mt-2">لا توجد سجلات صيانة</p>
                 </div>
 
+                <!-- Desktop Table -->
                 <v-data-table
-                  v-else
+                  v-else-if="!isMobile"
                   :headers="recordHeaders"
                   :items="filteredRecords"
                   :search="globalSearch"
@@ -307,7 +460,7 @@
                     {{ formatDate(item.date) }}
                   </template>
 
-                   <template #item.actions="{ item }">
+                  <template #item.actions="{ item }">
                     <div class="d-flex justify-end gap-2">
                       <v-btn icon variant="text" size="small" color="blue-lighten-3" @click="openEditRecord(item)">
                         <v-icon>mdi-pencil</v-icon>
@@ -318,19 +471,68 @@
                     </div>
                   </template>
                 </v-data-table>
+
+                <!-- Mobile List Cards with Pagination -->
+                <v-data-iterator
+                  v-else
+                  :items="filteredRecords"
+                  :items-per-page="5"
+                  :search="globalSearch"
+                >
+                  <template v-slot:default="{ items }">
+                    <div class="d-flex flex-column gap-3">
+                      <div v-for="item in items" :key="item.raw.id" class="surface-card pa-4 animate-slide-up">
+                        <div class="d-flex justify-space-between align-start mb-2">
+                          <div class="d-flex align-center gap-3">
+                             <div class="kpi-icon-box bg-orange-gradient" style="width: 40px; height: 40px;">
+                               <v-icon color="white" size="20">mdi-wrench</v-icon>
+                             </div>
+                             <div>
+                                <div class="text-subtitle-1 font-weight-bold text-white">{{ item.raw.task_name }}</div>
+                                <div class="text-caption text-medium-emphasis">{{ formatDate(item.raw.date) }}</div>
+                             </div>
+                          </div>
+                          <div class="text-end">
+                             <div class="text-h6 font-weight-bold text-green-accent-3">{{ (item.raw.cost || 0).toLocaleString() }}</div>
+                             <div class="text-caption text-medium-emphasis">SAR</div>
+                          </div>
+                        </div>
+                        
+                        <div class="d-flex align-center justify-space-between mt-3 pt-3 border-t border-opacity-10">
+                           <div class="text-caption text-medium-emphasis">
+                             <v-icon size="small" class="me-1">mdi-map-marker</v-icon>
+                             {{ item.raw.service_center || 'مركز غير محدد' }}
+                           </div>
+                           <div class="d-flex gap-2">
+                              <v-btn icon="mdi-pencil" variant="text" size="small" density="comfortable" color="blue" @click="openEditRecord(item.raw)"></v-btn>
+                              <v-btn icon="mdi-delete" variant="text" size="small" density="comfortable" color="red" @click="confirmDelete('record', item.raw)"></v-btn>
+                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                  <template v-slot:footer="{ page, pageCount, prevPage, nextPage }">
+                     <div class="d-flex align-center justify-center gap-4 mt-4 text-white">
+                      <v-btn icon="mdi-chevron-right" variant="text" :disabled="page === 1" @click="prevPage"></v-btn>
+                      <span class="text-caption font-weight-bold">صفحة {{ page }} من {{ pageCount }}</span>
+                      <v-btn icon="mdi-chevron-left" variant="text" :disabled="page === pageCount" @click="nextPage"></v-btn>
+                    </div>
+                  </template>
+                </v-data-iterator>
               </div>
             </v-window-item>
 
              <!-- 5. DOCUMENTS MANAGEMENT -->
             <v-window-item value="documents">
-              <div class="glass-panel table-container">
-                <div v-if="!filteredDocs.length" class="empty-state">
+              <div :class="['table-container', isMobile ? '' : 'glass-panel']">
+                 <div v-if="!filteredDocs.length" class="empty-state">
                   <v-icon size="64" color="grey-darken-2">mdi-file-document-alert</v-icon>
                   <p class="text-body-1 text-grey mt-2">لا توجد وثائق محفوظة</p>
                 </div>
 
+                <!-- Desktop Table -->
                 <v-data-table
-                  v-else
+                  v-else-if="!isMobile"
                   :headers="docHeaders"
                   :items="filteredDocs"
                   :search="globalSearch"
@@ -365,6 +567,63 @@
                     </div>
                   </template>
                 </v-data-table>
+
+                 <!-- Mobile List Cards with Pagination -->
+                 <v-data-iterator
+                   v-else
+                   :items="filteredDocs"
+                   :items-per-page="5"
+                   :search="globalSearch"
+                 >
+                   <template v-slot:default="{ items }">
+                     <div class="d-flex flex-column gap-3">
+                       <div v-for="item in items" :key="item.raw.id" class="surface-card pa-4 animate-slide-up">
+                          <div class="d-flex justify-space-between align-center mb-3">
+                             <div class="d-flex align-center gap-3">
+                                <v-icon :color="getDocColor(item.raw.type)" size="28">mdi-file-document</v-icon>
+                                 <div>
+                                   <div class="text-subtitle-1 font-weight-bold text-white">{{ item.raw.type }}</div>
+                                   <div class="text-caption text-medium-emphasis">
+                                     ينتهي: {{ item.raw.expiry_date ? formatDate(item.raw.expiry_date) : 'غير محدد' }}
+                                   </div>
+                                 </div>
+                             </div>
+                             <v-chip size="small" :color="getDocColor(item.raw.type)" variant="tonal">
+                                {{ dayjs(item.raw.expiry_date).fromNow() }}
+                             </v-chip>
+                          </div>
+
+                          <div class="d-flex gap-2">
+                             <v-btn 
+                                block 
+                                color="cyan-accent-3" 
+                                variant="tonal" 
+                                class="flex-grow-1 rounded-lg"
+                                prepend-icon="mdi-eye"
+                                :disabled="!item.raw.image"
+                                @click="viewDocument(item.raw)"
+                              >
+                                عرض الوثيقة
+                              </v-btn>
+                              <v-btn
+                                 icon="mdi-delete"
+                                 variant="tonal"
+                                 color="red-accent-2"
+                                 class="rounded-lg"
+                                 @click="confirmDelete('document', item.raw)"
+                              ></v-btn>
+                          </div>
+                       </div>
+                     </div>
+                   </template>
+                   <template v-slot:footer="{ page, pageCount, prevPage, nextPage }">
+                      <div class="d-flex align-center justify-center gap-4 mt-4 text-white">
+                       <v-btn icon="mdi-chevron-right" variant="text" :disabled="page === 1" @click="prevPage"></v-btn>
+                       <span class="text-caption font-weight-bold">صفحة {{ page }} من {{ pageCount }}</span>
+                       <v-btn icon="mdi-chevron-left" variant="text" :disabled="page === pageCount" @click="nextPage"></v-btn>
+                     </div>
+                   </template>
+                 </v-data-iterator>
               </div>
             </v-window-item>
 
@@ -634,6 +893,33 @@
        {{ snackbar.text }}
     </v-snackbar>
 
+    <!-- Admin Bottom Navigation -->
+    <v-bottom-navigation
+      v-if="isMobile"
+      v-model="activeTab"
+      bg-color="#000000"
+      active-color="cyan-accent-3"
+      grow
+      class="mobile-admin-bottom-nav"
+    >
+      <v-btn value="analytics">
+        <v-icon>mdi-chart-areaspline</v-icon>
+        <span>الإحصائيات</span>
+      </v-btn>
+      <v-btn value="users">
+        <v-icon>mdi-account-group</v-icon>
+        <span>المستخدمين</span>
+      </v-btn>
+      <v-btn value="cars">
+        <v-icon>mdi-car</v-icon>
+        <span>السيارات</span>
+      </v-btn>
+      <v-btn value="settings">
+        <v-icon>mdi-cog</v-icon>
+        <span>الإعدادات</span>
+      </v-btn>
+    </v-bottom-navigation>
+
   </div>
 </template>
 
@@ -641,6 +927,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
+import { useThemeStore } from '@/stores/theme'
 import { Doughnut, Line } from 'vue-chartjs'
 import { useDisplay } from 'vuetify'
 import {
@@ -665,9 +952,14 @@ ChartJS.register(Title, Tooltip, Legend, ArcElement, CategoryScale, LinearScale,
 
 const router = useRouter()
 const adminStore = useAdminStore()
+const themeStore = useThemeStore()
 const { mobile } = useDisplay()
 
 const isMobile = computed(() => mobile.value)
+
+function toggleTheme() {
+  themeStore.toggleTheme()
+}
 // State
 const drawer = ref(true) // Sidebar toggle
 const activeTab = ref('analytics')
@@ -1191,12 +1483,31 @@ onMounted(async () => {
     background: rgba(255,255,255,0.03);
   }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 64px 24px;
-  text-align: center;
+/* Entry Animations (Unified) */
+.animate-slide-up {
+  opacity: 0;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 960px) {
+  .management-portal {
+    background: #000000;
+  }
+  
+  .v-row.gap-6 {
+    gap: 24px !important;
+  }
+
+  .mobile-admin-header {
+    background: rgba(0, 0, 0, 0.8) !important;
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .mobile-admin-bottom-nav {
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(20px);
+    height: 64px !important;
+  }
 }
 </style>

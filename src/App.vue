@@ -3,26 +3,18 @@
     <ProfileSetup />
     <!-- Show navigation only for authenticated routes -->
     <template v-if="showNavigation">
-      <!-- Mobile App Bar -->
-      <v-app-bar v-if="isMobile" class="app-bar-mobile" elevation="0">
-        <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-        <v-toolbar-title class="d-flex align-center ps-0">
-          <v-img :src="ayarLogo" width="32" height="32" class="me-2" contain></v-img>
-          <span class="text-h6 font-weight-bold" style="line-height: 1;">عيار</span>
-        </v-toolbar-title>
-        <v-spacer></v-spacer>
-        <!-- Distinctive Theme Toggle (Top Left) -->
-        <v-btn 
-          class="theme-toggle-btn ms-2"
-          :color="themeStore.currentTheme === 'dark' ? 'amber' : 'primary'"
-          variant="tonal"
-          size="small"
-          rounded="pill"
-          prepend-icon="themeStore.currentTheme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-          @click="toggleTheme"
-        >
-          <v-icon :icon="themeStore.currentTheme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"></v-icon>
-        </v-btn>
+      <!-- Mobile App Bar (Premium Style) -->
+      <v-app-bar v-if="isMobile" class="app-bar-mobile-premium px-4" elevation="0" flat border="b">
+        <div class="d-flex align-center w-100 justify-space-between">
+          <div>
+            <div class="text-caption text-medium-emphasis mb-n1">أهلاً،</div>
+            <div class="text-h6 font-weight-bold">{{ profileStore.firstName || 'مستخدم' }}</div>
+          </div>
+
+          <v-avatar size="40" class="avatar-glow cursor-pointer" @click="router.push('/settings')">
+            <v-img :src="profileStore.profile?.avatar_url || 'https://randomuser.me/api/portraits/lego/1.jpg'"></v-img>
+          </v-avatar>
+        </div>
       </v-app-bar>
 
       <!-- Navigation Drawer -->
@@ -130,6 +122,35 @@
           <UserProfile v-if="authStore.isAuthenticated" @logout="handleLogout" />
         </template>
       </v-navigation-drawer>
+
+      <!-- Bottom Navigation for Mobile -->
+      <v-bottom-navigation
+        v-if="isMobile"
+        v-model="activeNav"
+        class="mobile-bottom-nav"
+        grow
+        border="t"
+        elevation="0"
+      >
+        <v-btn
+          v-for="item in navItems.slice(0, 5)"
+          :key="item.route"
+          :value="item.name"
+          :to="item.route"
+          class="nav-btn-mobile"
+        >
+          <v-icon>{{ item.icon }}</v-icon>
+          <span class="text-caption">{{ item.title }}</span>
+          <div v-if="activeNav === item.name" class="active-dot"></div>
+          <v-badge
+            v-if="item.badge > 0"
+            :content="item.badge"
+            color="error"
+            floating
+            class="nav-badge-mobile"
+          ></v-badge>
+        </v-btn>
+      </v-bottom-navigation>
     </template>
 
     <!-- Main Content -->
@@ -170,14 +191,13 @@
       </template>
     </v-snackbar>
 
-    <!-- Floating Action Button for Mobile -->
     <v-fab
-      v-if="isMobile && showNavigation && $route.name !== 'settings'"
+      v-if="isMobile && showNavigation && $route.name === 'tasks'"
       icon="mdi-plus"
       color="primary"
-      location="bottom end"
-      size="large"
-      class="fab-button"
+      location="bottom center"
+      size="x-large"
+      class="fab-button-mobile"
       @click="handleFabClick"
     ></v-fab>
   </v-app>
@@ -236,6 +256,11 @@ function toggleTheme() {
 const isMobile = ref(false)
 const drawer = ref(true)
 const rail = ref(false)
+const activeNav = ref('dashboard')
+
+watch(() => route.name, (val) => {
+  activeNav.value = val
+}, { immediate: true })
 
 function checkMobile() {
   isMobile.value = window.innerWidth < 960
@@ -394,9 +419,64 @@ provide('isMobile', isMobile)
 </script>
 
 <style scoped>
-.app-bar-mobile {
-  background: rgba(var(--v-theme-surface), 0.95) !important;
-  backdrop-filter: blur(10px);
+.app-bar-mobile-premium {
+  background: rgba(0, 0, 0, 0.8) !important;
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  height: 70px !important;
+}
+
+.avatar-glow {
+  border: 2px solid var(--electric-blue);
+  box-shadow: 0 0 15px rgba(0, 122, 255, 0.3);
+}
+
+.mobile-bottom-nav {
+  height: 75px !important;
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(25px);
+  border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+  padding-bottom: 20px; /* Safe area for home indicator */
+}
+
+.nav-btn-mobile {
+  min-width: 0 !important;
+  color: #888 !important;
+  position: relative;
+}
+
+.nav-btn-mobile :deep(.v-btn__content) {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-btn-mobile.v-btn--active {
+  color: var(--electric-blue) !important;
+}
+
+.active-dot {
+  width: 4px;
+  height: 4px;
+  background: var(--electric-blue);
+  border-radius: 50%;
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 0 8px var(--electric-blue);
+}
+
+.nav-badge-mobile {
+  position: absolute;
+  top: 10px;
+  right: 25%;
+}
+
+.fab-button-mobile {
+  bottom: 90px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 100;
 }
 
 .app-nav {
