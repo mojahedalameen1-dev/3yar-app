@@ -6,6 +6,7 @@ import { GoogleAuth } from 'google-auth-library'
 config({ path: '.env.local', quiet: true })
 
 const domain = process.argv[2]
+const enableGoogle = process.argv.includes('--enable-google')
 if (!domain) throw new Error('Usage: node scripts/configure-firebase-auth.mjs <authorized-domain>')
 
 const credentials = JSON.parse(
@@ -28,3 +29,19 @@ await client.request({
 })
 
 console.log(`Authorized Firebase domain ensured: ${domain}`)
+
+try {
+    const providerUrl = `https://identitytoolkit.googleapis.com/admin/v2/projects/${projectId}/defaultSupportedIdpConfigs/google.com`
+    let googleProvider = await client.request({ url: providerUrl })
+    if (enableGoogle && googleProvider.data.enabled !== true) {
+        googleProvider = await client.request({
+            url: `${providerUrl}?updateMask=enabled`,
+            method: 'PATCH',
+            data: { enabled: true }
+        })
+    }
+    console.log(`Google sign-in enabled: ${googleProvider.data.enabled === true}`)
+} catch (error) {
+    if (error.response?.status === 404) console.log('Google sign-in enabled: false')
+    else throw error
+}
