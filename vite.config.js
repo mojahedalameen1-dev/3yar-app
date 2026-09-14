@@ -9,7 +9,12 @@ export default defineConfig({
     vue(),
     vuetify({ autoImport: true }),
     VitePWA({
-      registerType: 'prompt',
+      // Apply new deployments immediately so users do not remain on a cached
+      // bundle with stale Firebase configuration (especially after auth changes).
+      registerType: 'autoUpdate',
+      workbox: {
+        cleanupOutdatedCaches: true
+      },
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
         name: 'عيار - مدير صيانة السيارات',
