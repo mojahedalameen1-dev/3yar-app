@@ -227,7 +227,7 @@ async function handleGoogleSignUp() {
   errorMessage.value = ''
   
   // Use the same signInWithGoogle function as login
-  // Supabase handles "Sign Up" vs "Sign In" automatically for OAuth
+  // Firebase handles Google sign-in and first-time account creation.
   const result = await authStore.signInWithGoogle()
   
   if (!result.success && result.error) {

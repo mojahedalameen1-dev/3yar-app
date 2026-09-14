@@ -130,7 +130,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/firebase'
 import ayarLogo from '@/assets/ayar-logo.png'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ar'

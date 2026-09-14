@@ -25,28 +25,9 @@
       </v-alert>
 
       <v-form @submit.prevent="handleLogin" ref="form">
-        <v-text-field
-          v-model="username"
-          label="اسم المستخدم"
-          prepend-inner-icon="mdi-account"
-          variant="outlined"
-          color="cyan"
-          class="mb-4"
-          :rules="[v => !!v || 'مطلوب']"
-        ></v-text-field>
-
-        <v-text-field
-          v-model="password"
-          label="كلمة المرور"
-          prepend-inner-icon="mdi-lock"
-          :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
-          :type="showPassword ? 'text' : 'password'"
-          variant="outlined"
-          color="cyan"
-          class="mb-6"
-          :rules="[v => !!v || 'مطلوب']"
-          @click:append-inner="showPassword = !showPassword"
-        ></v-text-field>
+        <v-alert type="info" variant="tonal" class="mb-6">
+          سجّل الدخول بحساب Firebase الممنوح صلاحية الإدارة، ثم تابع إلى لوحة التحكم.
+        </v-alert>
 
         <v-btn
           block
@@ -79,66 +60,35 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { supabase } from '@/lib/supabase'
+import { supabase, isFirebaseAdmin } from '@/lib/firebase'
 import { useProfileStore } from '@/stores/profile'
 
 const router = useRouter()
 const profileStore = useProfileStore()
 
-const username = ref('')
-const password = ref('')
-const showPassword = ref(false)
 const loading = ref(false)
 const error = ref('')
-
-// Hardcoded Credentials
-const ADMIN_USER = 'admin'
-const ADMIN_PASS = 'Mm58858Mm'
 
 async function handleLogin() {
   error.value = ''
   loading.value = true
 
   try {
-    // 1. Validate Form credentials
-    if (username.value !== ADMIN_USER || password.value !== ADMIN_PASS) {
-      throw new Error('بيانات الدخول غير صحيحة')
-    }
-
-    // 2. Check if user is authenticated in Supabase
+    // Admin access is granted only through a Firebase Auth custom claim.
     const { data: { session } } = await supabase.auth.getSession()
     
     if (!session) {
       throw new Error('يجب تسجيل الدخول بحسابك أولاً')
     }
 
-    // 3. Promote User to Admin in Database (This is the "Golden Key" step)
-    // We try to update their role to 'admin' directly.
-    // NOTE: This usually requires RLS policies to allow users to update their own role, 
-    // OR we rely on the migration script having run.
-    // If the migration script ran, admins have bypass RLS.
-    // But how do they BECOME admin first time? 
-    // We will attempt the update. If it fails due to RLS, we assume they are already admin or need manual intervention.
-    
-    // Attempt database promotion
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ role: 'admin' })
-      .eq('user_id', session.user.id)
-
-    if (updateError) {
-      console.warn('Could not auto-promote user in DB (RLS might block):', updateError)
-      // We continue anyway, hoping they are already admin or that session storage is enough for UI access,
-      // though data fetching might fail if they aren't DB admins.
+    if (!(await isFirebaseAdmin())) {
+      throw new Error('هذا الحساب لا يملك صلاحية الإدارة في Firebase')
     }
 
-    // 4. Set Session Storage (Browser-level lock)
-    sessionStorage.setItem('adminKey', 'valid')
-
-    // 5. Update Local Store
+    // Update Local Store
     profileStore.setRole('admin')
 
-    // 6. Redirect
+    // Redirect
     router.push({ name: 'control-tower' })
 
   } catch (err) {

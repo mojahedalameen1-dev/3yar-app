@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function admin() { return signedIn() && request.auth.token.admin == true; }
+    function owner() { return signedIn() && resource.data.user_id == request.auth.uid; }
+    function incomingOwner() { return signedIn() && request.resource.data.user_id == request.auth.uid; }
+    function sharedCar(carId) {
+      return get(/databases/$(database)/documents/cars/$(carId)).data.public_share_enabled == true;
+    }
+
+    match /profiles/{profileId} {
+      allow read: if admin() || owner();
+      allow create: if admin() || (incomingOwner() && request.resource.data.role == 'user');
+      allow update: if admin() || (owner() && incomingOwner() && request.resource.data.role == resource.data.role);
+      allow delete: if admin() || owner();
+    }
+
+    match /cars/{carId} {
+      allow read: if admin() || owner() || resource.data.public_share_enabled == true;
+      allow create: if admin() || incomingOwner();
+      allow update: if admin() || (owner() && incomingOwner());
+      allow delete: if admin() || owner();
+    }
+
+    match /maintenance_tasks/{taskId} {
+      allow read: if admin() || owner() || sharedCar(resource.data.car_id);
+      allow create: if admin() || incomingOwner();
+      allow update: if admin() || (owner() && incomingOwner());
+      allow delete: if admin() || owner();
+    }
+
+    match /maintenance_records/{recordId} {
+      allow read: if admin() || owner();
+      allow create: if admin() || incomingOwner();
+      allow update: if admin() || (owner() && incomingOwner());
+      allow delete: if admin() || owner();
+    }
+
+    match /documents/{documentId} {
+      allow read: if admin() || owner();
+      allow create: if admin() || incomingOwner();
+      allow update: if admin() || (owner() && incomingOwner());
+      allow delete: if admin() || owner();
+    }
+
+    match /odometer_readings/{readingId} {
+      allow read: if admin() || owner();
+      allow create: if admin() || incomingOwner();
+      allow update: if admin() || (owner() && incomingOwner());
+      allow delete: if admin() || owner();
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if admin();
+    }
+
+    match /announcement_reads/{readId} {
+      allow read, delete: if admin() || owner();
+      allow create: if admin() || incomingOwner();
+      allow update: if admin() || (owner() && incomingOwner());
+    }
+
+    match /activity_logs/{logId} {
+      allow read: if admin();
+      allow create: if admin() || incomingOwner();
+      allow update, delete: if admin();
+    }
+
+    match /default_maintenance_templates/{templateId} {
+      allow read: if true;
+      allow write: if admin();
+    }
+  }
+}

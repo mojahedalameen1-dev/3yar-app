@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/firebase'
 
 export const useCarStore = defineStore('car', () => {
     // State

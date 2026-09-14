@@ -54,7 +54,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import QRCode from 'qrcode'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/firebase'
 
 const props = defineProps({
   modelValue: Boolean,

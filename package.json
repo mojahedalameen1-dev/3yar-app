@@ -7,17 +7,21 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "migrate:firebase": "node scripts/migrate-supabase-to-firebase.mjs",
+    "firebase:set-admin": "node scripts/set-firebase-admin.mjs",
     "lint": "eslint . --fix",
     "format": "prettier --write src/"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
-    "@supabase/supabase-js": "^2.91.1",
+    "@vercel/blob": "^2.8.0",
     "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
     "dayjs": "^1.11.10",
+    "firebase": "^12.19.0",
+    "firebase-admin": "13.6.0",
     "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.1",
+    "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "pinia": "^2.1.7",
     "qrcode": "^1.5.4",
@@ -28,7 +32,9 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.91.1",
     "@vitejs/plugin-vue": "^5.0.0",
+    "dotenv": "^17.4.2",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.7.0",

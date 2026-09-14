@@ -1,0 +1,33 @@
+{
+  "indexes": [
+    { "collectionGroup": "cars", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "user_id", "order": "ASCENDING" },
+      { "fieldPath": "created_at", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "cars", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "share_token", "order": "ASCENDING" },
+      { "fieldPath": "public_share_enabled", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "maintenance_tasks", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "user_id", "order": "ASCENDING" },
+      { "fieldPath": "created_at", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "maintenance_records", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "user_id", "order": "ASCENDING" },
+      { "fieldPath": "date", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "documents", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "user_id", "order": "ASCENDING" },
+      { "fieldPath": "created_at", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "odometer_readings", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "user_id", "order": "ASCENDING" },
+      { "fieldPath": "date", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "announcement_reads", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "user_id", "order": "ASCENDING" },
+      { "fieldPath": "announcement_id", "order": "ASCENDING" }
+    ]}
+  ],
+  "fieldOverrides": []
+}

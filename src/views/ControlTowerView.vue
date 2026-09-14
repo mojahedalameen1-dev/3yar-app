@@ -711,7 +711,7 @@
     <v-dialog v-model="userDialog.show" max-width="500">
       <v-card :title="userDialog.isEdit ? 'تعديل المستخدم' : 'إضافة مستخدم جديد'" color="#1e1e24">
         <v-card-text>
-          <v-text-field v-model="userDialog.data.user_id" label="User ID (من سوبابيس)" hint="قم بنسخ الـ ID من لوحة تحكم Supabase Auth" persistent-hint class="mb-2" v-if="!userDialog.isEdit"></v-text-field>
+          <v-text-field v-model="userDialog.data.user_id" label="User ID (من Firebase)" hint="قم بنسخ UID من Firebase Authentication" persistent-hint class="mb-2" v-if="!userDialog.isEdit"></v-text-field>
           <v-row dense>
              <v-col cols="6">
                <v-text-field v-model="userDialog.data.first_name" label="الاسم الأول"></v-text-field>

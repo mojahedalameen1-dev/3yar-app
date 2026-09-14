@@ -288,7 +288,7 @@ async function initialize() {
   }
 }
 
-// Initialize data from Supabase
+// Initialize data from Firebase
 async function initializeData() {
   try {
     // Fetch profile first

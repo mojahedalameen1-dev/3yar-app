@@ -7,8 +7,11 @@ dist/
 # Local env files
 .env
 .env.*
+!.env.example
 .env.local
 .env.*.local
+firebase-service-account.json
+*-firebase-adminsdk-*.json
 
 # Editor directories and files
 .vscode/*
@@ -46,3 +49,4 @@ coverage/
 
 # Vite
 *.local
+.vercel

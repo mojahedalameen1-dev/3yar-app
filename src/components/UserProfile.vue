@@ -80,7 +80,7 @@ async function handleLogout() {
   loggingOut.value = true
   
   try {
-    // Sign out from Supabase & Clear State
+    // Sign out from Firebase and clear state
     const result = await authStore.signOut()
     
     if (result.success) {

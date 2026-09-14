@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/firebase'
 import { useCarStore } from './car'
 import { useTasksStore } from './tasks'
 import { useRecordsStore } from './records'
@@ -126,8 +126,8 @@ export const useAuthStore = defineStore('auth', () => {
             session.value = null
             return { success: true }
         } catch (err) {
-            // Even if Supabase errors, we should clear local state
-            console.error('Supabase signOut error, forcing local cleanup:', err)
+            // Even if Firebase errors, clear local state.
+            console.error('Firebase signOut error, forcing local cleanup:', err)
             clearAllStores()
             user.value = null
             session.value = null

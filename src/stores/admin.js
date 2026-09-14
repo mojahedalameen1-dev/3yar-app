@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/firebase'
 
 export const useAdminStore = defineStore('admin', () => {
     // State
@@ -280,7 +280,7 @@ export const useAdminStore = defineStore('admin', () => {
         try {
             const { error: err } = await supabase
                 .from('announcements')
-                .delete()
+                .update({ is_active: isActive })
                 .eq('id', id)
 
             if (err) throw err
@@ -305,8 +305,8 @@ export const useAdminStore = defineStore('admin', () => {
     // Create User (Profile)
     async function createUser(userData) {
         try {
-            // NOTE: Client-side Auth user creation is restricted.
-            // This function creates the profile for a user that should be created in Supabase Auth first.
+            // Auth user creation remains server-side. This callable creates the profile
+            // for a user that already exists in Firebase Authentication.
             const { error: err } = await supabase.rpc('create_user_profile_admin', {
                 new_user_id: userData.user_id, // Admin must provide the ID from Auth
                 first_name: userData.first_name,
@@ -402,15 +402,17 @@ export const useAdminStore = defineStore('admin', () => {
                 const fileName = `${Math.random()}.${fileExt}`
                 const filePath = `documents/${fileName}`
 
-                const { error: uploadError } = await supabase.storage
+                const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('images')
                     .upload(filePath, file)
 
                 if (uploadError) throw uploadError
 
-                const { data: publicUrlData } = supabase.storage
+                const { data: publicUrlData, error: urlError } = await supabase.storage
                     .from('images')
-                    .getPublicUrl(filePath)
+                    .getPublicUrl(uploadData.publicUrl || uploadData.path)
+
+                if (urlError) throw urlError
 
                 imageUrl = publicUrlData.publicUrl
             }

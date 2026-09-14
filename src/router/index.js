@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { supabase } from '@/lib/supabase'
-import { useProfileStore } from '@/stores/profile'
+import { supabase, isFirebaseAdmin } from '@/lib/firebase'
 
 const routes = [
     // Public routes (no auth required)
@@ -112,7 +111,7 @@ router.beforeEach(async (to, from, next) => {
     // Update page title
     document.title = to.meta.title ? `${to.meta.title} | عيار` : 'عيار'
 
-    // Check if user is authenticated using Supabase
+    // Check if user is authenticated using Firebase
     const { data: { session } } = await supabase.auth.getSession()
 
     // If user is logged in and trying to access landing/login/register, check car setup
@@ -185,7 +184,7 @@ router.beforeEach(async (to, from, next) => {
     // Check admin requirement for control tower
     if (to.meta.requiresAdmin) {
         // STRICT CHECK: Only allow access if they have the explicit session key from AdminLoginView
-        const isAdminSession = sessionStorage.getItem('adminKey') === 'valid'
+        const isAdminSession = await isFirebaseAdmin()
 
         if (isAdminSession) {
             next()

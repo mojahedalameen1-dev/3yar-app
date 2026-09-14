@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/firebase'
 import { useCarStore } from './car'
 import dayjs from 'dayjs'
 
