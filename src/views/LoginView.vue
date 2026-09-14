@@ -44,10 +44,12 @@
           <v-btn color="primary" size="x-large" block :loading="loading" :disabled="!formValid || loading" type="submit" class="auth-btn primary-btn"><span>تسجيل الدخول</span><v-icon end size="20">mdi-arrow-left</v-icon></v-btn>
         </v-form>
 
-        <div class="social-divider"><span>أو</span></div>
-        <v-btn block size="large" variant="outlined" class="auth-btn google-btn" :loading="loading" :disabled="loading" @click="handleGoogleLogin">
-          <template #prepend><span class="google-glyph">G</span></template><span>المتابعة باستخدام Google</span>
-        </v-btn>
+        <template v-if="googleAuthEnabled">
+          <div class="social-divider"><span>أو</span></div>
+          <v-btn block size="large" variant="outlined" class="auth-btn google-btn" :loading="loading" :disabled="loading" @click="handleGoogleLogin">
+            <template #prepend><span class="google-glyph">G</span></template><span>المتابعة باستخدام Google</span>
+          </v-btn>
+        </template>
         <p class="register-prompt">ليس لديك حساب؟ <router-link to="/register" class="auth-link">أنشئ حسابك مجاناً</router-link></p>
         <p class="panel-footnote"><v-icon size="14">mdi-lock-outline</v-icon> اتصال مشفّر وآمن</p>
       </section>
@@ -88,6 +90,8 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const showForgotPassword = ref(false)
 const resetEmail = ref('')
+// Google provider is intentionally opt-in; Firebase currently has it disabled.
+const googleAuthEnabled = import.meta.env.VITE_FIREBASE_GOOGLE_ENABLED === 'true'
 
 const emailRules = [v => !!v || 'البريد الإلكتروني مطلوب', v => /.+@.+\..+/.test(v) || 'البريد الإلكتروني غير صحيح']
 const passwordRules = [v => !!v || 'كلمة المرور مطلوبة', v => v.length >= 6 || 'كلمة المرور يجب أن تكون 6 أحرف على الأقل']
@@ -131,7 +135,7 @@ function getErrorMessage(error) {
   const raw = typeof error === 'string' ? error : error?.code || error?.message || ''
   const code = raw.match(/auth\/[a-z-]+/)?.[0] || raw
   const errorMap = {
-    'auth/operation-not-allowed': 'تسجيل الدخول بالبريد الإلكتروني غير مفعّل في إعدادات المشروع. جرّب تحديث الصفحة أو استخدم Google.',
+    'auth/operation-not-allowed': 'طريقة تسجيل الدخول هذه غير مفعّلة حاليًا. حدّث الصفحة وحاول مرة أخرى.',
     'auth/invalid-credential': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
     'auth/invalid-login-credentials': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
     'auth/user-not-found': 'لا يوجد حساب بهذا البريد الإلكتروني.',

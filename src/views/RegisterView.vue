@@ -101,8 +101,8 @@
             </v-alert>
           </v-form>
 
-          <!-- Google Sign Up -->
-          <div class="mb-6">
+          <!-- Google sign-up is shown only after the Firebase provider is enabled. -->
+          <div v-if="googleAuthEnabled" class="mb-6">
             <v-divider class="mb-4">
               <span class="divider-text">أو التسجيل بواسطة</span>
             </v-divider>
@@ -188,6 +188,7 @@ const errorMessage = ref('')
 
 // Success dialog
 const showSuccess = ref(false)
+const googleAuthEnabled = import.meta.env.VITE_FIREBASE_GOOGLE_ENABLED === 'true'
 
 // Validation rules
 const emailRules = [
