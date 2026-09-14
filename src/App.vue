@@ -1,5 +1,5 @@
 <template>
-  <v-app :theme="theme">
+  <v-app :theme="themeStore.currentTheme">
     <ProfileSetup />
     <!-- Show navigation only for authenticated routes -->
     <template v-if="showNavigation">

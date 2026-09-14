@@ -1,174 +1,69 @@
 <template>
   <div class="login-page">
-    <!-- Header -->
     <header class="auth-header">
-      <router-link to="/" class="logo d-flex align-center gap-2">
-        <div class="logo-wrapper">
-          <v-img :src="ayarLogo" width="32" height="32" contain></v-img>
-        </div>
-        <span class="logo-text">عيار</span>
+      <router-link to="/" class="brand-mark" aria-label="العودة إلى الصفحة الرئيسية">
+        <span class="brand-logo"><v-img :src="ayarLogo" width="34" height="34" contain></v-img></span>
+        <span class="brand-name">عيار</span>
       </router-link>
+      <router-link to="/register" class="header-action">حساب جديد <v-icon size="16">mdi-arrow-left</v-icon></router-link>
     </header>
 
-    <div class="login-container">
-      <!-- Logo Section -->
-      <div class="logo-section text-center mb-8">
-        <div class="logo-icon mx-auto mb-4">
-          <v-img :src="ayarLogo" width="64" height="64" contain></v-img>
+    <main class="auth-shell">
+      <section class="auth-story" aria-label="عن عيار">
+        <div class="story-kicker"><span class="kicker-dot"></span> رفيق سيارتك الذكي</div>
+        <h1>خلك مطمّن،<br><span>سيارتك تحت السيطرة.</span></h1>
+        <p>تابع صيانة سيارتك، مصاريفها ووثائقها من مكان واحد. كل التفاصيل التي تحتاجها، في متناول يدك.</p>
+        <div class="story-points">
+          <div class="story-point"><span class="point-icon"><v-icon size="19">mdi-shield-check-outline</v-icon></span><span><strong>بياناتك بأمان</strong><small>خصوصية وحماية في كل خطوة</small></span></div>
+          <div class="story-point"><span class="point-icon"><v-icon size="19">mdi-chart-timeline-variant</v-icon></span><span><strong>متابعة أسهل</strong><small>سجل واضح لكل ما يخص سيارتك</small></span></div>
         </div>
-        <h1 class="page-title mb-2">مرحباً بعودتك</h1>
-        <p class="page-subtitle">سجّل دخولك للوصول إلى لوحة التحكم</p>
-      </div>
+        <div class="story-orbit orbit-one"></div><div class="story-orbit orbit-two"></div>
+      </section>
 
-      <!-- Login Card -->
-      <v-card class="auth-card">
-        <v-card-text class="pa-6 pa-sm-8">
-          <v-form ref="loginForm" v-model="formValid" @submit.prevent="handleLogin">
-            <div class="form-group mb-4">
-              <label class="form-label">البريد الإلكتروني</label>
-              <v-text-field
-                v-model="email"
-                type="email"
-                placeholder="example@email.com"
-                prepend-inner-icon="mdi-email-outline"
-                :rules="emailRules"
-                variant="outlined"
-                density="comfortable"
-                dir="ltr"
-                class="auth-input"
-                bg-color="rgba(255,255,255,0.03)"
-              ></v-text-field>
-            </div>
+      <section class="auth-panel" aria-labelledby="login-title">
+        <div class="panel-logo"><v-img :src="ayarLogo" width="52" height="52" contain></v-img></div>
+        <div class="panel-heading">
+          <div class="panel-eyebrow">مرحباً بعودتك</div>
+          <h2 id="login-title">سجّل دخولك</h2>
+          <p>أدخل بياناتك للوصول إلى لوحة التحكم</p>
+        </div>
 
-            <div class="form-group mb-2">
-              <label class="form-label">كلمة المرور</label>
-              <v-text-field
-                v-model="password"
-                :type="showPassword ? 'text' : 'password'"
-                placeholder="••••••••"
-                prepend-inner-icon="mdi-lock-outline"
-                :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
-                :rules="passwordRules"
-                variant="outlined"
-                density="comfortable"
-                dir="ltr"
-                class="auth-input"
-                bg-color="rgba(255,255,255,0.03)"
-                @click:append-inner="showPassword = !showPassword"
-              ></v-text-field>
-            </div>
+        <v-alert v-if="successMessage" type="success" variant="tonal" density="comfortable" class="status-alert" closable @click:close="successMessage = ''">{{ successMessage }}</v-alert>
+        <v-alert v-if="errorMessage" type="error" variant="tonal" density="comfortable" class="status-alert" closable @click:close="errorMessage = ''"><template #prepend><v-icon>mdi-alert-circle-outline</v-icon></template>{{ errorMessage }}</v-alert>
 
-            <div class="d-flex justify-end mb-6">
-              <v-btn variant="text" size="small" color="primary" class="px-0" @click="showForgotPassword = true">
-                نسيت كلمة المرور؟
-              </v-btn>
-            </div>
-
-            <v-btn
-              color="primary"
-              size="x-large"
-              block
-              :loading="loading"
-              :disabled="!formValid"
-              type="submit"
-              class="auth-btn mb-4"
-            >
-              <v-icon start>mdi-login</v-icon>
-              تسجيل الدخول
-            </v-btn>
-
-            <!-- Error Alert -->
-            <v-alert
-              v-if="errorMessage"
-              type="error"
-              variant="tonal"
-              density="compact"
-              class="mb-4"
-              closable
-              @click:close="errorMessage = ''"
-            >
-              {{ errorMessage }}
-            </v-alert>
-          </v-form>
-
-          <!-- Google Sign In -->
-          <div class="mb-6">
-            <v-divider class="mb-4">
-              <span class="divider-text">أو الدخول بواسطة</span>
-            </v-divider>
-            
-            <v-btn
-              block
-              size="x-large"
-              color="white"
-              variant="flat"
-              class="auth-btn google-btn mb-3"
-              border
-              @click="handleGoogleLogin"
-              :loading="loading"
-            >
-              <template #prepend>
-                <div class="google-logo-wrapper">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24px" height="24px">
-                    <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
-                    <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
-                    <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.223,0-9.654-3.343-11.303-8l-6.571,4.819C9.656,39.663,16.318,44,24,44z"/>
-                    <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
-                  </svg>
-                </div>
-              </template>
-              <span class="text-secondary ms-2">الدخول بواسطة جوجل</span>
-            </v-btn>
+        <v-form ref="loginForm" v-model="formValid" @submit.prevent="handleLogin">
+          <div class="form-group">
+            <label class="form-label" for="login-email">البريد الإلكتروني</label>
+            <v-text-field id="login-email" v-model="email" type="email" placeholder="name@example.com" prepend-inner-icon="mdi-email-outline" :rules="emailRules" variant="outlined" density="comfortable" dir="ltr" class="auth-input" hide-details="auto" autocomplete="email"></v-text-field>
           </div>
-
-          <div class="text-center">
-            <span class="text-medium-emphasis">ليس لديك حساب؟</span>
-            <router-link to="/register" class="auth-link ms-1">
-              إنشاء حساب جديد
-            </router-link>
+          <div class="form-group password-group">
+            <label class="form-label" for="login-password">كلمة المرور</label>
+            <v-text-field id="login-password" v-model="password" :type="showPassword ? 'text' : 'password'" placeholder="أدخل كلمة المرور" prepend-inner-icon="mdi-lock-outline" :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'" :rules="passwordRules" variant="outlined" density="comfortable" dir="ltr" class="auth-input" hide-details="auto" autocomplete="current-password" @click:append-inner="showPassword = !showPassword" @keydown.enter="handleLogin"></v-text-field>
+            <button type="button" class="forgot-link" @click="showForgotPassword = true">نسيت كلمة المرور؟</button>
           </div>
-        </v-card-text>
-      </v-card>
+          <v-btn color="primary" size="x-large" block :loading="loading" :disabled="!formValid || loading" type="submit" class="auth-btn primary-btn"><span>تسجيل الدخول</span><v-icon end size="20">mdi-arrow-left</v-icon></v-btn>
+        </v-form>
 
-      <!-- Footer -->
-      <div class="auth-footer text-center mt-8">
-        <p class="text-caption text-medium-emphasis">
-          © {{ new Date().getFullYear() }} عيار - جميع الحقوق محفوظة
-        </p>
-      </div>
-    </div>
+        <div class="social-divider"><span>أو</span></div>
+        <v-btn block size="large" variant="outlined" class="auth-btn google-btn" :loading="loading" :disabled="loading" @click="handleGoogleLogin">
+          <template #prepend><span class="google-glyph">G</span></template><span>المتابعة باستخدام Google</span>
+        </v-btn>
+        <p class="register-prompt">ليس لديك حساب؟ <router-link to="/register" class="auth-link">أنشئ حسابك مجاناً</router-link></p>
+        <p class="panel-footnote"><v-icon size="14">mdi-lock-outline</v-icon> اتصال مشفّر وآمن</p>
+      </section>
+    </main>
+    <footer class="auth-footer">© {{ new Date().getFullYear() }} عيار · جميع الحقوق محفوظة</footer>
 
-    <!-- Forgot Password Dialog -->
-    <v-dialog v-model="showForgotPassword" max-width="400">
+    <v-dialog v-model="showForgotPassword" max-width="430">
       <v-card class="auth-dialog">
-        <v-card-title class="pa-5">
-          <v-icon color="primary" class="me-2">mdi-lock-reset</v-icon>
-          استعادة كلمة المرور
-        </v-card-title>
+        <v-card-title class="dialog-title"><span class="dialog-icon"><v-icon size="20">mdi-lock-reset</v-icon></span>استعادة كلمة المرور</v-card-title>
         <v-divider></v-divider>
-        <v-card-text class="pa-5">
-          <p class="mb-4 text-body-2 text-medium-emphasis">
-            أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة تعيين كلمة المرور.
-          </p>
-          <v-text-field
-            v-model="resetEmail"
-            label="البريد الإلكتروني"
-            type="email"
-            prepend-inner-icon="mdi-email-outline"
-            variant="outlined"
-            dir="ltr"
-            class="auth-input"
-            bg-color="rgba(255,255,255,0.03)"
-          ></v-text-field>
+        <v-card-text class="dialog-content">
+          <p>أدخل بريدك الإلكتروني وسنرسل لك رابطًا آمنًا لإعادة تعيين كلمة المرور.</p>
+          <v-text-field v-model="resetEmail" label="البريد الإلكتروني" type="email" prepend-inner-icon="mdi-email-outline" variant="outlined" dir="ltr" class="auth-input" hide-details="auto" autocomplete="email"></v-text-field>
         </v-card-text>
         <v-divider></v-divider>
-        <v-card-actions class="pa-4">
-          <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showForgotPassword = false">إلغاء</v-btn>
-          <v-btn color="primary" :loading="loading" @click="handleResetPassword">
-            إرسال الرابط
-          </v-btn>
-        </v-card-actions>
+        <v-card-actions class="dialog-actions"><v-btn variant="text" @click="showForgotPassword = false">إلغاء</v-btn><v-btn color="primary" :loading="loading" :disabled="!resetEmail" @click="handleResetPassword">إرسال الرابط</v-btn></v-card-actions>
       </v-card>
     </v-dialog>
   </div>
@@ -183,8 +78,6 @@ import ayarLogo from '@/assets/ayar-logo.png'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-
-// Form state
 const loginForm = ref(null)
 const formValid = ref(false)
 const email = ref('')
@@ -192,234 +85,132 @@ const password = ref('')
 const showPassword = ref(false)
 const loading = ref(false)
 const errorMessage = ref('')
-
-// Forgot password
+const successMessage = ref('')
 const showForgotPassword = ref(false)
 const resetEmail = ref('')
 
-// Validation rules
-const emailRules = [
-  v => !!v || 'البريد الإلكتروني مطلوب',
-  v => /.+@.+\..+/.test(v) || 'البريد الإلكتروني غير صحيح'
-]
-
-const passwordRules = [
-  v => !!v || 'كلمة المرور مطلوبة',
-  v => v.length >= 6 || 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'
-]
+const emailRules = [v => !!v || 'البريد الإلكتروني مطلوب', v => /.+@.+\..+/.test(v) || 'البريد الإلكتروني غير صحيح']
+const passwordRules = [v => !!v || 'كلمة المرور مطلوبة', v => v.length >= 6 || 'كلمة المرور يجب أن تكون 6 أحرف على الأقل']
 
 async function handleLogin() {
-  if (!formValid.value) return
-  
+  if (!formValid.value || loading.value) return
   loading.value = true
   errorMessage.value = ''
-
-  const result = await authStore.signIn(email.value, password.value)
-  
+  successMessage.value = ''
+  const result = await authStore.signIn(email.value.trim(), password.value)
   loading.value = false
-  
-  if (result.success) {
-    const redirect = route.query.redirect || '/dashboard'
-    router.push(redirect)
-  } else {
-    errorMessage.value = getErrorMessage(result.error)
-  }
+  if (result.success) router.push(route.query.redirect || '/dashboard')
+  else errorMessage.value = getErrorMessage(result.error)
 }
 
 async function handleGoogleLogin() {
+  if (loading.value) return
   loading.value = true
   errorMessage.value = ''
-  
   const result = await authStore.signInWithGoogle()
-  
-  // Note: OAuth redirect happens automatically if successful, 
-  // so we might not reach here unless there's an immediate error.
-  if (!result.success && result.error) {
+  if (!result.success) {
     loading.value = false
     errorMessage.value = getErrorMessage(result.error)
   }
 }
 
 async function handleResetPassword() {
-  if (!resetEmail.value) return
-
+  if (!resetEmail.value || loading.value) return
   loading.value = true
-  const result = await authStore.resetPassword(resetEmail.value)
+  errorMessage.value = ''
+  const result = await authStore.resetPassword(resetEmail.value.trim())
   loading.value = false
-  
   if (result.success) {
     showForgotPassword.value = false
-    errorMessage.value = ''
-    // Show success (reusing error message area)
-  } else {
-    errorMessage.value = getErrorMessage(result.error)
-  }
+    successMessage.value = 'تم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني.'
+    resetEmail.value = ''
+  } else errorMessage.value = getErrorMessage(result.error)
 }
 
 function getErrorMessage(error) {
+  const raw = typeof error === 'string' ? error : error?.code || error?.message || ''
+  const code = raw.match(/auth\/[a-z-]+/)?.[0] || raw
   const errorMap = {
-    'Invalid login credentials': 'بيانات الدخول غير صحيحة',
-    'Email not confirmed': 'يرجى تأكيد بريدك الإلكتروني أولاً',
-    'Too many requests': 'محاولات كثيرة، يرجى الانتظار قليلاً'
+    'auth/operation-not-allowed': 'تسجيل الدخول بالبريد الإلكتروني غير مفعّل في إعدادات المشروع. جرّب تحديث الصفحة أو استخدم Google.',
+    'auth/invalid-credential': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+    'auth/invalid-login-credentials': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+    'auth/user-not-found': 'لا يوجد حساب بهذا البريد الإلكتروني.',
+    'auth/wrong-password': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+    'auth/too-many-requests': 'محاولات كثيرة. انتظر قليلًا ثم حاول مرة أخرى.',
+    'auth/network-request-failed': 'تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة.',
+    'auth/popup-closed-by-user': 'أغلقت نافذة Google قبل إكمال الدخول.',
+    'auth/popup-blocked': 'المتصفح منع نافذة Google. اسمح بالنوافذ المنبثقة ثم حاول مجددًا.',
+    'auth/account-exists-with-different-credential': 'هذا البريد مرتبط بطريقة دخول أخرى. استخدم البريد وكلمة المرور.'
   }
-  return errorMap[error] || error || 'حدث خطأ، يرجى المحاولة مرة أخرى'
+  return errorMap[code] || 'تعذر تسجيل الدخول. تحقق من بياناتك وحاول مرة أخرى.'
 }
 </script>
 
 <style scoped>
-.login-page {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #0a1929 0%, #1a2744 50%, #0d2137 100%);
-  padding: 24px;
-  font-family: 'Tajawal', sans-serif;
-}
-
-/* Header */
-.auth-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  padding: 16px 24px;
-  z-index: 10;
-}
-
-.logo {
-  text-decoration: none;
-}
-
-.logo-wrapper {
-  width: 40px;
-  height: 40px;
-  background: white;
-  border-radius: 10px;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.logo-text {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #42a5f5;
-}
-
-/* Container */
-.login-container {
-  width: 100%;
-  max-width: 420px;
-}
-
-.logo-icon {
-  width: 88px;
-  height: 88px;
-  background: white;
-  border-radius: 24px;
-  padding: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 32px rgba(25, 118, 210, 0.25);
-}
-
-.page-title {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: white;
-}
-
-.page-subtitle {
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-/* Auth Card */
-.auth-card {
-  background: rgba(255, 255, 255, 0.03) !important;
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 24px !important;
-}
-
-.auth-dialog {
-  background: #1a2744 !important;
-  border-radius: 20px !important;
-}
-
-/* Form */
-.form-label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
-  margin-bottom: 8px;
-}
-
-.auth-input :deep(.v-field) {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border-radius: 12px !important;
-}
-
-.auth-input :deep(.v-field__outline) {
-  color: rgba(255, 255, 255, 0.15) !important;
-}
-
-.auth-input :deep(.v-field--focused .v-field__outline) {
-  color: #42a5f5 !important;
-}
-
-.auth-input :deep(.v-field__input) {
-  color: white !important;
-}
-
-.auth-input :deep(.v-field__input::placeholder) {
-  color: rgba(255, 255, 255, 0.3) !important;
-}
-
-.auth-input :deep(.v-icon) {
-  color: rgba(255, 255, 255, 0.5) !important;
-}
-
-.auth-btn {
-  font-weight: 700;
-  border-radius: 12px !important;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
-.divider-text {
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 0.875rem;
-  padding: 0 16px;
-}
-
-.auth-link {
-  color: #42a5f5;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.auth-link:hover {
-  text-decoration: underline;
-}
-
-.text-medium-emphasis {
-  color: rgba(255, 255, 255, 0.6) !important;
-}
-
-/* Responsive */
-@media (max-width: 600px) {
-  .login-container {
-    padding: 0;
-  }
-  
-  .auth-card {
-    border-radius: 20px !important;
-  }
-}
+.login-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; background: #f4f7fb; color: #13243d; padding: 0 28px 20px; font-family: 'Tajawal', sans-serif; }
+.auth-header { width: min(1180px, 100%); height: 86px; display: flex; align-items: center; justify-content: space-between; }
+.brand-mark { display: inline-flex; align-items: center; gap: 10px; color: #142842; text-decoration: none; }
+.brand-logo { width: 42px; height: 42px; border-radius: 13px; background: #fff; display: grid; place-items: center; box-shadow: 0 8px 20px rgba(20, 40, 66, .1); }
+.brand-name { font-size: 1.4rem; font-weight: 800; letter-spacing: -.04em; }
+.header-action { color: #42698d; text-decoration: none; font-size: .9rem; font-weight: 700; display: inline-flex; align-items: center; gap: 7px; transition: color .2s ease; }
+.header-action:hover { color: #1976d2; }
+.auth-shell { width: min(1180px, 100%); min-height: 660px; display: grid; grid-template-columns: 1.05fr .95fr; direction: ltr; overflow: hidden; background: #fff; border-radius: 30px; box-shadow: 0 24px 70px rgba(31, 54, 82, .13); }
+.auth-story, .auth-panel { direction: rtl; }
+.auth-story { position: relative; overflow: hidden; padding: clamp(44px, 7vw, 88px); display: flex; flex-direction: column; justify-content: center; color: #fff; background: radial-gradient(circle at 14% 85%, rgba(45, 168, 218, .23), transparent 32%), linear-gradient(145deg, #11263f 0%, #163e60 62%, #14779a 140%); }
+.auth-story::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .18; background-image: linear-gradient(rgba(255,255,255,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.12) 1px, transparent 1px); background-size: 42px 42px; mask-image: linear-gradient(to bottom, transparent, #000 36%, transparent); }
+.story-kicker { position: relative; z-index: 1; display: flex; align-items: center; gap: 9px; color: #9edcf3; font-size: .92rem; font-weight: 700; margin-bottom: 24px; }
+.kicker-dot { width: 8px; height: 8px; border-radius: 50%; background: #45c5e8; box-shadow: 0 0 0 6px rgba(69, 197, 232, .12); }
+.auth-story h1 { position: relative; z-index: 1; margin: 0; font-size: clamp(2.3rem, 4vw, 4.2rem); line-height: 1.15; letter-spacing: -.055em; font-weight: 800; }
+.auth-story h1 span { color: #7ed4ea; }
+.auth-story > p { position: relative; z-index: 1; max-width: 430px; margin: 24px 0 42px; color: rgba(255,255,255,.72); line-height: 1.9; font-size: 1.03rem; }
+.story-points { position: relative; z-index: 1; display: grid; gap: 17px; }
+.story-point { display: flex; align-items: center; gap: 13px; }
+.point-icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: #9edcf3; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.1); }
+.story-point strong, .story-point small { display: block; }
+.story-point strong { font-size: .95rem; }
+.story-point small { color: rgba(255,255,255,.56); font-size: .78rem; margin-top: 2px; }
+.story-orbit { position: absolute; border: 1px solid rgba(126, 212, 234, .2); border-radius: 50%; pointer-events: none; }
+.orbit-one { width: 440px; height: 440px; left: -180px; bottom: -210px; }
+.orbit-two { width: 290px; height: 290px; left: -110px; bottom: -130px; }
+.auth-panel { padding: clamp(38px, 6vw, 76px) clamp(32px, 6vw, 76px); display: flex; flex-direction: column; justify-content: center; background: #fff; }
+.panel-logo { width: 66px; height: 66px; border-radius: 20px; display: grid; place-items: center; background: #f0f7fb; margin-bottom: 28px; box-shadow: inset 0 0 0 1px #e4eef5; }
+.panel-heading { margin-bottom: 30px; }
+.panel-eyebrow { color: #1682a8; font-weight: 700; font-size: .9rem; margin-bottom: 7px; }
+.panel-heading h2 { margin: 0; color: #13243d; font-size: 2rem; line-height: 1.2; letter-spacing: -.04em; }
+.panel-heading p { margin: 9px 0 0; color: #708197; font-size: .93rem; }
+.status-alert { margin-bottom: 18px; border-radius: 14px !important; font-size: .88rem; line-height: 1.65; }
+.form-group { margin-bottom: 20px; }
+.password-group { margin-bottom: 8px; }
+.form-label { display: block; margin: 0 0 8px; color: #32465e; font-size: .87rem; font-weight: 700; }
+.auth-input :deep(.v-field) { min-height: 54px; border-radius: 14px !important; background: #f8fafc !important; box-shadow: inset 0 0 0 1px #e1e8f0; }
+.auth-input :deep(.v-field__outline) { --v-field-border-opacity: 0 !important; }
+.auth-input :deep(.v-field--focused) { background: #fff !important; box-shadow: inset 0 0 0 2px #1682a8; }
+.auth-input :deep(.v-field__input) { color: #152942 !important; font-size: .94rem; }
+.auth-input :deep(input) { background: #f8fafc !important; color: #152942 !important; color-scheme: light; }
+.auth-input :deep(.v-field__input::placeholder) { color: #a3afbc !important; opacity: 1; }
+.auth-input :deep(.v-icon) { color: #8ca1b4 !important; }
+.auth-input :deep(.v-field--focused .v-icon) { color: #1682a8 !important; }
+.forgot-link { display: block; border: 0; padding: 0; margin: 6px 0 0 auto; color: #1682a8; background: transparent; cursor: pointer; font: inherit; font-size: .82rem; font-weight: 700; }
+.forgot-link:hover, .auth-link:hover { text-decoration: underline; }
+.auth-btn { min-height: 54px !important; border-radius: 14px !important; text-transform: none !important; font-family: inherit !important; font-size: .98rem !important; font-weight: 800 !important; letter-spacing: 0 !important; }
+.primary-btn { margin-top: 18px; color: #fff !important; background: linear-gradient(110deg, #087da2, #1a9bc0) !important; box-shadow: 0 10px 22px rgba(16, 139, 176, .2); }
+.primary-btn:hover { box-shadow: 0 13px 28px rgba(16, 139, 176, .3); transform: translateY(-1px); }
+.social-divider { display: flex; align-items: center; gap: 14px; color: #9aa8b7; font-size: .8rem; margin: 27px 0 18px; }
+.social-divider::before, .social-divider::after { content: ''; height: 1px; flex: 1; background: #e7edf2; }
+.social-divider span { min-width: 24px; text-align: center; }
+.google-btn { color: #34485d !important; border: 1px solid #dfe6ed !important; background: #fff !important; }
+.google-btn:hover { background: #f7fafc !important; border-color: #b8cbd8 !important; }
+.google-glyph { color: #4285f4; font-family: Arial, sans-serif !important; font-size: 1.2rem; font-weight: 800; }
+.register-prompt { color: #8391a0; font-size: .88rem; text-align: center; margin: 25px 0 0; }
+.auth-link { color: #1682a8; text-decoration: none; font-weight: 800; }
+.panel-footnote { display: flex; justify-content: center; align-items: center; gap: 5px; color: #a4afba; font-size: .75rem; margin: 28px 0 0; }
+.auth-footer { color: #91a0af; font-size: .75rem; margin-top: 18px; }
+.auth-dialog { border-radius: 22px !important; background: #fff !important; color: #13243d; }
+.dialog-title { display: flex; align-items: center; gap: 10px; color: #13243d; font-size: 1.15rem; font-weight: 800; padding: 24px 24px 18px; }
+.dialog-icon { width: 36px; height: 36px; display: grid; place-items: center; color: #1682a8; border-radius: 11px; background: #eaf7fb; }
+.dialog-content { padding: 20px 24px 8px; }
+.dialog-content p { color: #718096; line-height: 1.8; font-size: .88rem; margin: 0 0 17px; }
+.dialog-actions { justify-content: flex-start; gap: 8px; padding: 16px 24px 20px; }
+@media (max-width: 850px) { .login-page { padding: 0 16px 16px; } .auth-header { height: 72px; } .auth-shell { min-height: auto; grid-template-columns: 1fr; border-radius: 24px; } .auth-story { min-height: 285px; padding: 35px 30px; } .auth-story h1 { font-size: 2.4rem; } .auth-story > p { margin: 15px 0 22px; font-size: .9rem; line-height: 1.7; } .story-points { grid-template-columns: 1fr 1fr; gap: 10px; } .story-point { align-items: flex-start; gap: 8px; } .point-icon { width: 34px; height: 34px; flex: 0 0 34px; } .story-point strong { font-size: .78rem; } .story-point small { font-size: .68rem; line-height: 1.4; } .auth-panel { padding: 36px 25px 34px; } .panel-logo { margin-bottom: 21px; } }
+@media (max-width: 430px) { .header-action { font-size: .8rem; } .auth-story { min-height: 300px; } .story-points { grid-template-columns: 1fr; } .story-point small { font-size: .72rem; } .auth-panel { padding-inline: 19px; } }
 </style>
