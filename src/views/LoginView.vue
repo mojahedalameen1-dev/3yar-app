@@ -40,6 +40,7 @@
             <label class="form-label" for="login-password">كلمة المرور</label>
             <v-text-field id="login-password" v-model="password" :type="showPassword ? 'text' : 'password'" placeholder="أدخل كلمة المرور" prepend-inner-icon="mdi-lock-outline" :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'" :rules="passwordRules" variant="outlined" density="comfortable" dir="ltr" class="auth-input" hide-details="auto" autocomplete="current-password" @click:append-inner="showPassword = !showPassword" @keydown.enter="handleLogin"></v-text-field>
             <button type="button" class="forgot-link" @click="showForgotPassword = true">نسيت كلمة المرور؟</button>
+            <p class="migration-note">للحسابات المنقولة من النظام السابق، استخدم «نسيت كلمة المرور؟» لتعيين كلمة مرور جديدة.</p>
           </div>
           <v-btn color="primary" size="x-large" block :loading="loading" :disabled="!formValid || loading" type="submit" class="auth-btn primary-btn"><span>تسجيل الدخول</span><v-icon end size="20">mdi-arrow-left</v-icon></v-btn>
         </v-form>
@@ -195,6 +196,7 @@ function getErrorMessage(error) {
 .auth-input :deep(.v-icon) { color: #8ca1b4 !important; }
 .auth-input :deep(.v-field--focused .v-icon) { color: #1682a8 !important; }
 .forgot-link { display: block; border: 0; padding: 0; margin: 6px 0 0 auto; color: #1682a8; background: transparent; cursor: pointer; font: inherit; font-size: .82rem; font-weight: 700; }
+.migration-note { margin: 7px 0 16px; color: #8a99a9; font-size: .74rem; line-height: 1.7; }
 .forgot-link:hover, .auth-link:hover { text-decoration: underline; }
 .auth-btn { min-height: 54px !important; border-radius: 14px !important; text-transform: none !important; font-family: inherit !important; font-size: .98rem !important; font-weight: 800 !important; letter-spacing: 0 !important; }
 .primary-btn { margin-top: 18px; color: #fff !important; background: linear-gradient(110deg, #087da2, #1a9bc0) !important; box-shadow: 0 10px 22px rgba(16, 139, 176, .2); }
