@@ -29,6 +29,7 @@ await client.request({
 })
 
 console.log(`Authorized Firebase domain ensured: ${domain}`)
+console.log(`Email/password enabled: ${current.data.signIn?.email?.enabled === true}`)
 
 try {
     const providerUrl = `https://identitytoolkit.googleapis.com/admin/v2/projects/${projectId}/defaultSupportedIdpConfigs/google.com`
