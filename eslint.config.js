@@ -33,7 +33,10 @@ export default [
                 URL: 'readonly',
                 navigator: 'readonly',
                 location: 'readonly',
-                FormData: 'readonly'
+                FormData: 'readonly',
+                fetch: 'readonly',
+                Buffer: 'readonly',
+                AbortController: 'readonly'
             }
         },
         rules: {

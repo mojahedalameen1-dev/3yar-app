@@ -215,6 +215,7 @@ import { useOdometerStore } from '@/stores/odometer'
 import { useProfileStore } from '@/stores/profile'
 import { useThemeStore } from '@/stores/theme'
 import { useNotificationsStore } from '@/stores/notifications'
+import { useFeaturesStore } from '@/stores/features'
 import UserProfile from '@/components/UserProfile.vue'
 import ProfileSetup from '@/components/ProfileSetup.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
@@ -246,6 +247,7 @@ const showNavigation = computed(() => {
 
 // Theme Store
 const themeStore = useThemeStore()
+const featuresStore = useFeaturesStore()
 
 function toggleTheme() {
   themeStore.toggleTheme()
@@ -322,6 +324,15 @@ watch(() => authStore.isAuthenticated, async (isAuth) => {
     await initializeData()
   }
 })
+
+// Flags load in the background and never gate the legacy application boot.
+watch(() => authStore.userId, (userId) => {
+  if (!userId) {
+    featuresStore.reset()
+    return
+  }
+  void featuresStore.load(userId)
+}, { immediate: true, flush: 'sync' })
 
 onMounted(() => {
   checkMobile()

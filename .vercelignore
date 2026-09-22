@@ -1,0 +1,10 @@
+.env*
+**/.env*
+*-firebase-adminsdk-*.json
+**/*-firebase-adminsdk-*.json
+firebase-service-account.json
+**/firebase-service-account.json
+.codex-vercel-temp-cache
+node_modules
+dist
+coverage
