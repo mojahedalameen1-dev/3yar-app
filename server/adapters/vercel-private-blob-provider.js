@@ -32,6 +32,12 @@ function sha256Stream(stream) {
   })
 }
 
+function normalizeStoreId(storeId) {
+  return typeof storeId === 'string' && storeId.startsWith('store_')
+    ? storeId.slice('store_'.length)
+    : storeId
+}
+
 export function createVercelPrivateBlobProvider({ env = process.env, sdk = {} } = {}) {
   const api = { del, get, head, issueSignedToken, list, parseStoreIdFromDelegationToken, presignUrl, ...sdk }
 
@@ -50,7 +56,8 @@ export function createVercelPrivateBlobProvider({ env = process.env, sdk = {} } 
 
   function assertDelegationStore(token, expectedStoreId, baselineStoreId) {
     const issuedForStoreId = api.parseStoreIdFromDelegationToken(token.delegationToken)
-    if (issuedForStoreId !== expectedStoreId || issuedForStoreId === baselineStoreId) {
+    if (issuedForStoreId !== normalizeStoreId(expectedStoreId)
+      || issuedForStoreId === normalizeStoreId(baselineStoreId)) {
       throw new HttpError(503, 'Vercel issued a Blob grant for an unexpected store', 'blob_store_identity_mismatch')
     }
   }

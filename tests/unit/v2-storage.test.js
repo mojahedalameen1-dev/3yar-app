@@ -6,19 +6,23 @@ import { sanitizeFilename, detectContentType } from '../../server/attachments/fi
 const stagingEnv = {
   VERCEL_ENV: 'preview',
   FIREBASE_ENVIRONMENT: 'staging',
-  BLOB_PRODUCTION_STORE_ID: 'production-store',
-  V2_PRIVATE_BLOB_STORE_ID: 'staging-store',
+  BLOB_PRODUCTION_STORE_ID: 'store_production-store',
+  V2_PRIVATE_BLOB_STORE_ID: 'store_staging-store',
   V2_PRIVATE_BLOB_READ_WRITE_TOKEN: 'token-is-not-logged'
+}
+
+function delegationFor(storeId) {
+  return `${Buffer.from(JSON.stringify({ storeId })).toString('base64url')}.signature`
 }
 
 describe('V2 private Blob adapter and storage access', () => {
   it('checks that an issued upload grant belongs to the distinct Staging store before returning a URL', async () => {
     const validUntil = Date.now() + 60_000
-    const issueSignedToken = vi.fn(async () => ({ delegationToken: 'delegation', clientSigningToken: 'signer', validUntil }))
+    const issueSignedToken = vi.fn(async () => ({ delegationToken: delegationFor('store_staging-store'), clientSigningToken: 'signer', validUntil }))
     const presignUrl = vi.fn(async () => ({ presignedUrl: 'https://private.test/upload' }))
     const provider = createVercelPrivateBlobProvider({
       env: stagingEnv,
-      sdk: { issueSignedToken, presignUrl, parseStoreIdFromDelegationToken: () => 'staging-store' }
+      sdk: { issueSignedToken, presignUrl }
     })
 
     const grant = await provider.createUploadGrant({
@@ -27,7 +31,7 @@ describe('V2 private Blob adapter and storage access', () => {
 
     expect(grant.url).toBe('https://private.test/upload')
     expect(issueSignedToken).toHaveBeenCalledWith(expect.objectContaining({
-      storeId: 'staging-store', pathname: 'v2/private/random-id', operations: ['put'], maximumSizeInBytes: 2048
+      storeId: 'store_staging-store', pathname: 'v2/private/random-id', operations: ['put'], maximumSizeInBytes: 2048
     }))
     expect(presignUrl).toHaveBeenCalledTimes(1)
   })
@@ -37,8 +41,7 @@ describe('V2 private Blob adapter and storage access', () => {
     const provider = createVercelPrivateBlobProvider({
       env: stagingEnv,
       sdk: {
-        issueSignedToken: async () => ({ delegationToken: 'delegation', clientSigningToken: 'signer', validUntil: Date.now() + 30_000 }),
-        parseStoreIdFromDelegationToken: () => 'production-store',
+        issueSignedToken: async () => ({ delegationToken: delegationFor('store_production-store'), clientSigningToken: 'signer', validUntil: Date.now() + 30_000 }),
         presignUrl
       }
     })
@@ -50,7 +53,7 @@ describe('V2 private Blob adapter and storage access', () => {
   })
 
   it('fails closed when the private store is missing or aliases the Production store', async () => {
-    const provider = createVercelPrivateBlobProvider({ env: { ...stagingEnv, V2_PRIVATE_BLOB_STORE_ID: 'production-store' } })
+    const provider = createVercelPrivateBlobProvider({ env: { ...stagingEnv, V2_PRIVATE_BLOB_STORE_ID: 'store_production-store' } })
     expect(() => provider.verifyIsolation()).toThrowError()
   })
 
