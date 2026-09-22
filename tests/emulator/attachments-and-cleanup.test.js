@@ -120,6 +120,12 @@ describe('Firestore V2 attachment lifecycle and orphan cleanup', () => {
       identity, attachmentId: grant.attachmentId, targetPath: targetRef.path, key: 'link-key'
     })
     expect(replay.status).toBe('linked')
+    await expect(lifecycle.linkToV2Resource({
+      identity,
+      attachmentId: grant.attachmentId,
+      targetPath: db.collection(`v2_synthetic_targets_${namespace}`).doc('different-target').path,
+      key: 'link-key'
+    })).rejects.toMatchObject({ status: 409, code: 'idempotency_conflict' })
 
     const tombstonedTarget = db.collection(`v2_synthetic_targets_${namespace}`).doc('tombstoned-target')
     await tombstonedTarget.create({ userId: identity.userId, version: 0, deletionState: 'tombstoned' })

@@ -216,7 +216,7 @@ export function createAttachmentLifecycle({
 
       const result = await idempotency.run({
         userId,
-        operation: `attachment.link:${targetPath}`,
+        operation: 'attachment.link',
         key,
         payload: { attachmentId, targetPath },
         executeInTransaction: async transaction => {
