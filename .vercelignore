@@ -1,3 +1,4 @@
+# Exclude local credentials, dependencies, and generated artifacts from Vercel uploads.
 .env*
 **/.env*
 *-firebase-adminsdk-*.json
