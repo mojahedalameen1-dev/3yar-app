@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/guard-deployment-secrets.mjs --source && vite build && node scripts/guard-deployment-secrets.mjs --artifact",
+    "test:security": "node --test tests/security-release/*.test.mjs",
     "preview": "vite preview",
     "migrate:firebase": "node scripts/migrate-supabase-to-firebase.mjs",
     "firebase:set-admin": "node scripts/set-firebase-admin.mjs",
@@ -15,11 +16,13 @@
   "dependencies": {
     "@mdi/font": "^7.4.47",
     "@vercel/blob": "^2.8.0",
+    "@vercel/oidc": "^3.8.7",
     "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
     "dayjs": "^1.11.10",
     "firebase": "^12.19.0",
     "firebase-admin": "13.6.0",
+    "google-auth-library": "^9.15.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",

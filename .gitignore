@@ -12,6 +12,17 @@ dist/
 .env.*.local
 firebase-service-account.json
 *-firebase-adminsdk-*.json
+*service-account*.json
+*credential*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.secret
+*.bak
+*.backup
+*.old
+*.orig
 
 # Editor directories and files
 .vscode/*
