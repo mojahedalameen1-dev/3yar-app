@@ -7,8 +7,8 @@ import {
     runOidcDiagnostic
 } from '../../api/internal/security/wif-probe.js'
 
-const audience = 'https://iam.googleapis.com/projects/615087307444/locations/global/workloadIdentityPools/vercel-production/providers/vercel-prod'
-const projectId = 'prj_3yar_project'
+const audience = 'https://iam.googleapis.com/projects/615087307444/locations/global/workloadIdentityPools/vercel-production/providers/vercel-3yar-production'
+const projectId = 'prj_MGTs8Foutto6Oh9gijiUJobv2x6u'
 const oidcSentinel = 'oidc-token-must-not-escape'
 const federatedSentinel = 'federated-token-must-not-escape'
 const serviceAccountSentinel = 'impersonated-token-must-not-escape'
@@ -21,7 +21,7 @@ const productionEnv = {
     GCP_PROJECT_NUMBER: '615087307444',
     GCP_SERVICE_ACCOUNT_EMAIL: 'three-yar-runtime-prod@yar-3yar-free.iam.gserviceaccount.com',
     GCP_WORKLOAD_IDENTITY_POOL_ID: 'vercel-production',
-    GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID: 'vercel-prod'
+    GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID: 'vercel-3yar-production'
 }
 
 const expectedPayload = {
@@ -141,7 +141,7 @@ test('diagnostic explicitly obtains and verifies the Vercel token, then checks S
 
     const firestoreRequest = dependencies.calls[2]
     assert.equal(firestoreRequest.options.method, 'GET')
-    assert.match(firestoreRequest.url, /documents\/security_probe\/oidc-validation$/)
+    assert.match(firestoreRequest.url, /documents\/__security_probe__\/oidc-validation$/)
     assert.equal(firestoreRequest.options.headers.Authorization, `Bearer ${serviceAccountSentinel}`)
 
     const serialized = JSON.stringify(result)
@@ -272,6 +272,18 @@ test('Stage D accepts a read-only missing-document response and safely classifie
     assert.equal(JSON.stringify(deniedResult).includes(serviceAccountSentinel), false)
 })
 
+test('Stage D does not treat an existing probe document as a successful absent-document check', async () => {
+    const dependencies = successfulDependencies({ firestoreResponse: apiResponse({ name: 'redacted' }, 200) })
+    const result = await runOidcDiagnostic({ env: productionEnv, ...dependencies })
+
+    assert.deepEqual(result, {
+        ok: false,
+        stage: 'firestore_read',
+        code: 'FIRESTORE_DOCUMENT_EXISTS',
+        claimsMatchExpected: true
+    })
+})
+
 test('HTTP probe serializes only safe diagnostic fields and never reveals thrown errors', async () => {
     const env = {
         ...productionEnv,
@@ -323,4 +335,24 @@ test('HTTP probe rejects an unrecognized diagnostic code instead of serializing 
         code: 'OIDC_TOKEN_UNAVAILABLE'
     })
     assert.equal(JSON.stringify(response.body).includes(oidcSentinel), false)
+})
+
+test('HTTP probe passes the environment using the diagnostic options contract', async () => {
+    const env = {
+        ...productionEnv,
+        SECURITY_PROBE_ENABLED: 'true',
+        SECURITY_PROBE_SECRET: 'test-only-secret'
+    }
+    let received
+    const response = fakeResponse()
+    await createWifProbeHandler({
+        env,
+        probe: async options => {
+            received = options
+            return { ok: true, stage: 'firestore_read', code: 'FIRESTORE_READ_OK' }
+        }
+    })({ method: 'GET', headers: { 'x-3yar-security-probe': 'test-only-secret' } }, response)
+
+    assert.deepEqual(received, { env })
+    assert.equal(response.statusCode, 200)
 })

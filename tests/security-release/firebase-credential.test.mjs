@@ -11,7 +11,7 @@ const stagingLikeConfig = {
     GCP_PROJECT_NUMBER: '615087307444',
     GCP_SERVICE_ACCOUNT_EMAIL: 'three-yar-runtime-prod@yar-3yar-free.iam.gserviceaccount.com',
     GCP_WORKLOAD_IDENTITY_POOL_ID: 'vercel-production',
-    GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID: 'vercel-prod'
+    GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID: 'vercel-3yar-production'
 }
 
 test('production federation fails closed when configuration is missing', () => {
@@ -36,6 +36,6 @@ test('production federation constructs a short-lived external credential without
 test('Vercel OIDC audience matches the Google workload identity provider resource name', () => {
     assert.equal(
         gcpWorkloadIdentityAudience(stagingLikeConfig),
-        'https://iam.googleapis.com/projects/615087307444/locations/global/workloadIdentityPools/vercel-production/providers/vercel-prod'
+        'https://iam.googleapis.com/projects/615087307444/locations/global/workloadIdentityPools/vercel-production/providers/vercel-3yar-production'
     )
 })

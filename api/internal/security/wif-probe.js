@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { getVercelOidcToken, verifyVercelOidcToken } from '@vercel/oidc'
 
 const PROJECT_ID = 'yar-3yar-free'
+const VERCEL_PROJECT_ID = 'prj_MGTs8Foutto6Oh9gijiUJobv2x6u'
 const SERVICE_ACCOUNT = 'three-yar-runtime-prod@yar-3yar-free.iam.gserviceaccount.com'
 const VERCEL_ISSUER = 'https://oidc.vercel.com/mojahed1s-projects'
 const VERCEL_SUBJECT = 'owner:mojahed1s-projects:project:3yar-app-lpha:environment:production'
@@ -41,7 +42,8 @@ function claimsMatchExpected(payload, env, audience) {
     const actualAudiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud]
     return payload.iss === VERCEL_ISSUER &&
         actualAudiences.includes(audience) &&
-        payload.project_id === env.VERCEL_PROJECT_ID &&
+        payload.project_id === VERCEL_PROJECT_ID &&
+        env.VERCEL_PROJECT_ID === VERCEL_PROJECT_ID &&
         payload.environment === 'production' &&
         payload.sub === VERCEL_SUBJECT
 }
@@ -159,7 +161,7 @@ const SAFE_DIAGNOSTIC_CODES = new Set([
     'WIF_IMPERSONATION_DENIED',
     'UNKNOWN_IMPERSONATION_ERROR',
     'FIRESTORE_READ_OK',
-    'FIRESTORE_READ_OK_DOCUMENT_EXISTS',
+    'FIRESTORE_DOCUMENT_EXISTS',
     'FIRESTORE_READ_DENIED',
     'FIRESTORE_API_DISABLED',
     'FIRESTORE_READ_FAILED',
@@ -275,7 +277,7 @@ export async function runOidcDiagnostic({
     let firestorePayload
     try {
         firestoreResponse = await fetchImpl(
-            `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/security_probe/oidc-validation`,
+            `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/__security_probe__/oidc-validation`,
             {
                 method: 'GET',
                 headers: { Authorization: `Bearer ${serviceAccountAccessToken}` },
@@ -291,10 +293,8 @@ export async function runOidcDiagnostic({
     const expectedDocumentMissing = firestoreResponse.status === 404 &&
         missingDocumentText.includes('document') &&
         (missingDocumentText.includes('not found') || missingDocumentText.includes('does not exist'))
-    if (firestoreResponse.ok || expectedDocumentMissing) {
-        const code = firestoreResponse.ok ? 'FIRESTORE_READ_OK_DOCUMENT_EXISTS' : 'FIRESTORE_READ_OK'
-        return diagnosticResult(true, 'firestore_read', code, true)
-    }
+    if (expectedDocumentMissing) return diagnosticResult(true, 'firestore_read', 'FIRESTORE_READ_OK', true)
+    if (firestoreResponse.ok) return diagnosticResult(false, 'firestore_read', 'FIRESTORE_DOCUMENT_EXISTS', true)
 
     return diagnosticResult(false, 'firestore_read', classifyFirestoreFailure(firestoreResponse, firestorePayload), true)
 }
@@ -321,7 +321,7 @@ export function createWifProbeHandler({ env = process.env, probe = runOidcDiagno
 
         let result
         try {
-            result = await probe(env)
+            result = await probe({ env })
         } catch {
             result = diagnosticResult(false, 'vercel_oidc_token', 'OIDC_TOKEN_UNAVAILABLE')
         }
