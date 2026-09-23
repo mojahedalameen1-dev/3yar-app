@@ -131,15 +131,6 @@ function classifyImpersonationFailure(response, payload) {
     return 'UNKNOWN_IMPERSONATION_ERROR'
 }
 
-function classifyFirestoreFailure(response, payload) {
-    const text = internalGoogleErrorText(payload)
-    if (text.includes('firestore.googleapis.com has not been used') || text.includes('service_disabled')) {
-        return 'FIRESTORE_API_DISABLED'
-    }
-    if (response.status === 403) return 'FIRESTORE_READ_DENIED'
-    return 'FIRESTORE_READ_FAILED'
-}
-
 function diagnosticResult(ok, stage, code, claimsMatch) {
     const result = { ok, stage, code }
     if (typeof claimsMatch === 'boolean') result.claimsMatchExpected = claimsMatch
@@ -160,11 +151,11 @@ const SAFE_DIAGNOSTIC_CODES = new Set([
     'WIF_PRINCIPAL_BINDING_MISSING',
     'WIF_IMPERSONATION_DENIED',
     'UNKNOWN_IMPERSONATION_ERROR',
-    'FIRESTORE_READ_OK',
-    'FIRESTORE_DOCUMENT_EXISTS',
-    'FIRESTORE_READ_DENIED',
-    'FIRESTORE_API_DISABLED',
-    'FIRESTORE_READ_FAILED',
+    'DIRECT_FIRESTORE_REST_PASS',
+    'DIRECT_FIRESTORE_DOCUMENT_EXISTS',
+    'DIRECT_FIRESTORE_IAM_DENIED',
+    'DIRECT_FIRESTORE_TOKEN_AUTH_FAILED',
+    'DIRECT_FIRESTORE_OTHER',
     'OIDC_TOKEN_UNAVAILABLE'
 ])
 
@@ -274,7 +265,6 @@ export async function runOidcDiagnostic({
     }
 
     let firestoreResponse
-    let firestorePayload
     try {
         firestoreResponse = await fetchImpl(
             `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/__security_probe__/oidc-validation`,
@@ -284,19 +274,24 @@ export async function runOidcDiagnostic({
                 signal: globalThis.AbortSignal.timeout(10000)
             }
         )
-        firestorePayload = firestoreResponse.status === 404 ? await safeJson(firestoreResponse) : null
     } catch {
-        return diagnosticResult(false, 'firestore_read', 'FIRESTORE_READ_FAILED', true)
+        return diagnosticResult(false, 'firestore_read', 'DIRECT_FIRESTORE_OTHER', true)
     }
 
-    const missingDocumentText = internalGoogleErrorText(firestorePayload)
-    const expectedDocumentMissing = firestoreResponse.status === 404 &&
-        missingDocumentText.includes('document') &&
-        (missingDocumentText.includes('not found') || missingDocumentText.includes('does not exist'))
-    if (expectedDocumentMissing) return diagnosticResult(true, 'firestore_read', 'FIRESTORE_READ_OK', true)
-    if (firestoreResponse.ok) return diagnosticResult(false, 'firestore_read', 'FIRESTORE_DOCUMENT_EXISTS', true)
+    if (firestoreResponse.status === 404) {
+        return diagnosticResult(true, 'firestore_read', 'DIRECT_FIRESTORE_REST_PASS', true)
+    }
+    if (firestoreResponse.status === 403) {
+        return diagnosticResult(false, 'firestore_read', 'DIRECT_FIRESTORE_IAM_DENIED', true)
+    }
+    if (firestoreResponse.status === 401) {
+        return diagnosticResult(false, 'firestore_read', 'DIRECT_FIRESTORE_TOKEN_AUTH_FAILED', true)
+    }
+    if (firestoreResponse.ok) {
+        return diagnosticResult(false, 'firestore_read', 'DIRECT_FIRESTORE_DOCUMENT_EXISTS', true)
+    }
 
-    return diagnosticResult(false, 'firestore_read', classifyFirestoreFailure(firestoreResponse, firestorePayload), true)
+    return diagnosticResult(false, 'firestore_read', 'DIRECT_FIRESTORE_OTHER', true)
 }
 
 export function createWifProbeHandler({ env = process.env, probe = runOidcDiagnostic } = {}) {

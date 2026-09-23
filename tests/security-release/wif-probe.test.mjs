@@ -84,7 +84,7 @@ test('probe only allows GET and never runs for other methods', async () => {
     let calls = 0
     const handler = createWifProbeHandler({
         env: { ...productionEnv, SECURITY_PROBE_ENABLED: 'true', SECURITY_PROBE_SECRET: 'test-only-secret' },
-        probe: async () => { calls++; return { ok: true, stage: 'firestore_read', code: 'FIRESTORE_READ_OK' } }
+        probe: async () => { calls++; return { ok: true, stage: 'firestore_read', code: 'DIRECT_FIRESTORE_REST_PASS' } }
     })
     const response = fakeResponse()
     await handler({ method: 'POST', headers: { 'x-3yar-security-probe': 'test-only-secret' } }, response)
@@ -95,7 +95,7 @@ test('probe only allows GET and never runs for other methods', async () => {
 
 test('probe is hidden unless Production, enabled, and authorized by header', async () => {
     let calls = 0
-    const probe = async () => { calls++; return { ok: true, stage: 'firestore_read', code: 'FIRESTORE_READ_OK' } }
+    const probe = async () => { calls++; return { ok: true, stage: 'firestore_read', code: 'DIRECT_FIRESTORE_REST_PASS' } }
     for (const env of [
         { ...productionEnv, SECURITY_PROBE_ENABLED: 'true', SECURITY_PROBE_SECRET: 'test-only-secret', VERCEL_ENV: 'preview' },
         { ...productionEnv, SECURITY_PROBE_ENABLED: 'false', SECURITY_PROBE_SECRET: 'test-only-secret' }
@@ -121,7 +121,7 @@ test('diagnostic explicitly obtains and verifies the Vercel token, then checks S
     assert.deepEqual(result, {
         ok: true,
         stage: 'firestore_read',
-        code: 'FIRESTORE_READ_OK',
+        code: 'DIRECT_FIRESTORE_REST_PASS',
         claimsMatchExpected: true
     })
     assert.equal(dependencies.calls.length, 3)
@@ -249,27 +249,35 @@ test('Stage C distinguishes a disabled IAM Credentials API and a missing imperso
     }
 })
 
-test('Stage D accepts a read-only missing-document response and safely classifies denied reads', async () => {
+test('Stage D accepts a read-only 404 response without inspecting Firestore error content', async () => {
     const missingDocument = successfulDependencies()
     const missingResult = await runOidcDiagnostic({ env: productionEnv, ...missingDocument })
-    assert.equal(missingResult.stage, 'firestore_read')
-    assert.equal(missingResult.code, 'FIRESTORE_READ_OK')
-
-    const deniedRead = successfulDependencies()
-    deniedRead.fetchImpl = async (url, options) => {
-        deniedRead.calls.push({ url, options })
-        if (deniedRead.calls.length === 1) return apiResponse({ access_token: federatedSentinel })
-        if (deniedRead.calls.length === 2) return apiResponse({ accessToken: serviceAccountSentinel })
-        return apiResponse({ error: { status: 'PERMISSION_DENIED', message: serviceAccountSentinel } }, 403)
-    }
-    const deniedResult = await runOidcDiagnostic({ env: productionEnv, ...deniedRead })
-    assert.deepEqual(deniedResult, {
-        ok: false,
+    assert.deepEqual(missingResult, {
+        ok: true,
         stage: 'firestore_read',
-        code: 'FIRESTORE_READ_DENIED',
+        code: 'DIRECT_FIRESTORE_REST_PASS',
         claimsMatchExpected: true
     })
-    assert.equal(JSON.stringify(deniedResult).includes(serviceAccountSentinel), false)
+    assert.equal(missingDocument.calls[2].options.method, 'GET')
+    assert.equal(missingDocument.calls[2].options.headers.Authorization, `Bearer ${serviceAccountSentinel}`)
+
+    for (const [status, code] of [
+        [401, 'DIRECT_FIRESTORE_TOKEN_AUTH_FAILED'],
+        [403, 'DIRECT_FIRESTORE_IAM_DENIED'],
+        [418, 'DIRECT_FIRESTORE_OTHER']
+    ]) {
+        const request = successfulDependencies({
+            firestoreResponse: apiResponse({ error: { message: serviceAccountSentinel } }, status)
+        })
+        const result = await runOidcDiagnostic({ env: productionEnv, ...request })
+        assert.deepEqual(result, {
+            ok: false,
+            stage: 'firestore_read',
+            code,
+            claimsMatchExpected: true
+        })
+        assert.equal(JSON.stringify(result).includes(serviceAccountSentinel), false)
+    }
 })
 
 test('Stage D does not treat an existing probe document as a successful absent-document check', async () => {
@@ -279,7 +287,7 @@ test('Stage D does not treat an existing probe document as a successful absent-d
     assert.deepEqual(result, {
         ok: false,
         stage: 'firestore_read',
-        code: 'FIRESTORE_DOCUMENT_EXISTS',
+        code: 'DIRECT_FIRESTORE_DOCUMENT_EXISTS',
         claimsMatchExpected: true
     })
 })
@@ -349,7 +357,7 @@ test('HTTP probe passes the environment using the diagnostic options contract', 
         env,
         probe: async options => {
             received = options
-            return { ok: true, stage: 'firestore_read', code: 'FIRESTORE_READ_OK' }
+            return { ok: true, stage: 'firestore_read', code: 'DIRECT_FIRESTORE_REST_PASS' }
         }
     })({ method: 'GET', headers: { 'x-3yar-security-probe': 'test-only-secret' } }, response)
 
