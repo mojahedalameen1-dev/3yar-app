@@ -1,6 +1,36 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { constantTimeSecretMatch, createWifProbeHandler } from '../../api/internal/security/wif-probe.js'
+import {
+    constantTimeSecretMatch,
+    createWifProbeHandler,
+    gcpProviderAudience,
+    runOidcDiagnostic
+} from '../../api/internal/security/wif-probe.js'
+
+const audience = 'https://iam.googleapis.com/projects/615087307444/locations/global/workloadIdentityPools/vercel-production/providers/vercel-prod'
+const projectId = 'prj_3yar_project'
+const oidcSentinel = 'oidc-token-must-not-escape'
+const federatedSentinel = 'federated-token-must-not-escape'
+const serviceAccountSentinel = 'impersonated-token-must-not-escape'
+
+const productionEnv = {
+    VERCEL_ENV: 'production',
+    VERCEL_PROJECT_ID: projectId,
+    FIREBASE_PROJECT_ID: 'yar-3yar-free',
+    GCP_PROJECT_ID: 'yar-3yar-free',
+    GCP_PROJECT_NUMBER: '615087307444',
+    GCP_SERVICE_ACCOUNT_EMAIL: 'three-yar-runtime-prod@yar-3yar-free.iam.gserviceaccount.com',
+    GCP_WORKLOAD_IDENTITY_POOL_ID: 'vercel-production',
+    GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID: 'vercel-prod'
+}
+
+const expectedPayload = {
+    iss: 'https://oidc.vercel.com/mojahed1s-projects',
+    aud: audience,
+    project_id: projectId,
+    environment: 'production',
+    sub: 'owner:mojahed1s-projects:project:3yar-app-lpha:environment:production'
+}
 
 function fakeResponse() {
     return {
@@ -13,10 +43,30 @@ function fakeResponse() {
     }
 }
 
-const productionEnv = {
-    VERCEL_ENV: 'production',
-    SECURITY_PROBE_ENABLED: 'true',
-    SECURITY_PROBE_SECRET: 'test-only-secret'
+function apiResponse(payload, status = 200) {
+    return { ok: status >= 200 && status < 300, status, async json() { return payload } }
+}
+
+function successfulDependencies({ firestoreResponse = apiResponse({ error: { status: 'NOT_FOUND', message: 'Document was not found.' } }, 404) } = {}) {
+    const calls = []
+    return {
+        calls,
+        getOidcToken: async options => {
+            assert.deepEqual(options, { audience, skipCache: true })
+            return oidcSentinel
+        },
+        verifyOidcToken: async (token, options) => {
+            assert.equal(token, oidcSentinel)
+            assert.deepEqual(options, { audience, issuer: expectedPayload.iss, projectId: '*', environment: '*' })
+            return { payload: expectedPayload }
+        },
+        fetchImpl: async (url, options) => {
+            calls.push({ url, options })
+            if (calls.length === 1) return apiResponse({ access_token: federatedSentinel })
+            if (calls.length === 2) return apiResponse({ accessToken: serviceAccountSentinel })
+            return firestoreResponse
+        }
+    }
 }
 
 test('probe secret comparison accepts exact values and rejects mismatches safely', () => {
@@ -25,45 +75,252 @@ test('probe secret comparison accepts exact values and rejects mismatches safely
     assert.equal(constantTimeSecretMatch(undefined, 'test-only-secret'), false)
 })
 
+test('probe audience is the explicit Google provider audience', () => {
+    assert.equal(gcpProviderAudience(productionEnv), audience)
+    assert.equal(gcpProviderAudience({ ...productionEnv, GCP_PROJECT_ID: 'another-project' }), null)
+})
+
 test('probe only allows GET and never runs for other methods', async () => {
     let calls = 0
-    const handler = createWifProbeHandler({ env: productionEnv, probe: async () => { calls++; return false } })
+    const handler = createWifProbeHandler({
+        env: { ...productionEnv, SECURITY_PROBE_ENABLED: 'true', SECURITY_PROBE_SECRET: 'test-only-secret' },
+        probe: async () => { calls++; return { ok: true, stage: 'firestore_read', code: 'FIRESTORE_READ_OK' } }
+    })
     const response = fakeResponse()
     await handler({ method: 'POST', headers: { 'x-3yar-security-probe': 'test-only-secret' } }, response)
     assert.equal(response.statusCode, 405)
+    assert.deepEqual(response.body, { ok: false, stage: 'authorization', code: 'METHOD_NOT_ALLOWED' })
     assert.equal(calls, 0)
 })
 
 test('probe is hidden unless Production, enabled, and authorized by header', async () => {
     let calls = 0
-    const probe = async () => { calls++; return false }
+    const probe = async () => { calls++; return { ok: true, stage: 'firestore_read', code: 'FIRESTORE_READ_OK' } }
     for (const env of [
-        { ...productionEnv, VERCEL_ENV: 'preview' },
-        { ...productionEnv, SECURITY_PROBE_ENABLED: 'false' }
+        { ...productionEnv, SECURITY_PROBE_ENABLED: 'true', SECURITY_PROBE_SECRET: 'test-only-secret', VERCEL_ENV: 'preview' },
+        { ...productionEnv, SECURITY_PROBE_ENABLED: 'false', SECURITY_PROBE_SECRET: 'test-only-secret' }
     ]) {
         const response = fakeResponse()
         await createWifProbeHandler({ env, probe })({ method: 'GET', headers: { 'x-3yar-security-probe': 'test-only-secret' } }, response)
         assert.equal(response.statusCode, 404)
+        assert.deepEqual(response.body, { ok: false, stage: 'authorization', code: 'NOT_FOUND' })
     }
     const missingHeader = fakeResponse()
-    await createWifProbeHandler({ env: productionEnv, probe })({ method: 'GET', headers: {} }, missingHeader)
+    await createWifProbeHandler({
+        env: { ...productionEnv, SECURITY_PROBE_ENABLED: 'true', SECURITY_PROBE_SECRET: 'test-only-secret' },
+        probe
+    })({ method: 'GET', headers: {} }, missingHeader)
     assert.equal(missingHeader.statusCode, 404)
     assert.equal(calls, 0)
 })
 
-test('probe returns only the read-only OIDC verification result', async () => {
+test('diagnostic explicitly obtains and verifies the Vercel token, then checks STS, impersonation, and read-only Firestore', async () => {
+    const dependencies = successfulDependencies()
+    const result = await runOidcDiagnostic({ env: productionEnv, ...dependencies })
+
+    assert.deepEqual(result, {
+        ok: true,
+        stage: 'firestore_read',
+        code: 'FIRESTORE_READ_OK',
+        claimsMatchExpected: true
+    })
+    assert.equal(dependencies.calls.length, 3)
+
+    const stsRequest = dependencies.calls[0]
+    assert.equal(stsRequest.url, 'https://sts.googleapis.com/v1/token')
+    assert.equal(stsRequest.options.method, 'POST')
+    const stsForm = new globalThis.URLSearchParams(stsRequest.options.body)
+    assert.equal(stsForm.get('audience'), audience.replace(/^https:/, ''))
+    assert.equal(stsForm.get('subject_token'), oidcSentinel)
+    assert.equal(stsForm.get('requested_token_type'), 'urn:ietf:params:oauth:token-type:access_token')
+
+    const impersonationRequest = dependencies.calls[1]
+    assert.match(impersonationRequest.url, /three-yar-runtime-prod@yar-3yar-free\.iam\.gserviceaccount\.com:generateAccessToken$/)
+    assert.equal(impersonationRequest.options.headers.Authorization, `Bearer ${federatedSentinel}`)
+    assert.equal(JSON.parse(impersonationRequest.options.body).lifetime, '900s')
+
+    const firestoreRequest = dependencies.calls[2]
+    assert.equal(firestoreRequest.options.method, 'GET')
+    assert.match(firestoreRequest.url, /documents\/security_probe\/oidc-validation$/)
+    assert.equal(firestoreRequest.options.headers.Authorization, `Bearer ${serviceAccountSentinel}`)
+
+    const serialized = JSON.stringify(result)
+    for (const secret of [oidcSentinel, federatedSentinel, serviceAccountSentinel]) {
+        assert.equal(serialized.includes(secret), false)
+    }
+})
+
+test('Stage A returns only a safe code when token acquisition fails', async () => {
+    const result = await runOidcDiagnostic({
+        env: productionEnv,
+        getOidcToken: async () => { throw new Error(oidcSentinel) },
+        verifyOidcToken: async () => { throw new Error('must not verify') },
+        fetchImpl: async () => { throw new Error('must not call Google') }
+    })
+    assert.deepEqual(result, {
+        ok: false,
+        stage: 'vercel_oidc_token',
+        code: 'VERCEL_OIDC_TOKEN_UNAVAILABLE'
+    })
+})
+
+test('Stage A verifies the exact audience, issuer, project, environment, and subject before STS', async () => {
+    let fetchCalls = 0
+    const result = await runOidcDiagnostic({
+        env: productionEnv,
+        getOidcToken: async () => oidcSentinel,
+        verifyOidcToken: async () => ({ payload: { ...expectedPayload, sub: 'owner:other:project:other:environment:production' } }),
+        fetchImpl: async () => { fetchCalls++; return apiResponse({}) }
+    })
+    assert.deepEqual(result, {
+        ok: false,
+        stage: 'vercel_oidc_token',
+        code: 'PROVIDER_CONDITION_REJECTED',
+        claimsMatchExpected: false
+    })
+    assert.equal(fetchCalls, 0)
+})
+
+test('Stage A classifies audience verification failure without returning the underlying error', async () => {
+    const result = await runOidcDiagnostic({
+        env: productionEnv,
+        getOidcToken: async () => oidcSentinel,
+        verifyOidcToken: async () => { throw Object.assign(new Error(oidcSentinel), { claim: 'aud' }) },
+        fetchImpl: async () => { throw new Error('must not call Google') }
+    })
+    assert.deepEqual(result, {
+        ok: false,
+        stage: 'vercel_oidc_token',
+        code: 'OIDC_AUDIENCE_MISMATCH'
+    })
+})
+
+test('Stage B maps Google STS failures to safe diagnostic codes only', async t => {
+    const cases = [
+        ['OIDC_AUDIENCE_MISMATCH', { error: 'invalid_target', error_description: 'The audience is invalid' }],
+        ['OIDC_ISSUER_MISMATCH', { error: 'invalid_grant', error_description: 'The issuer does not match' }],
+        ['PROVIDER_CONDITION_REJECTED', { error: 'invalid_grant', error_description: 'The given credential is rejected by the attribute condition' }],
+        ['WIF_PROVIDER_NOT_FOUND', { error: { status: 'NOT_FOUND', message: 'The workload identity pool provider does not exist' } }],
+        ['STS_DISABLED', { error: { status: 'PERMISSION_DENIED', message: 'Security Token Service API has not been used', details: [{ reason: 'SERVICE_DISABLED', metadata: { service: 'sts.googleapis.com' } }] } }],
+        ['STS_UNKNOWN', { error: 'temporarily_unavailable', error_description: oidcSentinel }]
+    ]
+
+    for (const [code, errorPayload] of cases) {
+        await t.test(code, async () => {
+            const dependencies = successfulDependencies()
+            dependencies.fetchImpl = async () => apiResponse(errorPayload, 400)
+            const result = await runOidcDiagnostic({ env: productionEnv, ...dependencies })
+            assert.deepEqual(result, {
+                ok: false,
+                stage: 'google_sts_exchange',
+                code,
+                claimsMatchExpected: true
+            })
+            assert.equal(JSON.stringify(result).includes(oidcSentinel), false)
+        })
+    }
+})
+
+test('Stage C distinguishes a disabled IAM Credentials API and a missing impersonation binding', async t => {
+    const cases = [
+        ['IAM_CREDENTIALS_API_DISABLED', { error: { status: 'PERMISSION_DENIED', message: 'IAM Service Account Credentials API has not been used', details: [{ reason: 'SERVICE_DISABLED', metadata: { service: 'iamcredentials.googleapis.com' } }] } }],
+        ['WIF_PRINCIPAL_BINDING_MISSING', { error: { status: 'PERMISSION_DENIED', message: 'Permission iam.serviceAccounts.getAccessToken denied' } }],
+        ['WIF_IMPERSONATION_DENIED', { error: { status: 'PERMISSION_DENIED', message: serviceAccountSentinel } }]
+    ]
+
+    for (const [code, errorPayload] of cases) {
+        await t.test(code, async () => {
+            const dependencies = successfulDependencies()
+            dependencies.fetchImpl = async (_url, options) => {
+                dependencies.calls.push({ options })
+                return dependencies.calls.length === 1
+                    ? apiResponse({ access_token: federatedSentinel })
+                    : apiResponse(errorPayload, 403)
+            }
+            const result = await runOidcDiagnostic({ env: productionEnv, ...dependencies })
+            assert.deepEqual(result, {
+                ok: false,
+                stage: 'service_account_impersonation',
+                code,
+                claimsMatchExpected: true
+            })
+            assert.equal(JSON.stringify(result).includes(serviceAccountSentinel), false)
+        })
+    }
+})
+
+test('Stage D accepts a read-only missing-document response and safely classifies denied reads', async () => {
+    const missingDocument = successfulDependencies()
+    const missingResult = await runOidcDiagnostic({ env: productionEnv, ...missingDocument })
+    assert.equal(missingResult.stage, 'firestore_read')
+    assert.equal(missingResult.code, 'FIRESTORE_READ_OK')
+
+    const deniedRead = successfulDependencies()
+    deniedRead.fetchImpl = async (url, options) => {
+        deniedRead.calls.push({ url, options })
+        if (deniedRead.calls.length === 1) return apiResponse({ access_token: federatedSentinel })
+        if (deniedRead.calls.length === 2) return apiResponse({ accessToken: serviceAccountSentinel })
+        return apiResponse({ error: { status: 'PERMISSION_DENIED', message: serviceAccountSentinel } }, 403)
+    }
+    const deniedResult = await runOidcDiagnostic({ env: productionEnv, ...deniedRead })
+    assert.deepEqual(deniedResult, {
+        ok: false,
+        stage: 'firestore_read',
+        code: 'FIRESTORE_READ_DENIED',
+        claimsMatchExpected: true
+    })
+    assert.equal(JSON.stringify(deniedResult).includes(serviceAccountSentinel), false)
+})
+
+test('HTTP probe serializes only safe diagnostic fields and never reveals thrown errors', async () => {
+    const env = {
+        ...productionEnv,
+        SECURITY_PROBE_ENABLED: 'true',
+        SECURITY_PROBE_SECRET: 'test-only-secret'
+    }
     const response = fakeResponse()
-    await createWifProbeHandler({ env: productionEnv, probe: async () => false })(
+    await createWifProbeHandler({
+        env,
+        probe: async () => { throw new Error(oidcSentinel) }
+    })(
         { method: 'GET', headers: { 'x-3yar-security-probe': 'test-only-secret' } },
         response
     )
-    assert.equal(response.statusCode, 200)
+
+    assert.equal(response.statusCode, 503)
     assert.deepEqual(response.body, {
-        ok: true,
-        authMode: 'oidc',
-        projectId: 'yar-3yar-free',
-        firestoreReachable: true,
-        documentExists: false
+        ok: false,
+        stage: 'vercel_oidc_token',
+        code: 'OIDC_TOKEN_UNAVAILABLE'
     })
     assert.equal(response.headers['Cache-Control'], 'no-store')
+    assert.equal(JSON.stringify(response.body).includes(oidcSentinel), false)
+})
+
+test('HTTP probe rejects an unrecognized diagnostic code instead of serializing it', async () => {
+    const response = fakeResponse()
+    await createWifProbeHandler({
+        env: {
+            ...productionEnv,
+            SECURITY_PROBE_ENABLED: 'true',
+            SECURITY_PROBE_SECRET: 'test-only-secret'
+        },
+        probe: async () => ({
+            ok: false,
+            stage: 'google_sts_exchange',
+            code: oidcSentinel,
+            claimsMatchExpected: true
+        })
+    })(
+        { method: 'GET', headers: { 'x-3yar-security-probe': 'test-only-secret' } },
+        response
+    )
+
+    assert.equal(response.statusCode, 503)
+    assert.deepEqual(response.body, {
+        ok: false,
+        stage: 'vercel_oidc_token',
+        code: 'OIDC_TOKEN_UNAVAILABLE'
+    })
+    assert.equal(JSON.stringify(response.body).includes(oidcSentinel), false)
 })
