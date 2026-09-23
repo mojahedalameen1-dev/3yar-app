@@ -297,7 +297,7 @@ export async function runOidcDiagnostic({
     let firestoreResponse
     try {
         firestoreResponse = await fetchImpl(
-            `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/__security_probe__/oidc-validation`,
+            `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/security_probe/oidc-validation`,
             {
                 method: 'GET',
                 headers: { Authorization: `Bearer ${serviceAccountAccessToken}` },

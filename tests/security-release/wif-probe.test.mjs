@@ -142,7 +142,7 @@ test('diagnostic explicitly obtains and verifies the Vercel token, then checks S
 
     const firestoreRequest = dependencies.calls[2]
     assert.equal(firestoreRequest.options.method, 'GET')
-    assert.match(firestoreRequest.url, /documents\/__security_probe__\/oidc-validation$/)
+    assert.match(firestoreRequest.url, /documents\/security_probe\/oidc-validation$/)
     assert.equal(firestoreRequest.options.headers.Authorization, `Bearer ${serviceAccountSentinel}`)
 
     const serialized = JSON.stringify(result)
