@@ -12,6 +12,7 @@ const projectId = 'prj_MGTs8Foutto6Oh9gijiUJobv2x6u'
 const oidcSentinel = 'oidc-token-must-not-escape'
 const federatedSentinel = 'federated-token-must-not-escape'
 const serviceAccountSentinel = 'impersonated-token-must-not-escape'
+const firestoreScope = 'https://www.googleapis.com/auth/cloud-platform'
 
 const productionEnv = {
     VERCEL_ENV: 'production',
@@ -119,10 +120,9 @@ test('diagnostic explicitly obtains and verifies the Vercel token, then checks S
     const result = await runOidcDiagnostic({ env: productionEnv, ...dependencies })
 
     assert.deepEqual(result, {
-        ok: true,
-        stage: 'firestore_read',
-        code: 'DIRECT_FIRESTORE_REST_PASS',
-        claimsMatchExpected: true
+        stage: 'firestore_rest',
+        httpStatus: 404,
+        transportFailure: false
     })
     assert.equal(dependencies.calls.length, 3)
 
@@ -138,6 +138,7 @@ test('diagnostic explicitly obtains and verifies the Vercel token, then checks S
     assert.match(impersonationRequest.url, /three-yar-runtime-prod@yar-3yar-free\.iam\.gserviceaccount\.com:generateAccessToken$/)
     assert.equal(impersonationRequest.options.headers.Authorization, `Bearer ${federatedSentinel}`)
     assert.equal(JSON.parse(impersonationRequest.options.body).lifetime, '900s')
+    assert.deepEqual(JSON.parse(impersonationRequest.options.body).scope, [firestoreScope])
 
     const firestoreRequest = dependencies.calls[2]
     assert.equal(firestoreRequest.options.method, 'GET')
@@ -249,47 +250,52 @@ test('Stage C distinguishes a disabled IAM Credentials API and a missing imperso
     }
 })
 
-test('Stage D accepts a read-only 404 response without inspecting Firestore error content', async () => {
-    const missingDocument = successfulDependencies()
-    const missingResult = await runOidcDiagnostic({ env: productionEnv, ...missingDocument })
-    assert.deepEqual(missingResult, {
-        ok: true,
-        stage: 'firestore_read',
-        code: 'DIRECT_FIRESTORE_REST_PASS',
-        claimsMatchExpected: true
-    })
-    assert.equal(missingDocument.calls[2].options.method, 'GET')
-    assert.equal(missingDocument.calls[2].options.headers.Authorization, `Bearer ${serviceAccountSentinel}`)
-
-    for (const [status, code] of [
-        [401, 'DIRECT_FIRESTORE_TOKEN_AUTH_FAILED'],
-        [403, 'DIRECT_FIRESTORE_IAM_DENIED'],
-        [418, 'DIRECT_FIRESTORE_OTHER']
-    ]) {
-        const request = successfulDependencies({
-            firestoreResponse: apiResponse({ error: { message: serviceAccountSentinel } }, status)
+test('Stage D returns the original Firestore HTTP status without reading its body', async t => {
+    for (const status of [404, 401, 403, 429, 500, 503]) {
+        await t.test(String(status), async () => {
+            const responseBodySentinel = 'google-error-body-must-not-escape'
+            const dependencies = successfulDependencies({
+                firestoreResponse: {
+                    ok: status >= 200 && status < 300,
+                    status,
+                    async json() { throw new Error(responseBodySentinel) }
+                }
+            })
+            const result = await runOidcDiagnostic({ env: productionEnv, ...dependencies })
+            assert.deepEqual(result, {
+                stage: 'firestore_rest',
+                httpStatus: status,
+                transportFailure: false
+            })
+            assert.equal(dependencies.calls[2].options.method, 'GET')
+            assert.equal(dependencies.calls[2].options.headers.Authorization, `Bearer ${serviceAccountSentinel}`)
+            assert.equal(JSON.stringify(result).includes(responseBodySentinel), false)
         })
-        const result = await runOidcDiagnostic({ env: productionEnv, ...request })
-        assert.deepEqual(result, {
-            ok: false,
-            stage: 'firestore_read',
-            code,
-            claimsMatchExpected: true
-        })
-        assert.equal(JSON.stringify(result).includes(serviceAccountSentinel), false)
     }
 })
 
-test('Stage D does not treat an existing probe document as a successful absent-document check', async () => {
-    const dependencies = successfulDependencies({ firestoreResponse: apiResponse({ name: 'redacted' }, 200) })
-    const result = await runOidcDiagnostic({ env: productionEnv, ...dependencies })
-
-    assert.deepEqual(result, {
-        ok: false,
-        stage: 'firestore_read',
-        code: 'DIRECT_FIRESTORE_DOCUMENT_EXISTS',
-        claimsMatchExpected: true
+test('Stage D returns only safe transport metadata when fetch throws before a response', async () => {
+    const transportError = new TypeError(oidcSentinel, {
+        cause: Object.assign(new Error('private transport detail'), { code: 'ECONNRESET' })
     })
+    const dependencies = successfulDependencies({
+        firestoreResponse: undefined
+    })
+    dependencies.fetchImpl = async (url, options) => {
+        dependencies.calls.push({ url, options })
+        if (dependencies.calls.length === 1) return apiResponse({ access_token: federatedSentinel })
+        if (dependencies.calls.length === 2) return apiResponse({ accessToken: serviceAccountSentinel })
+        throw transportError
+    }
+    const result = await runOidcDiagnostic({ env: productionEnv, ...dependencies })
+    assert.deepEqual(result, {
+        transportFailure: true,
+        errorClass: 'TypeError',
+        causeCode: 'ECONNRESET'
+    })
+    for (const secret of [oidcSentinel, federatedSentinel, serviceAccountSentinel, 'private transport detail']) {
+        assert.equal(JSON.stringify(result).includes(secret), false)
+    }
 })
 
 test('HTTP probe serializes only safe diagnostic fields and never reveals thrown errors', async () => {
@@ -314,6 +320,55 @@ test('HTTP probe serializes only safe diagnostic fields and never reveals thrown
         code: 'OIDC_TOKEN_UNAVAILABLE'
     })
     assert.equal(response.headers['Cache-Control'], 'no-store')
+    assert.equal(JSON.stringify(response.body).includes(oidcSentinel), false)
+})
+
+test('HTTP probe preserves the Firestore status and serializes only the requested status fields', async () => {
+    const response = fakeResponse()
+    await createWifProbeHandler({
+        env: {
+            ...productionEnv,
+            SECURITY_PROBE_ENABLED: 'true',
+            SECURITY_PROBE_SECRET: 'test-only-secret'
+        },
+        probe: async () => ({ stage: 'firestore_rest', httpStatus: 404, transportFailure: false })
+    })(
+        { method: 'GET', headers: { 'x-3yar-security-probe': 'test-only-secret' } },
+        response
+    )
+    assert.equal(response.statusCode, 404)
+    assert.deepEqual(response.body, {
+        stage: 'firestore_rest',
+        httpStatus: 404,
+        transportFailure: false
+    })
+})
+
+test('HTTP probe sanitizes transport failures to safe class and cause code only', async () => {
+    const response = fakeResponse()
+    await createWifProbeHandler({
+        env: {
+            ...productionEnv,
+            SECURITY_PROBE_ENABLED: 'true',
+            SECURITY_PROBE_SECRET: 'test-only-secret'
+        },
+        probe: async () => ({
+            transportFailure: true,
+            errorClass: 'TypeError',
+            causeCode: 'ECONNRESET',
+            message: oidcSentinel,
+            stack: oidcSentinel
+        })
+    })(
+        { method: 'GET', headers: { 'x-3yar-security-probe': 'test-only-secret' } },
+        response
+    )
+    assert.equal(response.statusCode, 503)
+    assert.deepEqual(response.body, {
+        transportFailure: true,
+        errorClass: 'TypeError',
+        causeCode: 'ECONNRESET'
+    })
     assert.equal(JSON.stringify(response.body).includes(oidcSentinel), false)
 })
 
@@ -357,10 +412,10 @@ test('HTTP probe passes the environment using the diagnostic options contract', 
         env,
         probe: async options => {
             received = options
-            return { ok: true, stage: 'firestore_read', code: 'DIRECT_FIRESTORE_REST_PASS' }
+            return { stage: 'firestore_rest', httpStatus: 404, transportFailure: false }
         }
     })({ method: 'GET', headers: { 'x-3yar-security-probe': 'test-only-secret' } }, response)
 
     assert.deepEqual(received, { env })
-    assert.equal(response.statusCode, 200)
+    assert.equal(response.statusCode, 404)
 })

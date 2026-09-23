@@ -159,6 +159,36 @@ const SAFE_DIAGNOSTIC_CODES = new Set([
     'OIDC_TOKEN_UNAVAILABLE'
 ])
 
+const SAFE_TRANSPORT_ERROR_CLASSES = new Set([
+    'AbortError',
+    'Error',
+    'FetchError',
+    'TimeoutError',
+    'TypeError'
+])
+const SAFE_TRANSPORT_CAUSE_CODES = new Set([
+    'EAI_AGAIN',
+    'ECONNREFUSED',
+    'ECONNRESET',
+    'ENOTFOUND',
+    'ETIMEDOUT',
+    'UND_ERR_CONNECT_TIMEOUT',
+    'UND_ERR_HEADERS_TIMEOUT',
+    'UND_ERR_SOCKET'
+])
+
+function safeTransportFailure(error) {
+    const errorClass = SAFE_TRANSPORT_ERROR_CLASSES.has(error?.constructor?.name)
+        ? error.constructor.name
+        : 'Error'
+    const causeCode = error?.cause?.code
+    const result = { transportFailure: true, errorClass }
+    if (typeof causeCode === 'string' && SAFE_TRANSPORT_CAUSE_CODES.has(causeCode)) {
+        result.causeCode = causeCode
+    }
+    return result
+}
+
 export async function runOidcDiagnostic({
     env = process.env,
     getOidcToken = getVercelOidcToken,
@@ -274,24 +304,15 @@ export async function runOidcDiagnostic({
                 signal: globalThis.AbortSignal.timeout(10000)
             }
         )
-    } catch {
-        return diagnosticResult(false, 'firestore_read', 'DIRECT_FIRESTORE_OTHER', true)
+    } catch (error) {
+        return safeTransportFailure(error)
     }
 
-    if (firestoreResponse.status === 404) {
-        return diagnosticResult(true, 'firestore_read', 'DIRECT_FIRESTORE_REST_PASS', true)
+    return {
+        stage: 'firestore_rest',
+        httpStatus: firestoreResponse.status,
+        transportFailure: false
     }
-    if (firestoreResponse.status === 403) {
-        return diagnosticResult(false, 'firestore_read', 'DIRECT_FIRESTORE_IAM_DENIED', true)
-    }
-    if (firestoreResponse.status === 401) {
-        return diagnosticResult(false, 'firestore_read', 'DIRECT_FIRESTORE_TOKEN_AUTH_FAILED', true)
-    }
-    if (firestoreResponse.ok) {
-        return diagnosticResult(false, 'firestore_read', 'DIRECT_FIRESTORE_DOCUMENT_EXISTS', true)
-    }
-
-    return diagnosticResult(false, 'firestore_read', 'DIRECT_FIRESTORE_OTHER', true)
 }
 
 export function createWifProbeHandler({ env = process.env, probe = runOidcDiagnostic } = {}) {
@@ -320,6 +341,37 @@ export function createWifProbeHandler({ env = process.env, probe = runOidcDiagno
         } catch {
             result = diagnosticResult(false, 'vercel_oidc_token', 'OIDC_TOKEN_UNAVAILABLE')
         }
+
+        if (result?.stage === 'firestore_rest') {
+            if (
+                Number.isInteger(result.httpStatus) &&
+                result.httpStatus >= 100 &&
+                result.httpStatus <= 599 &&
+                result.transportFailure === false
+            ) {
+                response.status(result.httpStatus).json({
+                    stage: 'firestore_rest',
+                    httpStatus: result.httpStatus,
+                    transportFailure: false
+                })
+                return
+            }
+            response.status(503).json({ transportFailure: true, errorClass: 'Error' })
+            return
+        }
+
+        if (result?.transportFailure === true) {
+            const errorClass = SAFE_TRANSPORT_ERROR_CLASSES.has(result.errorClass)
+                ? result.errorClass
+                : 'Error'
+            const safeResult = { transportFailure: true, errorClass }
+            if (SAFE_TRANSPORT_CAUSE_CODES.has(result.causeCode)) {
+                safeResult.causeCode = result.causeCode
+            }
+            response.status(503).json(safeResult)
+            return
+        }
+
         const safeStages = new Set([
             'vercel_oidc_token',
             'google_sts_exchange',
