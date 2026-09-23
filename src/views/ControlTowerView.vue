@@ -329,7 +329,9 @@
                   <template #item.vehicle="{ item }">
                     <div class="d-flex align-center gap-3 py-2">
                       <v-avatar rounded="lg" color="grey-darken-3" size="48">
-                         <v-img v-if="item.image" :src="item.image" cover></v-img>
+                         <V1BlobSource v-if="item.image" :source="item.image" :document-id="item.id" collection-name="cars" v-slot="{ url }">
+                           <v-img v-if="url" :src="url" cover></v-img>
+                         </V1BlobSource>
                          <v-icon v-else icon="mdi-car" color="grey"></v-icon>
                       </v-avatar>
                       <div>
@@ -373,12 +375,8 @@
                   <template v-slot:default="{ items }">
                     <div class="d-flex flex-column gap-4">
                       <div v-for="item in items" :key="item.raw.id" class="surface-card pa-0 overflow-hidden animate-slide-up">
-                        <v-img
-                          :src="item.raw.image || 'https://via.placeholder.com/300x150?text=No+Image'"
-                          height="150"
-                          cover
-                          class="bg-grey-darken-4"
-                        >
+                        <V1BlobSource :source="item.raw.image || ''" :document-id="item.raw.id" collection-name="cars" v-slot="{ url }">
+                        <v-img v-if="url" :src="url" height="150" cover class="bg-grey-darken-4">
                           <div class="d-flex justify-end pa-2">
                             <v-menu>
                               <template v-slot:activator="{ props }">
@@ -391,6 +389,7 @@
                             </v-menu>
                           </div>
                         </v-img>
+                        </V1BlobSource>
                         
                         <div class="pa-4">
                           <div class="d-flex justify-space-between align-center mb-2">
@@ -859,32 +858,21 @@
     <!-- Document Viewer (Enhanced) -->
     <v-dialog v-model="docViewer.show" fullscreen transition="dialog-bottom-transition">
        <v-card class="bg-black">
-         <v-toolbar color="surface" density="compact">
-            <v-btn icon="mdi-close" @click="docViewer.show = false"></v-btn>
-            <v-toolbar-title>معاينة الوثيقة</v-toolbar-title>
-            <v-spacer></v-spacer>
-            <v-btn color="primary" variant="text" :href="docViewer.url" target="_blank" prepend-icon="mdi-download">تحميل</v-btn>
-         </v-toolbar>
-         <v-progress-linear v-if="docViewer.loading" indeterminate color="cyan-accent-3" absolute bottom></v-progress-linear>
-         <div class="d-flex align-center justify-center fill-height bg-grey-darken-4 pa-4">
-             <!-- PDF Viewer Check -->
-             <iframe 
-               v-if="isPdf(docViewer.url)" 
-               :src="docViewer.url"
-               width="100%" 
-               height="100%" 
-               frameborder="0"
-               @load="docViewer.loading = false"
-             ></iframe>
-             <v-img 
-                v-else 
-                :src="docViewer.url" 
-                contain 
-                max-height="90vh"
-                @load="docViewer.loading = false"
-             ></v-img>
-         </div>
-       </v-card>
+         <V1BlobSource :source="docViewer.document?.image" :document-id="docViewer.document?.id" v-slot="{ url, loading, error }">
+           <v-toolbar color="surface" density="compact">
+              <v-btn icon="mdi-close" @click="docViewer.show = false"></v-btn>
+              <v-toolbar-title>معاينة الوثيقة</v-toolbar-title>
+              <v-spacer></v-spacer>
+              <v-btn color="primary" variant="text" :href="url" target="_blank" :disabled="!url || loading" prepend-icon="mdi-download">تحميل</v-btn>
+           </v-toolbar>
+           <v-progress-linear v-if="loading" indeterminate color="cyan-accent-3" absolute bottom></v-progress-linear>
+           <v-alert v-if="error" type="error" class="ma-4">{{ error }}</v-alert>
+           <div v-else class="d-flex align-center justify-center fill-height bg-grey-darken-4 pa-4">
+             <iframe v-if="url && isPdf(docViewer.document?.image)" :src="url" width="100%" height="100%" frameborder="0"></iframe>
+             <v-img v-else-if="url" :src="url" contain max-height="90vh"></v-img>
+           </div>
+         </V1BlobSource>
+         </v-card>
     </v-dialog>
 
      <!-- Global Snackbar -->
@@ -927,6 +915,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
+import V1BlobSource from '@/components/V1BlobSource.vue'
 import { useThemeStore } from '@/stores/theme'
 import { Doughnut, Line } from 'vue-chartjs'
 import { useTheme } from 'vuetify'
@@ -980,7 +969,7 @@ const userDialog = ref({ show: false, loading: false, isEdit: false, data: {} })
 const carDialog = ref({ show: false, loading: false, isEdit: false, data: {} })
 const recordDialog = ref({ show: false, loading: false, isEdit: false, data: {} })
 const docDialog = ref({ show: false, loading: false, data: {}, file: null })
-const docViewer = ref({ show: false, url: null })
+const docViewer = ref({ show: false, document: null })
 
 // Announcement Form
 const announcementForm = ref({ title: '', message: '', type: 'info' })
@@ -1270,7 +1259,7 @@ function getDocColor(type) {
 }
 
 function viewDocument(doc) {
-  docViewer.value = { show: true, url: doc.image, loading: true }
+  docViewer.value = { show: true, document: doc }
 }
 
 function isPdf(url) {

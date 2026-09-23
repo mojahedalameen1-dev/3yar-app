@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/firebase'
+import { useCarStore } from './car'
 import dayjs from 'dayjs'
 
 export const useRecordsStore = defineStore('records', () => {
@@ -126,10 +127,17 @@ export const useRecordsStore = defineStore('records', () => {
                 return
             }
 
+            const carId = useCarStore().car?.id
+            if (!carId) {
+                records.value = []
+                return
+            }
+
             const { data, error: err } = await supabase
                 .from('maintenance_records')
                 .select('*')
                 .eq('user_id', userId)
+                .eq('car_id', carId)
                 .order('date', { ascending: false })
 
             if (err) throw err
@@ -171,6 +179,9 @@ export const useRecordsStore = defineStore('records', () => {
         loading.value = true
         error.value = null
         try {
+            const userId = await getUserId()
+            const carId = useCarStore().car?.id
+            if (!userId || !carId) throw new Error('تعذر تحديد حسابك وسيارتك لتحديث السجل بأمان.')
             const dbUpdates = {}
             if (updates.taskId !== undefined) dbUpdates.task_id = updates.taskId
             if (updates.taskName !== undefined) dbUpdates.task_name = updates.taskName
@@ -186,6 +197,8 @@ export const useRecordsStore = defineStore('records', () => {
                 .from('maintenance_records')
                 .update(dbUpdates)
                 .eq('id', id)
+                .eq('user_id', userId)
+                .eq('car_id', carId)
                 .select()
                 .maybeSingle()
 
@@ -204,14 +217,24 @@ export const useRecordsStore = defineStore('records', () => {
         }
     }
 
+    function applyCommittedRecord(row) {
+        if (records.value.some(record => String(record.id) === String(row.id))) return
+        records.value.push(mapFromDb(row))
+    }
+
     async function deleteRecord(id) {
         loading.value = true
         error.value = null
         try {
+            const userId = await getUserId()
+            const carId = useCarStore().car?.id
+            if (!userId || !carId) throw new Error('تعذر تحديد حسابك وسيارتك لحذف السجل بأمان.')
             const { error: err } = await supabase
                 .from('maintenance_records')
                 .delete()
                 .eq('id', id)
+                .eq('user_id', userId)
+                .eq('car_id', carId)
 
             if (err) throw err
 
@@ -244,10 +267,14 @@ export const useRecordsStore = defineStore('records', () => {
         loading.value = true
         error.value = null
         try {
+            const userId = await getUserId()
+            const carId = useCarStore().car?.id
+            if (!userId || !carId) throw new Error('تعذر تحديد حسابك وسيارتك لحذف السجلات بأمان.')
             const { error: err } = await supabase
                 .from('maintenance_records')
                 .delete()
-                .neq('id', 0) // Delete all
+                .eq('user_id', userId)
+                .eq('car_id', carId)
 
             if (err) throw err
             records.value = []
@@ -275,6 +302,7 @@ export const useRecordsStore = defineStore('records', () => {
         stats,
         fetchRecords,
         addRecord,
+        applyCommittedRecord,
         updateRecord,
         deleteRecord,
         getRecordsByTask,

@@ -13,6 +13,15 @@
       </div>
     </div>
 
+    <v-alert v-if="documentsStore.error" type="error" variant="tonal" class="mb-4" role="alert">
+      تعذر تحديث الوثائق. {{ documentsStore.documents.length ? 'نعرض آخر بيانات محفوظة.' : 'لم نتمكن من التحقق من وجود وثائق.' }}
+      <v-btn class="ms-2" size="small" variant="text" :loading="documentsStore.loading" @click="documentsStore.fetchDocuments()">إعادة المحاولة</v-btn>
+    </v-alert>
+    <v-card v-else-if="documentsStore.loading && !documentsStore.documents.length" class="glass-card pa-8 text-center mb-6">
+      <v-progress-circular indeterminate color="primary" aria-label="جارٍ تحميل الوثائق" />
+      <div class="text-body-2 text-medium-emphasis mt-3">جارٍ تحميل الوثائق…</div>
+    </v-card>
+
     <!-- Stats Overview -->
     <v-row class="mb-6">
       <v-col cols="6" sm="3">
@@ -78,7 +87,9 @@
                 <v-icon size="64" color="error">mdi-file-pdf-box</v-icon>
               </div>
             </template>
-            <v-img v-else :src="getDocument(type).image" height="140" cover class="document-image"></v-img>
+              <V1BlobSource v-else :source="getDocument(type).image" :document-id="getDocument(type).id" v-slot="{ url }">
+                <v-img v-if="url" :src="url" height="140" cover class="document-image"></v-img>
+              </V1BlobSource>
             <div class="image-view-overlay"><v-icon size="32" color="white">mdi-eye</v-icon></div>
           </div>
           <div v-else class="document-icon-placeholder" :class="`bg-${documentsStore.DOCUMENT_COLORS[type]}`">
@@ -110,7 +121,7 @@
         </v-card>
         
         <!-- Empty State Card -->
-        <v-card v-else class="document-card glass-card h-100 document-empty" @click="openAddDialog(type)">
+        <v-card v-else-if="!documentsStore.error && !documentsStore.loading" class="document-card glass-card h-100 document-empty" @click="openAddDialog(type)">
           <v-card-text class="pa-8 text-center h-100 d-flex flex-column justify-center align-center">
             <div class="empty-icon mb-4" :class="`bg-${documentsStore.DOCUMENT_COLORS[type]}`">
               <v-icon size="36" color="white">{{ documentsStore.DOCUMENT_ICONS[type] }}</v-icon>
@@ -137,7 +148,9 @@
                   <v-icon size="64" color="error">mdi-file-pdf-box</v-icon>
                 </div>
               </template>
-              <v-img v-else :src="doc.image" height="140" cover class="document-image"></v-img>
+              <V1BlobSource v-else :source="doc.image" :document-id="doc.id" v-slot="{ url }">
+                <v-img v-if="url" :src="url" height="140" cover class="document-image"></v-img>
+              </V1BlobSource>
               <div class="image-view-overlay"><v-icon size="32" color="white">mdi-eye</v-icon></div>
             </div>
             <div v-else class="document-icon-placeholder bg-grey-darken-1">
@@ -185,6 +198,7 @@
         </v-card-title>
         <v-divider></v-divider>
         <v-card-text class="pa-5">
+          <v-alert v-if="saveError" type="error" variant="tonal" class="mb-4" role="alert">{{ saveError }}</v-alert>
           <!-- Image Upload -->
           <div class="image-upload-section mb-5">
             <div class="image-upload-area" @click="triggerImageUpload">
@@ -193,7 +207,9 @@
                   <v-icon size="64" color="error">mdi-file-pdf-box</v-icon>
                   <span class="text-caption text-medium-emphasis mt-2">ملف PDF</span>
                 </div>
-                <v-img v-else :src="formData.image" height="180" cover class="rounded-lg"></v-img>
+                <V1BlobSource v-else :source="formData.image" :document-id="formData.id" v-slot="{ url }">
+                  <v-img v-if="url" :src="url" height="180" cover class="rounded-lg"></v-img>
+                </V1BlobSource>
                 <div class="image-overlay d-flex flex-column align-center justify-center">
                   <v-icon size="36" color="white">mdi-camera</v-icon>
                   <span class="text-caption text-white mt-1">تغيير الصورة</span>
@@ -204,7 +220,7 @@
                 <span class="text-body-2 text-medium-emphasis mt-2">انقر لرفع صورة أو ملف PDF</span>
                 <span class="text-caption text-medium-emphasis">(اختياري)</span>
               </div>
-              <input ref="imageInput" type="file" accept="image/*,application/pdf" style="display: none" @change="handleImageUpload" />
+              <input ref="imageInput" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" style="display: none" @change="handleImageUpload" />
             </div>
           </div>
 
@@ -235,8 +251,8 @@
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="closeDialog">إلغاء</v-btn>
-          <v-btn :color="dialogColor" @click="saveDocument">{{ editMode ? 'تحديث' : 'حفظ' }}</v-btn>
+          <v-btn variant="text" :disabled="savingDocument" @click="closeDialog">إلغاء</v-btn>
+          <v-btn :color="dialogColor" :loading="savingDocument" :disabled="savingDocument" @click="saveDocument">{{ editMode ? 'تحديث' : 'حفظ' }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -253,14 +269,12 @@
         </v-card-title>
         <v-divider></v-divider>
         <div v-if="viewDocument.image" class="bg-grey-darken-4 d-flex align-center justify-center" style="min-height: 400px; max-height: 80vh">
-          <iframe 
-            v-if="isPdf(viewDocument.image)" 
-            :src="viewDocument.image"
-            width="100%"
-            height="500px"
-            frameborder="0"
-          ></iframe>
-          <v-img v-else :src="viewDocument.image" max-height="500" contain></v-img>
+          <V1BlobSource :source="viewDocument.image" :document-id="viewDocument.id" v-slot="{ url, loading, error }">
+            <v-progress-circular v-if="loading" indeterminate color="primary" />
+            <v-alert v-else-if="error" type="error" variant="tonal">{{ error }}</v-alert>
+            <iframe v-else-if="url && isPdf(viewDocument.image)" :src="url" width="100%" height="500px" frameborder="0"></iframe>
+            <v-img v-else-if="url" :src="url" max-height="500" contain></v-img>
+          </V1BlobSource>
         </div>
         <div v-else class="pa-12 text-center">
           <v-icon size="80" color="grey">mdi-image-off</v-icon>
@@ -303,8 +317,8 @@
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showDeleteDialog = false">إلغاء</v-btn>
-          <v-btn color="error" @click="deleteDocument">حذف</v-btn>
+          <v-btn variant="text" :disabled="deletingDocument" @click="showDeleteDialog = false">إلغاء</v-btn>
+          <v-btn color="error" :loading="deletingDocument" :disabled="deletingDocument" @click="deleteDocument">حذف</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -314,6 +328,8 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
 import { useDocumentsStore } from '@/stores/documents'
+import V1BlobSource from '@/components/V1BlobSource.vue'
+import { readFileAsDataUrl, validateDataUrlFile } from '@/lib/data-url-upload'
 import dayjs from 'dayjs'
 
 const showSnackbar = inject('showSnackbar')
@@ -337,6 +353,9 @@ const editMode = ref(false)
 const dialogType = ref('license')
 const formData = ref(getEmptyForm())
 const imageInput = ref(null)
+const savingDocument = ref(false)
+const saveError = ref('')
+const deletingDocument = ref(false)
 
 const dialogTitle = computed(() => {
   if (dialogType.value === 'custom' && formData.value.title) return formData.value.title
@@ -361,6 +380,7 @@ function openAddDialog(type = 'custom') {
   editMode.value = false
   dialogType.value = type
   formData.value = getEmptyForm()
+  saveError.value = ''
   showDialog.value = true
 }
 
@@ -376,47 +396,65 @@ function openEditDialog(doc) {
     notes: doc.notes || '',
     reminderDays: doc.reminderDays || 30
   }
+  saveError.value = ''
   showDialog.value = true
 }
 
 function closeDialog() {
+  if (savingDocument.value) return
   showDialog.value = false
   formData.value = getEmptyForm()
+  saveError.value = ''
 }
 
 function triggerImageUpload() { imageInput.value?.click() }
 
-function handleImageUpload(event) {
+async function handleImageUpload(event) {
   const file = event.target.files[0]
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = (e) => { formData.value.image = e.target.result }
-    reader.readAsDataURL(file)
-  }
+  if (!file) return
+  const validationError = await validateDataUrlFile(file, { allowPdf: true })
+  if (validationError) { saveError.value = validationError; return }
+  try {
+    formData.value.image = await readFileAsDataUrl(file)
+    saveError.value = ''
+  } catch (error) { saveError.value = error.message }
 }
 
-function saveDocument() {
+async function saveDocument() {
+  if (savingDocument.value) return
+  saveError.value = ''
   const data = { type: dialogType.value, ...formData.value }
   
   // Validation for Custom Title
   if (dialogType.value === 'custom' && !data.title) {
-    showSnackbar('يرجى إدخال اسم الوثيقة', 'error')
+    saveError.value = 'يرجى إدخال اسم الوثيقة.'
+    return
+  }
+  if (!data.expiryDate) {
+    saveError.value = 'يرجى إدخال تاريخ انتهاء الوثيقة.'
     return
   }
 
-  if (editMode.value) {
-    documentsStore.updateDocument(formData.value.id, data)
-    showSnackbar('تم تحديث الوثيقة بنجاح')
-  } else {
-    // If standard type, ensure no duplicates (although store logic handles it, explicit check is good ui)
-    if (dialogType.value !== 'custom' && getDocument(dialogType.value)) {
-       showSnackbar('هذه الوثيقة موجودة بالفعل', 'warning')
-       return
+  savingDocument.value = true
+  try {
+    if (editMode.value) {
+      await documentsStore.updateDocument(formData.value.id, data)
+    } else {
+      // Custom documents are repeatable; standard types are updated, never delete-first.
+      if (dialogType.value !== 'custom' && getDocument(dialogType.value)) {
+        await documentsStore.updateDocument(getDocument(dialogType.value).id, data)
+      } else {
+        await documentsStore.addDocument(data)
+      }
     }
-    documentsStore.addDocument(data)
-    showSnackbar('تم إضافة الوثيقة بنجاح')
+    showSnackbar(editMode.value ? 'تم تحديث الوثيقة بنجاح' : 'تم حفظ الوثيقة بنجاح')
+    showDialog.value = false
+    formData.value = getEmptyForm()
+  } catch (error) {
+    saveError.value = error.message || 'تعذر حفظ الوثيقة. بقيت البيانات في النموذج؛ أعد المحاولة.'
+  } finally {
+    savingDocument.value = false
   }
-  closeDialog()
 }
 
 // View Dialog
@@ -437,10 +475,16 @@ function confirmDelete(doc) {
   showDeleteDialog.value = true
 }
 
-function deleteDocument() {
-  documentsStore.deleteDocument(documentToDelete.value.id)
-  showDeleteDialog.value = false
-  showSnackbar('تم حذف الوثيقة')
+async function deleteDocument() {
+  if (!documentToDelete.value || deletingDocument.value) return
+  deletingDocument.value = true
+  try {
+    await documentsStore.deleteDocument(documentToDelete.value.id)
+    showDeleteDialog.value = false
+    showSnackbar('تم حذف الوثيقة')
+  } catch (error) {
+    showSnackbar(error.message || 'تعذر حذف الوثيقة. أعد المحاولة.', 'error')
+  } finally { deletingDocument.value = false }
 }
 
 function isPdf(url) {

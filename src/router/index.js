@@ -22,6 +22,12 @@ const routes = [
         meta: { title: 'إنشاء حساب', public: true }
     },
     {
+        path: '/verify-email',
+        name: 'verify-email',
+        component: () => import('@/views/VerifyEmailView.vue'),
+        meta: { title: 'تأكيد البريد الإلكتروني', requiresAuth: true, allowUnverified: true }
+    },
+    {
         path: '/status/:token',
         name: 'status',
         component: () => import('@/views/StatusView.vue'),
@@ -113,6 +119,16 @@ router.beforeEach(async (to, from, next) => {
 
     // Check if user is authenticated using Firebase
     const { data: { session } } = await supabase.auth.getSession()
+
+    if (session && session.user.emailVerified === false && to.name !== 'verify-email' && to.name !== 'admin-login') {
+        next({ name: 'verify-email' })
+        return
+    }
+
+    if (session && session.user.emailVerified === true && to.name === 'verify-email') {
+        next({ name: 'setup-car' })
+        return
+    }
 
     // If user is logged in and trying to access landing/login/register, check car setup
     if (session && (to.name === 'landing' || to.name === 'login' || to.name === 'register')) {

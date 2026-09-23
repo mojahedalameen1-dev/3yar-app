@@ -78,6 +78,8 @@ export const useAuthStore = defineStore('auth', () => {
                 password
             })
             if (err) throw err
+            user.value = data.user
+            session.value = data.session
             return { success: true, data }
         } catch (err) {
             error.value = err.message
@@ -85,6 +87,20 @@ export const useAuthStore = defineStore('auth', () => {
         } finally {
             loading.value = false
         }
+    }
+
+    async function resendVerificationEmail() {
+        const { error: err, alreadyVerified } = await supabase.auth.resendVerificationEmail()
+        if (err) return { success: false, error: err.message }
+        return { success: true, alreadyVerified }
+    }
+
+    async function refreshCurrentUser() {
+        const { data, error: err } = await supabase.auth.reloadCurrentUser()
+        if (err) return { success: false, error: err.message }
+        user.value = data.user
+        session.value = { user: data.user }
+        return { success: true, user: data.user }
     }
 
     // Sign in with email/password
@@ -195,6 +211,8 @@ export const useAuthStore = defineStore('auth', () => {
         userInitials,
         initialize,
         signUp,
+        resendVerificationEmail,
+        refreshCurrentUser,
         signIn,
         signInWithGoogle,
         signOut,

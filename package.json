@@ -7,6 +7,10 @@
     "dev": "vite",
     "build": "node scripts/guard-deployment-secrets.mjs --source && vite build && node scripts/guard-deployment-secrets.mjs --artifact",
     "test:security": "node --test tests/security-release/*.test.mjs",
+    "test:unit": "vitest run tests/unit",
+    "test:rules": "firebase emulators:exec --project demo-3yar-v1-rules --only firestore \"vitest run tests/rules\"",
+    "test:rules:run": "vitest run tests/rules",
+    "lint:check": "eslint .",
     "preview": "vite preview",
     "migrate:firebase": "node scripts/migrate-supabase-to-firebase.mjs",
     "firebase:set-admin": "node scripts/set-firebase-admin.mjs",
@@ -41,11 +45,14 @@
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.7.0",
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase-tools": "^14.23.0",
     "prettier": "^3.8.1",
     "sass": "^1.69.5",
     "vite": "^5.0.0",
     "vite-plugin-pwa": "^1.2.0",
-    "vite-plugin-vuetify": "^2.0.1"
+    "vite-plugin-vuetify": "^2.0.1",
+    "vitest": "^3.2.4"
   },
   "overrides": {
     "dompurify": "^3.2.4"

@@ -28,7 +28,7 @@
             <div class="car-image-section mb-5">
               <div class="car-image-wrapper" @click="triggerImageUpload">
                 <v-img
-                  v-if="carData.image"
+                v-if="carData.image"
                   :src="carData.image"
                   height="160"
                   cover
@@ -48,12 +48,14 @@
                 <input
                   ref="imageInput"
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   style="display: none"
                   @change="handleImageUpload"
                 />
               </div>
             </div>
+
+            <v-alert v-if="carSaveError" type="error" variant="tonal" class="mb-4" role="alert">{{ carSaveError }}</v-alert>
 
             <v-form ref="carForm" v-model="carFormValid">
               <v-row>
@@ -209,11 +211,12 @@
               block
               variant="outlined"
               color="error"
-              @click="showClearDataDialog = true"
+              disabled
             >
               <v-icon start>mdi-delete-sweep</v-icon>
-              مسح جميع البيانات
+              مسح جميع البيانات — غير متاح مؤقتًا
             </v-btn>
+            <p class="text-caption text-medium-emphasis mt-3 mb-0">أوقفنا المسح الجزئي حتى نضمن حذف البيانات المرتبطة دون ترك سجلات يتيمة.</p>
           </v-card-text>
         </v-card>
 
@@ -242,6 +245,7 @@
         </v-card-title>
         <v-divider></v-divider>
         <v-card-text class="pa-5">
+          <v-alert v-if="deleteCarError" type="error" variant="tonal" class="mb-4" role="alert">{{ deleteCarError }}</v-alert>
           <v-alert type="warning" variant="tonal" class="mb-4">
             سيتم حذف جميع البيانات المرتبطة بالسيارة!
           </v-alert>
@@ -250,8 +254,8 @@
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showDeleteCarDialog = false">إلغاء</v-btn>
-          <v-btn color="error" @click="deleteCar">حذف نهائياً</v-btn>
+          <v-btn variant="text" :disabled="deletingCar" @click="showDeleteCarDialog = false">إلغاء</v-btn>
+          <v-btn color="error" :loading="deletingCar" :disabled="deletingCar" @click="deleteCar">حذف نهائياً</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -344,6 +348,7 @@ import { useRecordsStore } from '@/stores/records'
 import { useDocumentsStore } from '@/stores/documents'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
+import { readFileAsDataUrl, validateDataUrlFile } from '@/lib/data-url-upload'
 
 const showSnackbar = inject('showSnackbar')
 const isMobile = inject('isMobile')
@@ -361,22 +366,20 @@ const authStore = useAuthStore()
 const carForm = ref(null)
 const carFormValid = ref(false)
 const savingCar = ref(false)
+const carSaveError = ref('')
 const carData = reactive({ 
   make: '', model: '', year: 2024, plateNumber: '', 
   color: '', vin: '', notes: '', image: null 
 })
 
-// Delete Data State
+// Clear Data stays disabled until it can be made a safe single operation.
 const showClearDataDialog = ref(false)
 const deletePassword = ref('')
 const deletingData = ref(false)
 const deleteError = ref('')
-const deleteOptions = reactive({
-  car: true,
-  tasks: true,
-  records: true,
-  documents: true
-})
+const deleteOptions = reactive({ car: true, tasks: true, records: true, documents: true })
+const deletingCar = ref(false)
+const deleteCarError = ref('')
 
 // Image Upload
 const imageInput = ref(null)
@@ -385,15 +388,15 @@ function triggerImageUpload() {
   imageInput.value?.click()
 }
 
-function handleImageUpload(event) {
+async function handleImageUpload(event) {
   const file = event.target.files[0]
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      carData.image = e.target.result
-    }
-    reader.readAsDataURL(file)
-  }
+  if (!file) return
+  const validationError = await validateDataUrlFile(file)
+  if (validationError) { carSaveError.value = validationError; return }
+  try {
+    carData.image = await readFileAsDataUrl(file)
+    carSaveError.value = ''
+  } catch (error) { carSaveError.value = error.message }
 }
 
 onMounted(() => {
@@ -403,13 +406,11 @@ onMounted(() => {
 })
 
 async function saveCar() {
+  if (savingCar.value) return
   savingCar.value = true
-  
-  // Optimistic UI - save old values for rollback
-  const oldCarData = { ...carStore.car }
+  carSaveError.value = ''
   
   try {
-    // console.log('Saving car data:', carData)
     await carStore.updateCar(carData)
     
     // Re-fetch to ensure UI is synced
@@ -422,26 +423,33 @@ async function saveCar() {
     
     showSnackbar('تم حفظ التغييرات بنجاح', 'success')
   } catch (error) {
-    // Rollback on error
-    Object.assign(carData, oldCarData)
-    showSnackbar('حدث خطأ أثناء الحفظ: ' + error.message, 'error')
+    carSaveError.value = 'تعذر حفظ بيانات السيارة. بقيت التعديلات في النموذج؛ أعد المحاولة.'
+    showSnackbar(carSaveError.value, 'error')
     console.error('Save error:', error)
   } finally {
     savingCar.value = false
   }
 }
 
-// Delete Car
+// Delete the car and related V1 data atomically before clearing client state.
 const showDeleteCarDialog = ref(false)
 
-function deleteCar() {
-  carStore.deleteCar()
-  odometerStore.clearAllReadings()
-  tasksStore.resetTasks()
-  recordsStore.clearAllRecords()
-  showDeleteCarDialog.value = false
-  Object.assign(carData, { make: '', model: '', year: 2024, plateNumber: '', color: '', vin: '', notes: '', image: null })
-  showSnackbar('تم حذف السيارة')
+async function deleteCar() {
+  if (deletingCar.value) return
+  deletingCar.value = true
+  deleteCarError.value = ''
+  try {
+    await carStore.deleteCar()
+    tasksStore.$reset()
+    recordsStore.$reset()
+    documentsStore.$reset()
+    odometerStore.$reset()
+    showDeleteCarDialog.value = false
+    Object.assign(carData, { make: '', model: '', year: 2024, plateNumber: '', color: '', vin: '', notes: '', image: null })
+    showSnackbar('تم حذف السيارة وسجلاتها المرتبطة بنجاح')
+  } catch (error) {
+    deleteCarError.value = error.message || 'تعذر حذف السيارة. لم نعرض نجاحًا؛ أعد المحاولة.'
+  } finally { deletingCar.value = false }
 }
 
 // Reset Tasks

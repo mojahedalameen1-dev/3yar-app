@@ -94,10 +94,17 @@ export const useOdometerStore = defineStore('odometer', () => {
                 return
             }
 
+            const carId = useCarStore().car?.id
+            if (!carId) {
+                readings.value = []
+                return
+            }
+
             const { data, error: err } = await supabase
                 .from('odometer_readings')
                 .select('*')
                 .eq('user_id', userId)
+                .eq('car_id', carId)
                 .order('date', { ascending: false })
 
             if (err) throw err
@@ -141,10 +148,15 @@ export const useOdometerStore = defineStore('odometer', () => {
 
     async function deleteReading(id) {
         try {
+            const userId = await getUserId()
+            const carId = useCarStore().car?.id
+            if (!userId || !carId) throw new Error('تعذر تحديد حسابك وسيارتك لحذف القراءة بأمان.')
             const { error: err } = await supabase
                 .from('odometer_readings')
                 .delete()
                 .eq('id', id)
+                .eq('user_id', userId)
+                .eq('car_id', carId)
 
             if (err) throw err
             readings.value = readings.value.filter(r => r.id !== id)
@@ -157,10 +169,14 @@ export const useOdometerStore = defineStore('odometer', () => {
 
     async function clearAllReadings() {
         try {
+            const userId = await getUserId()
+            const carId = useCarStore().car?.id
+            if (!userId || !carId) throw new Error('تعذر تحديد حسابك وسيارتك لحذف القراءات بأمان.')
             const { error: err } = await supabase
                 .from('odometer_readings')
                 .delete()
-                .neq('id', 0)
+                .eq('user_id', userId)
+                .eq('car_id', carId)
 
             if (err) throw err
             readings.value = []
@@ -183,6 +199,10 @@ export const useOdometerStore = defineStore('odometer', () => {
         readingsWithDistance,
         fetchReadings,
         addReading,
+        applyCommittedReading(reading) {
+            if (readings.value.some(item => String(item.id) === String(reading.id))) return
+            readings.value.push(mapFromDb(reading))
+        },
         deleteReading,
         clearAllReadings
     }

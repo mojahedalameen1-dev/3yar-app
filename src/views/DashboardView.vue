@@ -1,5 +1,9 @@
 <template>
   <div class="dashboard">
+    <v-alert v-if="tasksStore.error || recordsStore.error || documentsStore.error" type="error" variant="tonal" class="mb-4" role="alert">
+      تعذر تحديث بعض بيانات لوحة التحكم. نعرض آخر البيانات المحفوظة إن توفرت.
+      <v-btn size="small" variant="text" @click="retryDashboardData">إعادة المحاولة</v-btn>
+    </v-alert>
     <!-- Greeting Header -->
     <div class="d-flex flex-wrap justify-space-between align-center mb-6 px-1 animate-slide-up" v-if="!isMobile">
       <div>
@@ -80,7 +84,7 @@
               <input
                 ref="imageInput"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 style="display: none"
                 @change="handleImageUpload"
               />
@@ -467,6 +471,7 @@
         </v-card-title>
         <v-divider></v-divider>
         <v-card-text class="pa-5">
+          <v-alert v-if="carDialogError" type="error" variant="tonal" class="mb-4" role="alert">{{ carDialogError }}</v-alert>
           <v-form ref="carForm" v-model="carFormValid">
             <!-- Image Upload -->
             <div class="image-upload-area mb-4" @click="triggerDialogImageUpload">
@@ -488,7 +493,7 @@
               <input
                 ref="dialogImageInput"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 style="display: none"
                 @change="handleDialogImageUpload"
               />
@@ -556,8 +561,8 @@
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showCarDialog = false">إلغاء</v-btn>
-          <v-btn color="primary" :disabled="!carFormValid" @click="saveCar">
+          <v-btn variant="text" :disabled="savingCar" @click="showCarDialog = false">إلغاء</v-btn>
+          <v-btn color="primary" :disabled="!carFormValid || savingCar" :loading="savingCar" @click="saveCar">
             إضافة السيارة
           </v-btn>
         </v-card-actions>
@@ -651,6 +656,7 @@
         </v-card-title>
         <v-divider></v-divider>
         <v-card-text class="pa-5">
+          <v-alert v-if="recordSaveError" type="error" variant="tonal" class="mb-4" role="alert">{{ recordSaveError }}</v-alert>
           <div class="task-badge pa-4 rounded-lg mb-4">
             <div class="text-caption text-medium-emphasis">المهمة</div>
             <div class="text-h6 font-weight-bold">{{ selectedTask?.name }}</div>
@@ -687,8 +693,8 @@
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showRecordDialog = false">إلغاء</v-btn>
-          <v-btn color="success" @click="confirmRecord">تسجيل</v-btn>
+          <v-btn variant="text" :disabled="savingRecord" @click="showRecordDialog = false">إلغاء</v-btn>
+          <v-btn color="success" :loading="savingRecord" :disabled="savingRecord" @click="confirmRecord">تسجيل</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -715,6 +721,9 @@ const CostChart = defineAsyncComponent(() => import('@/components/CostChart.vue'
 import confetti from 'canvas-confetti'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ar'
+import { readFileAsDataUrl, validateDataUrlFile } from '@/lib/data-url-upload'
+import { completeMaintenanceV1 } from '@/services/maintenance-completion-v1'
+import { runSingleFlight } from '@/lib/single-flight'
 
 dayjs.locale('ar')
 
@@ -736,6 +745,10 @@ onMounted(async () => {
   // Ensure documents are fetched for regulatory check
   if (documentsStore.documents.length === 0) await documentsStore.fetchDocuments()
 })
+
+function retryDashboardData() {
+  return Promise.all([tasksStore.fetchTasks(), recordsStore.fetchRecords(), documentsStore.fetchDocuments()])
+}
 
 // Greeting with first name
 const greeting = computed(() => {
@@ -803,35 +816,54 @@ const carFormData = ref({
 // Image Upload
 const imageInput = ref(null)
 const dialogImageInput = ref(null)
+const savingCar = ref(false)
+const carDialogError = ref('')
+const savingCarImage = ref(false)
 
 function triggerImageUpload() { imageInput.value?.click() }
 function triggerDialogImageUpload() { dialogImageInput.value?.click() }
 
-function handleImageUpload(event) {
+async function handleImageUpload(event) {
   const file = event.target.files[0]
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      carStore.updateCar({ image: e.target.result })
-      showSnackbar('تم تحديث صورة السيارة')
-    }
-    reader.readAsDataURL(file)
+  if (!file || savingCarImage.value) return
+  const validationError = await validateDataUrlFile(file)
+  if (validationError) { showSnackbar(validationError, 'error'); return }
+  savingCarImage.value = true
+  try {
+    const image = await readFileAsDataUrl(file)
+    await carStore.updateCar({ image })
+    showSnackbar('تم تحديث صورة السيارة')
+  } catch {
+    showSnackbar('تعذر حفظ الصورة. بقيت الصورة الحالية؛ أعد المحاولة.', 'error')
+  } finally {
+    savingCarImage.value = false
+    event.target.value = ''
   }
 }
 
-function handleDialogImageUpload(event) {
+async function handleDialogImageUpload(event) {
   const file = event.target.files[0]
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = (e) => { carFormData.value.image = e.target.result }
-    reader.readAsDataURL(file)
-  }
+  if (!file) return
+  const validationError = await validateDataUrlFile(file)
+  if (validationError) { carDialogError.value = validationError; return }
+  try {
+    carFormData.value.image = await readFileAsDataUrl(file)
+    carDialogError.value = ''
+  } catch (error) { carDialogError.value = error.message }
 }
 
-function saveCar() {
-  carStore.addCar(carFormData.value)
-  showCarDialog.value = false
-  showSnackbar('تم إضافة السيارة بنجاح')
+async function saveCar() {
+  if (savingCar.value) return
+  savingCar.value = true
+  carDialogError.value = ''
+  try {
+    await carStore.addCar(carFormData.value)
+    showCarDialog.value = false
+    carFormData.value = { make: '', model: '', year: new Date().getFullYear(), plateNumber: '', color: '', initialOdometer: 0, notes: '', image: null }
+    showSnackbar('تم إضافة السيارة بنجاح')
+  } catch {
+    carDialogError.value = 'تعذر حفظ السيارة. بقيت البيانات في النموذج؛ أعد المحاولة.'
+  } finally { savingCar.value = false }
 }
 
 // Odometer Dialog
@@ -871,9 +903,12 @@ function confirmSnooze() {
 const showRecordDialog = ref(false)
 const recordFormValid = ref(false)
 const recordFormData = ref({ odometerReading: 0, cost: 0, serviceCenter: '', notes: '' })
+const savingRecord = ref(false)
+const recordSaveError = ref('')
 
 function recordMaintenance(task) {
   selectedTask.value = task
+  recordSaveError.value = ''
   recordFormData.value = {
     odometerReading: carStore.car?.currentOdometer || 0,
     cost: 0, serviceCenter: '', notes: ''
@@ -881,25 +916,19 @@ function recordMaintenance(task) {
   showRecordDialog.value = true
 }
 
-function confirmRecord() {
-  tasksStore.recordMaintenance(selectedTask.value.id, {
-    odometer: recordFormData.value.odometerReading,
-    date: new Date().toISOString()
-  })
-  recordsStore.addRecord({
-    taskId: selectedTask.value.id,
-    taskName: selectedTask.value.name,
-    odometerReading: recordFormData.value.odometerReading,
-    cost: recordFormData.value.cost,
-    serviceCenter: recordFormData.value.serviceCenter,
-    notes: recordFormData.value.notes
-  })
-  showRecordDialog.value = false
-  showSnackbar('تم تسجيل الصيانة بنجاح', 'success')
-  confetti({
-    particleCount: 100,
-    spread: 70,
-    origin: { y: 0.6 }
+async function confirmRecord() {
+  if (!selectedTask.value) return
+  recordSaveError.value = ''
+  await runSingleFlight(savingRecord, async () => {
+    try {
+      await completeMaintenanceV1(selectedTask.value, recordFormData.value)
+      showRecordDialog.value = false
+      showSnackbar('تم تسجيل الصيانة بنجاح', 'success')
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
+    } catch (error) {
+      console.error('Maintenance completion failed:', error)
+      recordSaveError.value = error.message || 'تعذر تسجيل الصيانة. بقيت البيانات كما هي؛ أعد المحاولة.'
+    }
   })
 }
 
