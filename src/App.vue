@@ -4,7 +4,7 @@
     <!-- Show navigation only for authenticated routes -->
     <template v-if="showNavigation">
       <!-- Mobile App Bar (Premium Style) -->
-      <v-app-bar v-if="isMobile" class="app-bar-mobile-premium px-4 pt-safe" elevation="0" flat border="b">
+      <v-app-bar v-if="isMobile" :height="90" class="app-bar-mobile-premium px-4 pt-safe" elevation="0" flat border="b">
         <div class="d-flex align-center w-100 justify-space-between pt-2">
           <div>
             <div class="text-caption text-medium-emphasis mb-n1">أهلاً،</div>
