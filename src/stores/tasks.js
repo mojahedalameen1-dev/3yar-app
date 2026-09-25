@@ -343,6 +343,7 @@ export const useTasksStore = defineStore('tasks', () => {
         snoozedTasks,
         taskStats,
         needsSetupTasks,
+        getDefaultTasks,
         fetchTasks,
         addTask,
         updateTask,

@@ -42,4 +42,12 @@ describe('stores distinguish stale data from a confirmed empty result', () => {
         expect([tasks.error, records.error, documents.error]).toEqual(['offline', 'offline', 'offline'])
         expect([tasks.loading, records.loading, documents.loading]).toEqual([false, false, false])
     })
+
+    it('exposes the default maintenance plan for first-car onboarding', () => {
+        const defaults = useTasksStore().getDefaultTasks()
+
+        expect(defaults).toHaveLength(5)
+        expect(defaults.map(task => task.name)).toContain('تغيير الزيت')
+        expect(defaults.every(task => task.isRecurring && (task.intervalKm || task.intervalMonths))).toBe(true)
+    })
 })
