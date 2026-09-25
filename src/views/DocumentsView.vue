@@ -113,7 +113,7 @@
               <v-btn variant="tonal" size="small" class="flex-grow-1" @click="openEditDialog(getDocument(type))">
                 <v-icon start>mdi-pencil</v-icon>تعديل
               </v-btn>
-              <v-btn icon variant="text" size="small" color="error" @click="confirmDelete(getDocument(type))">
+              <v-btn icon variant="text" size="small" color="error" :aria-label="`حذف ${documentsStore.DOCUMENT_LABELS[type]}`" @click="confirmDelete(getDocument(type))">
                 <v-icon>mdi-delete</v-icon>
               </v-btn>
             </div>
@@ -174,7 +174,7 @@
                 <v-btn variant="tonal" size="small" class="flex-grow-1" @click="openEditDialog(doc)">
                   <v-icon start>mdi-pencil</v-icon>تعديل
                 </v-btn>
-                <v-btn icon variant="text" size="small" color="error" @click="confirmDelete(doc)">
+                <v-btn icon variant="text" size="small" color="error" :aria-label="`حذف ${doc.title || documentsStore.DOCUMENT_LABELS[doc.type] || 'الوثيقة'}`" @click="confirmDelete(doc)">
                   <v-icon>mdi-delete</v-icon>
                 </v-btn>
               </div>
@@ -265,7 +265,7 @@
             <v-icon :color="viewDocument.typeColor" class="me-2">{{ viewDocument.typeIcon }}</v-icon>
             <span>{{ viewDocument.typeLabel }}</span>
           </div>
-          <v-btn icon variant="text" @click="showViewDialog = false"><v-icon>mdi-close</v-icon></v-btn>
+          <v-btn icon variant="text" aria-label="إغلاق معاينة الوثيقة" @click="showViewDialog = false"><v-icon>mdi-close</v-icon></v-btn>
         </v-card-title>
         <v-divider></v-divider>
         <div v-if="viewDocument.image" class="bg-grey-darken-4 d-flex align-center justify-center" style="min-height: 400px; max-height: 80vh">

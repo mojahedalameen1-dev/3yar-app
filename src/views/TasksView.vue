@@ -101,7 +101,7 @@
               </div>
               <v-menu>
                 <template #activator="{ props }">
-                  <v-btn icon variant="text" size="small" v-bind="props">
+                  <v-btn icon variant="text" size="small" v-bind="props" :aria-label="`خيارات مهمة: ${task.name}`">
                     <v-icon>mdi-dots-vertical</v-icon>
                   </v-btn>
                 </template>
@@ -214,6 +214,8 @@
                 size="small"
                 class="flex-grow-1"
                 prepend-icon="mdi-alarm-off"
+                :loading="cancelingTaskId === task.id"
+                :disabled="Boolean(cancelingTaskId) || snoozingTask"
                 @click="cancelSnooze(task)"
               >
                 إلغاء
@@ -366,7 +368,7 @@
     </v-dialog>
 
     <!-- Snooze Dialog -->
-    <v-dialog v-model="showSnoozeDialog" max-width="400">
+    <v-dialog v-model="showSnoozeDialog" max-width="400" :persistent="snoozingTask">
       <v-card class="rounded-xl">
         <v-card-title class="pa-5">
           <v-icon color="warning" class="me-2">mdi-alarm-snooze</v-icon>
@@ -375,6 +377,9 @@
         <v-divider></v-divider>
         <v-card-text class="pa-5">
           <p class="mb-4">اختر مدة التأجيل لمهمة: <strong>{{ selectedTask?.name }}</strong></p>
+          <v-alert v-if="snoozeError" type="error" variant="tonal" class="mb-4" role="alert">
+            {{ snoozeError }}
+          </v-alert>
           <div class="snooze-options">
             <v-btn
               v-for="option in snoozeOptions"
@@ -382,6 +387,7 @@
               :variant="snoozeDuration === option.value ? 'flat' : 'tonal'"
               :color="snoozeDuration === option.value ? 'primary' : undefined"
               class="ma-1"
+              :disabled="snoozingTask"
               @click="snoozeDuration = option.value"
             >
               {{ option.label }}
@@ -391,8 +397,8 @@
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showSnoozeDialog = false">إلغاء</v-btn>
-          <v-btn color="warning" @click="confirmSnooze">تأجيل</v-btn>
+          <v-btn variant="text" :disabled="snoozingTask" @click="showSnoozeDialog = false">إلغاء</v-btn>
+          <v-btn color="warning" :loading="snoozingTask" :disabled="snoozingTask || !selectedTask" @click="confirmSnooze">تأجيل</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -598,21 +604,42 @@ async function saveTask() {
 const showSnoozeDialog = ref(false)
 const selectedTask = ref(null)
 const snoozeDuration = ref('week')
+const snoozingTask = ref(false)
+const cancelingTaskId = ref(null)
+const snoozeError = ref('')
 
 function openSnoozeDialog(task) {
+  snoozeError.value = ''
   selectedTask.value = task
   showSnoozeDialog.value = true
 }
 
-function confirmSnooze() {
-  tasksStore.snoozeTask(selectedTask.value.id, snoozeDuration.value)
-  showSnoozeDialog.value = false
-  showSnackbar('تم تأجيل التنبيه')
+async function confirmSnooze() {
+  if (!selectedTask.value || snoozingTask.value) return
+  snoozingTask.value = true
+  snoozeError.value = ''
+  try {
+    await tasksStore.snoozeTask(selectedTask.value.id, snoozeDuration.value)
+    showSnoozeDialog.value = false
+    showSnackbar('تم تأجيل التنبيه')
+  } catch {
+    snoozeError.value = 'تعذر تأجيل التنبيه. لم يتغير موعد المهمة؛ أعد المحاولة.'
+  } finally {
+    snoozingTask.value = false
+  }
 }
 
-function cancelSnooze(task) {
-  tasksStore.cancelSnooze(task.id)
-  showSnackbar('تم إلغاء التأجيل')
+async function cancelSnooze(task) {
+  if (cancelingTaskId.value || snoozingTask.value) return
+  cancelingTaskId.value = task.id
+  try {
+    await tasksStore.cancelSnooze(task.id)
+    showSnackbar('تم إلغاء التأجيل')
+  } catch {
+    showSnackbar('تعذر إلغاء التأجيل. أعد المحاولة.', 'error')
+  } finally {
+    cancelingTaskId.value = null
+  }
 }
 
 // Record Dialog

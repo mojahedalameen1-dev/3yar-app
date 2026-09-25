@@ -20,7 +20,7 @@
 
     <v-alert v-if="recordsStore.error" type="error" variant="tonal" class="mb-4" role="alert">
       تعذر تحديث السجلات. {{ recordsStore.records.length ? 'نعرض آخر بيانات محفوظة.' : 'لم نتمكن من التحقق من وجود سجلات.' }}
-      <v-btn class="ms-2" size="small" variant="text" :loading="recordsStore.loading" @click="recordsStore.fetchRecords()">إعادة المحاولة</v-btn>
+      <v-btn class="ms-2" size="small" variant="text" :loading="recordsStore.loading" :disabled="recordsStore.loading" @click="recordsStore.fetchRecords()">إعادة المحاولة</v-btn>
     </v-alert>
 
     <!-- Stats Cards -->
@@ -79,12 +79,12 @@
             ></v-text-field>
           </v-col>
           <v-col cols="12" md="4" class="d-flex justify-end gap-2">
-            <v-btn-toggle v-model="viewMode" mandatory density="compact" color="primary">
-              <v-btn value="timeline" icon>
+            <v-btn-toggle v-model="viewMode" mandatory density="compact" color="primary" aria-label="طريقة عرض السجلات">
+              <v-btn value="timeline" icon aria-label="عرض زمني">
                 <v-icon>mdi-timeline</v-icon>
                 <v-tooltip activator="parent" location="top">عرض زمني</v-tooltip>
               </v-btn>
-              <v-btn value="grid" icon>
+              <v-btn value="grid" icon aria-label="عرض شبكي">
                 <v-icon>mdi-view-grid</v-icon>
                 <v-tooltip activator="parent" location="top">عرض شبكي</v-tooltip>
               </v-btn>
@@ -119,7 +119,6 @@
               v-for="record in group.records" 
               :key="record.id" 
               class="timeline-card glass-card mb-3"
-              @click="viewRecord(record)"
             >
               <v-card-text class="pa-4">
                 <div class="d-flex align-center gap-4">
@@ -145,7 +144,10 @@
                           </span>
                         </div>
                       </div>
-                      <div class="d-flex align-center gap-2">
+                      <div class="d-flex align-center gap-2 flex-wrap">
+                        <v-btn variant="text" size="small" color="primary" :aria-label="`عرض تفاصيل ${record.taskName}`" @click="viewRecord(record)">
+                          التفاصيل
+                        </v-btn>
                         <v-chip color="success" size="small" variant="flat">
                           {{ record.cost?.toLocaleString() || 0 }} ر.س
                         </v-chip>
@@ -154,6 +156,7 @@
                           variant="text"
                           size="small"
                           color="error"
+                          :aria-label="`حذف سجل ${record.taskName}`"
                           @click.stop="confirmDelete(record)"
                         >
                           <v-icon>mdi-delete</v-icon>
@@ -171,7 +174,7 @@
       <!-- Grid View -->
       <v-row v-else>
         <v-col v-for="record in filteredRecords" :key="record.id" cols="12" sm="6" lg="4">
-          <v-card class="record-card glass-card h-100" @click="viewRecord(record)">
+          <v-card class="record-card glass-card h-100">
             <v-card-text class="pa-5">
               <div class="d-flex align-center justify-space-between mb-3">
                 <v-avatar color="primary" size="44">
@@ -199,12 +202,12 @@
             </v-card-text>
             <v-divider></v-divider>
             <v-card-actions class="pa-3">
-              <v-btn variant="text" size="small" color="primary" @click.stop="viewRecord(record)">
+              <v-btn variant="text" size="small" color="primary" :aria-label="`عرض تفاصيل ${record.taskName}`" @click="viewRecord(record)">
                 <v-icon start>mdi-eye</v-icon>
                 التفاصيل
               </v-btn>
               <v-spacer></v-spacer>
-              <v-btn icon variant="text" size="small" color="error" @click.stop="confirmDelete(record)">
+              <v-btn icon variant="text" size="small" color="error" :aria-label="`حذف سجل ${record.taskName}`" @click="confirmDelete(record)">
                 <v-icon>mdi-delete</v-icon>
               </v-btn>
             </v-card-actions>
@@ -503,13 +506,11 @@ function formatFullDate(date) {
 }
 
 .timeline-card {
-  cursor: pointer;
-  transition: all 0.3s ease;
+  transition: box-shadow 0.2s ease;
   border-right: 3px solid rgb(var(--v-theme-primary));
 }
 
 .timeline-card:hover {
-  transform: translateX(-4px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
@@ -525,12 +526,11 @@ function formatFullDate(date) {
 
 /* Grid Cards */
 .record-card {
-  cursor: pointer;
-  transition: all 0.3s ease;
+  transition: box-shadow 0.2s ease;
 }
 
 .record-card:hover {
-  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 .record-details {

@@ -38,8 +38,22 @@
           </div>
           <div class="form-group password-group">
             <label class="form-label" for="login-password">كلمة المرور</label>
-            <v-text-field id="login-password" v-model="password" :type="showPassword ? 'text' : 'password'" placeholder="أدخل كلمة المرور" prepend-inner-icon="mdi-lock-outline" :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'" :rules="passwordRules" variant="outlined" density="comfortable" dir="ltr" class="auth-input" hide-details="auto" autocomplete="current-password" @click:append-inner="showPassword = !showPassword" @keydown.enter="handleLogin"></v-text-field>
-            <button type="button" class="forgot-link" @click="showForgotPassword = true">نسيت كلمة المرور؟</button>
+          <v-text-field id="login-password" v-model="password" :type="showPassword ? 'text' : 'password'" placeholder="أدخل كلمة المرور" prepend-inner-icon="mdi-lock-outline" :rules="passwordRules" variant="outlined" density="comfortable" dir="ltr" class="auth-input" hide-details="auto" autocomplete="current-password" @keydown.enter="handleLogin">
+            <template #append-inner>
+              <v-btn
+                icon
+                variant="text"
+                size="x-small"
+                type="button"
+                :aria-label="showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'"
+                :aria-pressed="showPassword"
+                @click="showPassword = !showPassword"
+              >
+                <v-icon size="20">{{ showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline' }}</v-icon>
+              </v-btn>
+            </template>
+          </v-text-field>
+            <button type="button" class="forgot-link" @click="openForgotPassword">نسيت كلمة المرور؟</button>
             <p class="migration-note">للحسابات المنقولة من النظام السابق، استخدم «نسيت كلمة المرور؟» لتعيين كلمة مرور جديدة.</p>
           </div>
           <v-btn color="primary" size="x-large" block :loading="loading" :disabled="!formValid || loading" type="submit" class="auth-btn primary-btn"><span>تسجيل الدخول</span><v-icon end size="20">mdi-arrow-left</v-icon></v-btn>
@@ -63,7 +77,10 @@
         <v-divider></v-divider>
         <v-card-text class="dialog-content">
           <p>أدخل بريدك الإلكتروني وسنرسل لك رابطًا آمنًا لإعادة تعيين كلمة المرور.</p>
-          <v-text-field v-model="resetEmail" label="البريد الإلكتروني" type="email" prepend-inner-icon="mdi-email-outline" variant="outlined" dir="ltr" class="auth-input" hide-details="auto" autocomplete="email"></v-text-field>
+          <v-alert v-if="resetErrorMessage" type="error" variant="tonal" density="comfortable" class="mb-4" role="alert">
+            {{ resetErrorMessage }}
+          </v-alert>
+          <v-text-field v-model="resetEmail" label="البريد الإلكتروني" type="email" prepend-inner-icon="mdi-email-outline" variant="outlined" dir="ltr" class="auth-input" hide-details="auto" autocomplete="email" @update:model-value="resetErrorMessage = ''"></v-text-field>
         </v-card-text>
         <v-divider></v-divider>
         <v-card-actions class="dialog-actions"><v-btn variant="text" @click="showForgotPassword = false">إلغاء</v-btn><v-btn color="primary" :loading="loading" :disabled="!resetEmail" @click="handleResetPassword">إرسال الرابط</v-btn></v-card-actions>
@@ -91,6 +108,7 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const showForgotPassword = ref(false)
 const resetEmail = ref('')
+const resetErrorMessage = ref('')
 // Google provider is intentionally opt-in; Firebase currently has it disabled.
 const googleAuthEnabled = import.meta.env.VITE_FIREBASE_GOOGLE_ENABLED === 'true'
 
@@ -134,6 +152,7 @@ function getSafeRedirect() {
 async function handleResetPassword() {
   if (!resetEmail.value || loading.value) return
   loading.value = true
+  resetErrorMessage.value = ''
   errorMessage.value = ''
   const result = await authStore.resetPassword(resetEmail.value.trim())
   loading.value = false
@@ -141,7 +160,13 @@ async function handleResetPassword() {
     showForgotPassword.value = false
     successMessage.value = 'تم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني.'
     resetEmail.value = ''
-  } else errorMessage.value = getErrorMessage(result.error)
+  } else resetErrorMessage.value = getErrorMessage(result.error)
+}
+
+function openForgotPassword() {
+  resetEmail.value = email.value.trim()
+  resetErrorMessage.value = ''
+  showForgotPassword.value = true
 }
 
 function getErrorMessage(error) {

@@ -49,15 +49,27 @@
                 :type="showPassword ? 'text' : 'password'"
                 placeholder="6 أحرف على الأقل"
                 prepend-inner-icon="mdi-lock-outline"
-                :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
                 :rules="passwordRules"
                 variant="outlined"
                 density="comfortable"
                 dir="ltr"
                 class="auth-input"
                 bg-color="rgba(255,255,255,0.03)"
-                @click:append-inner="showPassword = !showPassword"
-              ></v-text-field>
+              >
+                <template #append-inner>
+                  <v-btn
+                    icon
+                    variant="text"
+                    size="x-small"
+                    type="button"
+                    :aria-label="showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'"
+                    :aria-pressed="showPassword"
+                    @click="showPassword = !showPassword"
+                  >
+                    <v-icon size="20">{{ showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline' }}</v-icon>
+                  </v-btn>
+                </template>
+              </v-text-field>
             </div>
 
             <div class="form-group mb-6">

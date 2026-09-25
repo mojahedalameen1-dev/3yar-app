@@ -125,7 +125,7 @@
                   color="primary"
                   class="flex-grow-1 action-btn-mobile"
                   prepend-icon="mdi-plus-circle"
-                  @click="showOdometerDialog = true"
+                  @click="openOdometerDialog"
                   :height="isMobile ? 52 : 40"
                   rounded="xl"
                 >
@@ -325,6 +325,7 @@
                               size="small"
                               variant="text"
                               color="success"
+                              :aria-label="`تسجيل صيانة: ${task.name}`"
                               @click="recordMaintenance(task)"
                             >
                               <v-icon>mdi-check</v-icon>
@@ -403,7 +404,7 @@
 
             <!-- Cost Summary -->
             <v-col cols="12" md="6">
-              <v-card :class="['cost-card h-100 animate-slide-up', isMobile ? 'surface-card' : '']" :style="{ background: isMobile ? '#121212' : '' }">
+              <v-card :class="['cost-card h-100 animate-slide-up', isMobile ? 'surface-card' : '']">
                 <v-card-text class="pa-6 text-white text-center text-md-start">
                   <div class="d-flex align-center justify-space-between mb-4 flex-column flex-md-row">
                     <div>
@@ -549,7 +550,7 @@
     </v-dialog>
 
     <!-- Odometer Dialog -->
-    <v-dialog v-model="showOdometerDialog" max-width="400" persistent>
+    <v-dialog v-model="showOdometerDialog" max-width="400" :persistent="savingOdometer">
       <v-card class="rounded-xl">
         <v-card-title class="d-flex align-center pa-5">
           <div class="dialog-icon me-3">
@@ -559,6 +560,9 @@
         </v-card-title>
         <v-divider></v-divider>
         <v-card-text class="pa-5">
+          <v-alert v-if="odometerSaveError" type="error" variant="tonal" class="mb-4" role="alert">
+            {{ odometerSaveError }}
+          </v-alert>
           <div class="current-reading pa-4 rounded-lg mb-4 text-center">
             <div class="text-caption text-medium-emphasis">القراءة الحالية</div>
             <div class="text-h4 font-weight-bold text-primary">
@@ -572,21 +576,24 @@
             suffix="كم"
             prepend-inner-icon="mdi-speedometer"
             autofocus
+            :disabled="savingOdometer"
           ></v-text-field>
           <v-textarea
             v-model="odometerNotes"
             label="ملاحظات (اختياري)"
             rows="2"
             class="mt-2"
+            :disabled="savingOdometer"
           ></v-textarea>
         </v-card-text>
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showOdometerDialog = false">إلغاء</v-btn>
+          <v-btn variant="text" :disabled="savingOdometer" @click="showOdometerDialog = false">إلغاء</v-btn>
           <v-btn
             color="primary"
-            :disabled="!newOdometerReading || newOdometerReading <= (carStore.car?.currentOdometer || 0)"
+            :loading="savingOdometer"
+            :disabled="savingOdometer || !newOdometerReading || newOdometerReading <= (carStore.car?.currentOdometer || 0)"
             @click="saveOdometerReading"
           >
             حفظ
@@ -596,7 +603,7 @@
     </v-dialog>
 
     <!-- Snooze Dialog -->
-    <v-dialog v-model="showSnoozeDialog" max-width="400">
+    <v-dialog v-model="showSnoozeDialog" max-width="400" :persistent="snoozingTask">
       <v-card class="rounded-xl">
         <v-card-title class="pa-5">
           <v-icon color="warning" class="me-2">mdi-alarm-snooze</v-icon>
@@ -605,12 +612,16 @@
         <v-divider></v-divider>
         <v-card-text class="pa-5">
           <p class="mb-4">اختر مدة التأجيل لمهمة: <strong>{{ selectedTask?.name }}</strong></p>
+          <v-alert v-if="snoozeError" type="error" variant="tonal" class="mb-4" role="alert">
+            {{ snoozeError }}
+          </v-alert>
           <div class="snooze-options d-flex flex-wrap gap-2">
             <v-btn
               v-for="opt in snoozeOptions"
               :key="opt.value"
               :variant="snoozeDuration === opt.value ? 'flat' : 'tonal'"
               :color="snoozeDuration === opt.value ? 'primary' : undefined"
+              :disabled="snoozingTask"
               @click="snoozeDuration = opt.value"
             >
               {{ opt.label }}
@@ -620,8 +631,8 @@
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showSnoozeDialog = false">إلغاء</v-btn>
-          <v-btn color="warning" @click="confirmSnooze">تأجيل</v-btn>
+          <v-btn variant="text" :disabled="snoozingTask" @click="showSnoozeDialog = false">إلغاء</v-btn>
+          <v-btn color="warning" :loading="snoozingTask" :disabled="snoozingTask || !selectedTask" @click="confirmSnooze">تأجيل</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -846,16 +857,28 @@ async function saveCar() {
 const showOdometerDialog = ref(false)
 const newOdometerReading = ref(null)
 const odometerNotes = ref('')
+const savingOdometer = ref(false)
+const odometerSaveError = ref('')
 
-function saveOdometerReading() {
+function openOdometerDialog() {
+  odometerSaveError.value = ''
+  showOdometerDialog.value = true
+}
+
+async function saveOdometerReading() {
+  if (savingOdometer.value) return
+  savingOdometer.value = true
+  odometerSaveError.value = ''
   try {
-    odometerStore.addReading({ reading: newOdometerReading.value, notes: odometerNotes.value })
+    await odometerStore.addReading({ reading: newOdometerReading.value, notes: odometerNotes.value })
     showOdometerDialog.value = false
     newOdometerReading.value = null
     odometerNotes.value = ''
     showSnackbar('تم تحديث قراءة العداد')
-  } catch (error) {
-    showSnackbar(error.message, 'error')
+  } catch {
+    odometerSaveError.value = 'تعذر تأكيد تحديث قراءة العداد. تحقق من القراءة الحالية قبل إعادة المحاولة.'
+  } finally {
+    savingOdometer.value = false
   }
 }
 
@@ -863,16 +886,28 @@ function saveOdometerReading() {
 const showSnoozeDialog = ref(false)
 const selectedTask = ref(null)
 const snoozeDuration = ref('week')
+const snoozingTask = ref(false)
+const snoozeError = ref('')
 
 function snoozeTask(task) {
+  snoozeError.value = ''
   selectedTask.value = task
   showSnoozeDialog.value = true
 }
 
-function confirmSnooze() {
-  tasksStore.snoozeTask(selectedTask.value.id, snoozeDuration.value)
-  showSnoozeDialog.value = false
-  showSnackbar('تم تأجيل التنبيه')
+async function confirmSnooze() {
+  if (!selectedTask.value || snoozingTask.value) return
+  snoozingTask.value = true
+  snoozeError.value = ''
+  try {
+    await tasksStore.snoozeTask(selectedTask.value.id, snoozeDuration.value)
+    showSnoozeDialog.value = false
+    showSnackbar('تم تأجيل التنبيه')
+  } catch {
+    snoozeError.value = 'تعذر تأجيل التنبيه. لم يتغير موعد المهمة؛ أعد المحاولة.'
+  } finally {
+    snoozingTask.value = false
+  }
 }
 
 // Record Dialog
