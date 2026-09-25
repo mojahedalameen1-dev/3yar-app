@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/firebase'
+import { useCarStore } from './car'
 import dayjs from 'dayjs'
 
 const DOCUMENT_TYPES = {
@@ -193,10 +194,17 @@ export const useDocumentsStore = defineStore('documents', () => {
                 return
             }
 
+            const carId = useCarStore().car?.id
+            if (!carId) {
+                documents.value = []
+                return
+            }
+
             const { data, error: err } = await supabase
                 .from('documents')
                 .select('*')
                 .eq('user_id', userId)
+                .eq('car_id', carId)
                 .order('created_at', { ascending: true })
 
             if (err) throw err
@@ -216,10 +224,12 @@ export const useDocumentsStore = defineStore('documents', () => {
 
     async function addDocument(docData) {
         try {
-            // Remove existing document of same type
-            const existing = documents.value.find(d => d.type === docData.type)
+            // Standard documents are singletons. Custom documents may repeat.
+            const existing = docData.type === DOCUMENT_TYPES.CUSTOM
+                ? null
+                : documents.value.find(d => d.type === docData.type)
             if (existing) {
-                await deleteDocument(existing.id)
+                return await updateDocument(existing.id, docData)
             }
 
             const { data, error: err } = await supabase
@@ -242,6 +252,9 @@ export const useDocumentsStore = defineStore('documents', () => {
 
     async function updateDocument(id, updates) {
         try {
+            const userId = await getUserId()
+            const carId = useCarStore().car?.id
+            if (!userId || !carId) throw new Error('تعذر تحديد حسابك وسيارتك لتحديث الوثيقة بأمان.')
             const dbUpdates = {}
             if (updates.type !== undefined) dbUpdates.type = updates.type
             if (updates.title !== undefined) dbUpdates.title = updates.title
@@ -255,15 +268,19 @@ export const useDocumentsStore = defineStore('documents', () => {
                 .from('documents')
                 .update(dbUpdates)
                 .eq('id', id)
+                .eq('user_id', userId)
+                .eq('car_id', carId)
                 .select()
                 .maybeSingle()
 
             if (err) throw err
+            if (!data) throw new Error('الوثيقة غير موجودة أو لم تعد مرتبطة بسيارتك الحالية.')
 
             const index = documents.value.findIndex(d => d.id === id)
             if (index !== -1) {
                 documents.value[index] = mapFromDb(data)
             }
+            return mapFromDb(data)
         } catch (err) {
             error.value = err.message
             console.error('Error updating document:', err)
@@ -273,10 +290,15 @@ export const useDocumentsStore = defineStore('documents', () => {
 
     async function deleteDocument(id) {
         try {
+            const userId = await getUserId()
+            const carId = useCarStore().car?.id
+            if (!userId || !carId) throw new Error('تعذر تحديد حسابك وسيارتك لحذف الوثيقة بأمان.')
             const { error: err } = await supabase
                 .from('documents')
                 .delete()
                 .eq('id', id)
+                .eq('user_id', userId)
+                .eq('car_id', carId)
 
             if (err) throw err
             documents.value = documents.value.filter(d => d.id !== id)
@@ -289,10 +311,14 @@ export const useDocumentsStore = defineStore('documents', () => {
 
     async function clearAllDocuments() {
         try {
+            const userId = await getUserId()
+            const carId = useCarStore().car?.id
+            if (!userId || !carId) throw new Error('تعذر تحديد حسابك وسيارتك لحذف الوثائق بأمان.')
             const { error: err } = await supabase
                 .from('documents')
                 .delete()
-                .neq('id', 0)
+                .eq('user_id', userId)
+                .eq('car_id', carId)
 
             if (err) throw err
             documents.value = []

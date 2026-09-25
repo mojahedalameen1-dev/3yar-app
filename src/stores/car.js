@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/firebase'
+import { deleteCarDataV1 } from '../lib/car-deletion-v1'
 
 export const useCarStore = defineStore('car', () => {
     // State
@@ -187,21 +188,18 @@ export const useCarStore = defineStore('car', () => {
         }
     }
 
+    function applyCommittedOdometer(reading) {
+        if (car.value && Number(reading) > Number(car.value.currentOdometer || 0)) {
+            car.value.currentOdometer = Number(reading)
+        }
+    }
+
     async function deleteCar() {
         if (!car.value) return
         loading.value = true
         error.value = null
         try {
-            const userId = await getUserId()
-            if (!userId) throw new Error('يجب تسجيل الدخول أولاً')
-
-            const { error: err } = await supabase
-                .from('cars')
-                .delete()
-                .eq('id', car.value.id)
-                .eq('user_id', userId)
-
-            if (err) throw err
+            await deleteCarDataV1(car.value.id)
             car.value = null
         } catch (err) {
             error.value = err.message
@@ -223,6 +221,7 @@ export const useCarStore = defineStore('car', () => {
         addCar,
         updateCar,
         updateOdometer,
+        applyCommittedOdometer,
         deleteCar
     }
 })

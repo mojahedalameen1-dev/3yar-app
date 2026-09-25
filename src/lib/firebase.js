@@ -7,6 +7,8 @@ import {
     GoogleAuthProvider,
     signOut as firebaseSignOut,
     sendPasswordResetEmail,
+    sendEmailVerification,
+    reload,
     onAuthStateChanged
 } from 'firebase/auth'
 import {
@@ -257,7 +259,35 @@ export const backend = {
         async signUp({ email, password }) {
             try {
                 const credential = await createUserWithEmailAndPassword(firebaseAuth, email, password)
-                return { data: { user: publicUser(credential.user), session: sessionFor(credential.user) }, error: null }
+                let verificationSent = true
+                let verificationError = null
+                try {
+                    await sendEmailVerification(credential.user, { url: `${window.location.origin}/verify-email` })
+                } catch (error) {
+                    verificationSent = false
+                    verificationError = error
+                }
+                return {
+                    data: { user: publicUser(credential.user), session: sessionFor(credential.user), verificationSent, verificationError },
+                    error: null
+                }
+            } catch (error) { return { data: null, error } }
+        },
+        async resendVerificationEmail() {
+            try {
+                const user = await waitForInitialAuth()
+                if (!user) throw new Error('انتهت جلسة الدخول. سجّل الدخول ثم أعد المحاولة.')
+                if (user.emailVerified) return { error: null, alreadyVerified: true }
+                await sendEmailVerification(user, { url: `${window.location.origin}/verify-email` })
+                return { error: null, alreadyVerified: false }
+            } catch (error) { return { error } }
+        },
+        async reloadCurrentUser() {
+            try {
+                const user = await waitForInitialAuth()
+                if (!user) throw new Error('انتهت جلسة الدخول. سجّل الدخول ثم أعد المحاولة.')
+                await reload(user)
+                return { data: { user: publicUser(user) }, error: null }
             } catch (error) { return { data: null, error } }
         },
         async signInWithPassword({ email, password }) {
@@ -288,12 +318,17 @@ export const backend = {
     storage: {
         from(bucket) {
             return {
-                async upload(path, file) {
+                async upload(path, file, { ownerId, carId } = {}) {
                     try {
                         const user = await waitForInitialAuth()
                         if (!user) throw new Error('يجب تسجيل الدخول أولاً')
                         const token = await user.getIdToken()
-                        const response = await fetch(`/api/blob-upload?pathname=${encodeURIComponent(`${bucket}/${path}`)}`, {
+                        const params = new URLSearchParams({
+                            pathname: `${bucket}/${path}`,
+                            ownerId: ownerId || '',
+                            carId: carId || ''
+                        })
+                        const response = await fetch(`/api/blob-upload?${params.toString()}`, {
                             method: 'POST',
                             headers: {
                                 Authorization: `Bearer ${token}`,
@@ -303,11 +338,12 @@ export const backend = {
                         })
                         const data = await response.json()
                         if (!response.ok) throw new Error(data.error || 'فشل رفع الملف')
-                        return { data: { path: data.pathname, publicUrl: data.url }, error: null }
+                        return { data: { path: data.pathname, publicUrl: null }, error: null }
                     } catch (error) { return { data: null, error } }
                 },
                 async getPublicUrl(path) {
-                    return { data: { publicUrl: path.startsWith('/api/blob?') ? path : `/api/blob?pathname=${encodeURIComponent(path)}` }, error: null }
+                    // Private Blob objects have no public URL; render through V1BlobSource instead.
+                    return { data: { publicUrl: null, pathname: path }, error: null }
                 }
             }
         }

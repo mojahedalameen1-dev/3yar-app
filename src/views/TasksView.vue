@@ -19,6 +19,11 @@
       </v-btn>
     </div>
 
+    <v-alert v-if="tasksStore.error" type="error" variant="tonal" class="mb-4" role="alert">
+      تعذر تحديث المهام. {{ tasksStore.tasks.length ? 'نعرض آخر بيانات محفوظة.' : 'لم نتمكن من التحقق من وجود مهام.' }}
+      <v-btn class="ms-2" size="small" variant="text" :loading="tasksStore.loading" @click="tasksStore.fetchTasks()">إعادة المحاولة</v-btn>
+    </v-alert>
+
     <!-- Stats Overview -->
     <v-row class="mb-6">
       <v-col v-for="stat in statsCards" :key="stat.status" cols="6" sm="4" md="2">
@@ -44,7 +49,7 @@
     </v-row>
 
     <!-- Tasks Grid -->
-    <v-row v-if="filteredTasks.length > 0">
+    <v-row v-if="!tasksStore.error && filteredTasks.length > 0">
       <v-col 
         v-for="task in filteredTasks" 
         :key="task.id" 
@@ -215,7 +220,7 @@
     </v-row>
 
     <!-- Empty State -->
-    <v-card v-else class="glass-card pa-12 text-center">
+    <v-card v-else-if="!tasksStore.error && !tasksStore.loading" class="glass-card pa-12 text-center">
       <div class="empty-state-icon mx-auto mb-6">
         <v-icon size="80" color="grey-lighten-1">mdi-clipboard-check-outline</v-icon>
       </div>
@@ -239,6 +244,10 @@
       >
         عرض جميع المهام
       </v-btn>
+    </v-card>
+    <v-card v-else-if="tasksStore.loading" class="glass-card pa-8 text-center">
+      <v-progress-circular indeterminate color="primary" aria-label="جارٍ تحميل المهام" />
+      <div class="text-body-2 text-medium-emphasis mt-3">جارٍ تحميل المهام…</div>
     </v-card>
 
     <!-- Add/Edit Task Dialog -->
@@ -391,6 +400,7 @@
         </v-card-title>
         <v-divider></v-divider>
         <v-card-text class="pa-5">
+          <v-alert v-if="recordSaveError" type="error" variant="tonal" class="mb-4" role="alert">{{ recordSaveError }}</v-alert>
           <div class="selected-task-card pa-4 rounded-lg mb-4">
             <div class="text-subtitle-2 text-medium-emphasis mb-1">المهمة المُنجزة</div>
             <div class="text-h6 font-weight-bold">{{ selectedTask?.name }}</div>
@@ -427,8 +437,8 @@
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showRecordDialog = false">إلغاء</v-btn>
-          <v-btn color="success" @click="saveRecord">تسجيل الصيانة</v-btn>
+          <v-btn variant="text" :disabled="savingRecord" @click="showRecordDialog = false">إلغاء</v-btn>
+          <v-btn color="success" :loading="savingRecord" :disabled="savingRecord" @click="saveRecord">تسجيل الصيانة</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -460,7 +470,8 @@
 import { ref, computed, inject } from 'vue'
 import { useCarStore } from '@/stores/car'
 import { useTasksStore } from '@/stores/tasks'
-import { useRecordsStore } from '@/stores/records'
+import { completeMaintenanceV1 } from '@/services/maintenance-completion-v1'
+import { runSingleFlight } from '@/lib/single-flight'
 import confetti from 'canvas-confetti'
 import dayjs from 'dayjs'
 
@@ -468,7 +479,6 @@ const showSnackbar = inject('showSnackbar')
 
 const carStore = useCarStore()
 const tasksStore = useTasksStore()
-const recordsStore = useRecordsStore()
 
 // Filter
 const activeFilter = ref('all')
@@ -591,9 +601,12 @@ const recordData = ref({
   serviceCenter: '',
   notes: ''
 })
+const savingRecord = ref(false)
+const recordSaveError = ref('')
 
 function openRecordDialog(task) {
   selectedTask.value = task
+  recordSaveError.value = ''
   recordData.value = {
     odometerReading: carStore.car?.currentOdometer || 0,
     cost: 0,
@@ -603,27 +616,19 @@ function openRecordDialog(task) {
   showRecordDialog.value = true
 }
 
-function saveRecord() {
-  tasksStore.recordMaintenance(selectedTask.value.id, {
-    odometer: recordData.value.odometerReading,
-    date: new Date().toISOString()
-  })
-  
-  recordsStore.addRecord({
-    taskId: selectedTask.value.id,
-    taskName: selectedTask.value.name,
-    odometerReading: recordData.value.odometerReading,
-    cost: recordData.value.cost,
-    serviceCenter: recordData.value.serviceCenter,
-    notes: recordData.value.notes
-  })
-  
-  showRecordDialog.value = false
-  showSnackbar('تم تسجيل الصيانة بنجاح', 'success')
-  confetti({
-    particleCount: 100,
-    spread: 70,
-    origin: { y: 0.6 }
+async function saveRecord() {
+  if (!selectedTask.value) return
+  recordSaveError.value = ''
+  await runSingleFlight(savingRecord, async () => {
+    try {
+      await completeMaintenanceV1(selectedTask.value, recordData.value)
+      showRecordDialog.value = false
+      showSnackbar('تم تسجيل الصيانة بنجاح', 'success')
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
+    } catch (error) {
+      console.error('Maintenance completion failed:', error)
+      recordSaveError.value = error.message || 'تعذر تسجيل الصيانة. بقيت البيانات كما هي؛ أعد المحاولة.'
+    }
   })
 }
 

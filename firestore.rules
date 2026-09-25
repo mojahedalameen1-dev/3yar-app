@@ -5,8 +5,28 @@ service cloud.firestore {
     function admin() { return signedIn() && request.auth.token.admin == true; }
     function owner() { return signedIn() && resource.data.user_id == request.auth.uid; }
     function incomingOwner() { return signedIn() && request.resource.data.user_id == request.auth.uid; }
-    function sharedCar(carId) {
-      return get(/databases/$(database)/documents/cars/$(carId)).data.public_share_enabled == true;
+
+    function ownsCar(carId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/cars/$(carId))
+        && get(/databases/$(database)/documents/cars/$(carId)).data.user_id == request.auth.uid;
+    }
+    function ownsActiveCar(carId) {
+      return ownsCar(carId)
+        && get(/databases/$(database)/documents/cars/$(carId)).data.deletion_requested != true;
+    }
+    function ownsChild() {
+      return owner() && ownsCar(resource.data.car_id);
+    }
+    function incomingOwnedChild() {
+      return incomingOwner() && ownsActiveCar(request.resource.data.car_id);
+    }
+    function carOwnerCanUpdate() {
+      return owner() && incomingOwner() && (
+        resource.data.deletion_requested != true
+        || (request.resource.data.deletion_requested == false
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletion_requested', 'updated_at']))
+      );
     }
 
     match /profiles/{profileId} {
@@ -16,39 +36,43 @@ service cloud.firestore {
       allow delete: if admin() || owner();
     }
 
+    match /app_config/{configId} {
+      allow read, write: if admin();
+    }
+
     match /cars/{carId} {
-      allow read: if admin() || owner() || resource.data.public_share_enabled == true;
-      allow create: if admin() || incomingOwner();
-      allow update: if admin() || (owner() && incomingOwner());
+      allow read: if admin() || owner();
+      allow create: if admin() || (incomingOwner() && request.resource.data.deletion_requested != true);
+      allow update: if admin() || carOwnerCanUpdate();
       allow delete: if admin() || owner();
     }
 
     match /maintenance_tasks/{taskId} {
-      allow read: if admin() || owner() || sharedCar(resource.data.car_id);
-      allow create: if admin() || incomingOwner();
-      allow update: if admin() || (owner() && incomingOwner());
-      allow delete: if admin() || owner();
+      allow read: if admin() || ownsChild();
+      allow create: if admin() || incomingOwnedChild();
+      allow update: if admin() || (ownsChild() && incomingOwnedChild() && request.resource.data.car_id == resource.data.car_id);
+      allow delete: if admin() || ownsChild();
     }
 
     match /maintenance_records/{recordId} {
-      allow read: if admin() || owner();
-      allow create: if admin() || incomingOwner();
-      allow update: if admin() || (owner() && incomingOwner());
-      allow delete: if admin() || owner();
+      allow read: if admin() || ownsChild();
+      allow create: if admin() || incomingOwnedChild();
+      allow update: if admin() || (ownsChild() && incomingOwnedChild() && request.resource.data.car_id == resource.data.car_id);
+      allow delete: if admin() || ownsChild();
     }
 
     match /documents/{documentId} {
-      allow read: if admin() || owner();
-      allow create: if admin() || incomingOwner();
-      allow update: if admin() || (owner() && incomingOwner());
-      allow delete: if admin() || owner();
+      allow read: if admin() || ownsChild();
+      allow create: if admin() || incomingOwnedChild();
+      allow update: if admin() || (ownsChild() && incomingOwnedChild() && request.resource.data.car_id == resource.data.car_id);
+      allow delete: if admin() || ownsChild();
     }
 
     match /odometer_readings/{readingId} {
-      allow read: if admin() || owner();
-      allow create: if admin() || incomingOwner();
-      allow update: if admin() || (owner() && incomingOwner());
-      allow delete: if admin() || owner();
+      allow read: if admin() || ownsChild();
+      allow create: if admin() || incomingOwnedChild();
+      allow update: if admin() || (ownsChild() && incomingOwnedChild() && request.resource.data.car_id == resource.data.car_id);
+      allow delete: if admin() || ownsChild();
     }
 
     match /announcements/{announcementId} {

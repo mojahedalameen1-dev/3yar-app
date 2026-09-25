@@ -236,10 +236,17 @@ export const useTasksStore = defineStore('tasks', () => {
                 return
             }
 
+            const carId = useCarStore().car?.id
+            if (!carId) {
+                tasks.value = []
+                return
+            }
+
             const { data, error: err } = await supabase
                 .from('maintenance_tasks')
                 .select('*')
                 .eq('user_id', userId)
+                .eq('car_id', carId)
                 .order('created_at', { ascending: true })
 
             if (err) throw err
@@ -275,6 +282,9 @@ export const useTasksStore = defineStore('tasks', () => {
 
     async function updateTask(id, updates) {
         try {
+            const userId = await getUserId()
+            const carId = useCarStore().car?.id
+            if (!userId || !carId) throw new Error('تعذر تحديد حسابك وسيارتك لتحديث المهمة بأمان.')
             const dbUpdates = {}
             if (updates.name !== undefined) dbUpdates.name = updates.name
             if (updates.type !== undefined) dbUpdates.type = updates.type
@@ -290,6 +300,8 @@ export const useTasksStore = defineStore('tasks', () => {
                 .from('maintenance_tasks')
                 .update(dbUpdates)
                 .eq('id', id)
+                .eq('user_id', userId)
+                .eq('car_id', carId)
                 .select()
                 .maybeSingle()
 
@@ -308,10 +320,15 @@ export const useTasksStore = defineStore('tasks', () => {
 
     async function deleteTask(id) {
         try {
+            const userId = await getUserId()
+            const carId = useCarStore().car?.id
+            if (!userId || !carId) throw new Error('تعذر تحديد حسابك وسيارتك لحذف المهمة بأمان.')
             const { error: err } = await supabase
                 .from('maintenance_tasks')
                 .delete()
                 .eq('id', id)
+                .eq('user_id', userId)
+                .eq('car_id', carId)
 
             if (err) throw err
             tasks.value = tasks.value.filter(t => t.id !== id)
@@ -345,12 +362,24 @@ export const useTasksStore = defineStore('tasks', () => {
         })
     }
 
+    function applyMaintenanceCompletion(taskId, updates) {
+        const task = tasks.value.find(item => String(item.id) === String(taskId))
+        if (!task) return
+        task.lastMaintenanceDate = updates.last_maintenance_date
+        task.lastMaintenanceOdometer = updates.last_maintenance_odometer
+        task.snoozedUntil = null
+    }
+
     async function resetTasks() {
         try {
+            const userId = await getUserId()
+            const carId = useCarStore().car?.id
+            if (!userId || !carId) throw new Error('تعذر تحديد حسابك وسيارتك لحذف المهام بأمان.')
             const { error: err } = await supabase
                 .from('maintenance_tasks')
                 .delete()
-                .neq('id', 0)
+                .eq('user_id', userId)
+                .eq('car_id', carId)
 
             if (err) throw err
 
@@ -392,6 +421,7 @@ export const useTasksStore = defineStore('tasks', () => {
         snoozeTask,
         cancelSnooze,
         recordMaintenance,
+        applyMaintenanceCompletion,
         resetTasks,
         addDefaultTasks,
         calculateTaskStatus

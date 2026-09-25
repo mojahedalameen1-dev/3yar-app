@@ -18,6 +18,11 @@
       </div>
     </div>
 
+    <v-alert v-if="recordsStore.error" type="error" variant="tonal" class="mb-4" role="alert">
+      تعذر تحديث السجلات. {{ recordsStore.records.length ? 'نعرض آخر بيانات محفوظة.' : 'لم نتمكن من التحقق من وجود سجلات.' }}
+      <v-btn class="ms-2" size="small" variant="text" :loading="recordsStore.loading" @click="recordsStore.fetchRecords()">إعادة المحاولة</v-btn>
+    </v-alert>
+
     <!-- Stats Cards -->
     <v-row class="mb-6">
       <v-col v-for="stat in statsCards" :key="stat.title" cols="6" md="3">
@@ -94,7 +99,7 @@
     </v-card>
 
     <!-- Timeline View -->
-    <template v-if="filteredRecords.length > 0">
+    <template v-if="!recordsStore.error && filteredRecords.length > 0">
       <div v-if="viewMode === 'timeline'" class="timeline-view">
         <div v-for="(group, monthKey) in groupedRecords" :key="monthKey" class="mb-6">
           <div class="month-header d-flex align-center mb-4">
@@ -209,7 +214,7 @@
     </template>
 
     <!-- Empty State -->
-    <v-card v-else class="glass-card pa-12 text-center">
+    <v-card v-else-if="!recordsStore.error && !recordsStore.loading" class="glass-card pa-12 text-center">
       <div class="empty-icon mx-auto mb-6">
         <v-icon size="64" color="white">mdi-clipboard-text-outline</v-icon>
       </div>
@@ -225,6 +230,10 @@
       <v-btn v-else color="primary" to="/tasks">
         الذهاب للمهام
       </v-btn>
+    </v-card>
+    <v-card v-else-if="recordsStore.loading" class="glass-card pa-8 text-center">
+      <v-progress-circular indeterminate color="primary" aria-label="جارٍ تحميل السجلات" />
+      <div class="text-body-2 text-medium-emphasis mt-3">جارٍ تحميل السجلات…</div>
     </v-card>
 
     <!-- Record Details Dialog -->

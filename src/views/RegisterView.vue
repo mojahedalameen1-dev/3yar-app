@@ -158,11 +158,13 @@
           تم إنشاء الحساب!
         </v-card-title>
         <v-card-text class="pb-6">
-          <p class="text-body-1 mb-2">تم إرسال رابط التأكيد إلى بريدك الإلكتروني</p>
+          <v-alert :type="verificationSent ? 'success' : 'warning'" variant="tonal" class="mb-3">
+            {{ verificationSent ? 'أرسلنا رابط التأكيد. افتح بريدك ثم ارجع للتحقق.' : 'أُنشئ الحساب، لكن تعذر إرسال رسالة التأكيد. يمكنك إعادة المحاولة من صفحة التأكيد.' }}
+          </v-alert>
           <p class="text-body-2 text-medium-emphasis">{{ email }}</p>
         </v-card-text>
-        <v-btn color="primary" size="large" block to="/login" class="auth-btn">
-          العودة لتسجيل الدخول
+        <v-btn color="primary" size="large" block to="/verify-email" class="auth-btn">
+          متابعة تأكيد البريد
         </v-btn>
       </v-card>
     </v-dialog>
@@ -188,6 +190,7 @@ const errorMessage = ref('')
 
 // Success dialog
 const showSuccess = ref(false)
+const verificationSent = ref(false)
 const googleAuthEnabled = import.meta.env.VITE_FIREBASE_GOOGLE_ENABLED === 'true'
 
 // Validation rules
@@ -217,6 +220,7 @@ async function handleRegister() {
   loading.value = false
   
   if (result.success) {
+    verificationSent.value = result.data?.verificationSent === true
     showSuccess.value = true
   } else {
     errorMessage.value = getErrorMessage(result.error)

@@ -398,23 +398,14 @@ export const useAdminStore = defineStore('admin', () => {
 
             // 1. Upload File if present
             if (file) {
-                const fileExt = file.name.split('.').pop()
-                const fileName = `${Math.random()}.${fileExt}`
-                const filePath = `documents/${fileName}`
+                const filePath = `documents/${file.name}`
 
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('images')
-                    .upload(filePath, file)
+                    .upload(filePath, file, { ownerId: docData.user_id, carId: docData.car_id })
 
                 if (uploadError) throw uploadError
-
-                const { data: publicUrlData, error: urlError } = await supabase.storage
-                    .from('images')
-                    .getPublicUrl(uploadData.publicUrl || uploadData.path)
-
-                if (urlError) throw urlError
-
-                imageUrl = publicUrlData.publicUrl
+                imageUrl = uploadData.path
             }
 
             // 2. Insert Record
