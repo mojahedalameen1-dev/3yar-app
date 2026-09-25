@@ -21,7 +21,7 @@
 
     <v-alert v-if="tasksStore.error" type="error" variant="tonal" class="mb-4" role="alert">
       تعذر تحديث المهام. {{ tasksStore.tasks.length ? 'نعرض آخر بيانات محفوظة.' : 'لم نتمكن من التحقق من وجود مهام.' }}
-      <v-btn class="ms-2" size="small" variant="text" :loading="tasksStore.loading" @click="tasksStore.fetchTasks()">إعادة المحاولة</v-btn>
+      <v-btn class="ms-2" size="small" variant="text" :loading="tasksStore.loading" :disabled="tasksStore.loading" @click="tasksStore.fetchTasks()">إعادة المحاولة</v-btn>
     </v-alert>
 
     <!-- Stats Overview -->
@@ -30,7 +30,12 @@
         <v-card 
           class="stat-card glass-card h-100 cursor-pointer"
           :class="{ 'stat-card-active': activeFilter === stat.status }"
+          role="button"
+          tabindex="0"
+          :aria-label="`تصفية المهام: ${stat.label}`"
+          :aria-pressed="activeFilter === stat.status"
           @click="activeFilter = stat.status"
+          @keydown.enter.space.prevent="activeFilter = stat.status"
         >
           <v-card-text class="text-center pa-4">
             <div 
@@ -96,7 +101,7 @@
               </div>
               <v-menu>
                 <template #activator="{ props }">
-                  <v-btn icon variant="text" size="small" v-bind="props">
+                  <v-btn icon variant="text" size="small" v-bind="props" :aria-label="`خيارات مهمة: ${task.name}`">
                     <v-icon>mdi-dots-vertical</v-icon>
                   </v-btn>
                 </template>
@@ -209,6 +214,8 @@
                 size="small"
                 class="flex-grow-1"
                 prepend-icon="mdi-alarm-off"
+                :loading="cancelingTaskId === task.id"
+                :disabled="Boolean(cancelingTaskId) || snoozingTask"
                 @click="cancelSnooze(task)"
               >
                 إلغاء
@@ -264,6 +271,7 @@
         </v-card-title>
         <v-divider></v-divider>
         <v-card-text class="pa-5">
+          <v-alert v-if="taskSaveError" type="error" variant="tonal" class="mb-4" role="alert">{{ taskSaveError }}</v-alert>
           <v-form ref="taskForm" v-model="taskFormValid">
             <v-text-field
               v-model="taskFormData.name"
@@ -351,8 +359,8 @@
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="closeTaskDialog">إلغاء</v-btn>
-          <v-btn color="primary" :disabled="!taskFormValid" @click="saveTask">
+          <v-btn variant="text" :disabled="savingTask" @click="closeTaskDialog">إلغاء</v-btn>
+          <v-btn color="primary" :loading="savingTask" :disabled="!taskFormValid || savingTask" @click="saveTask">
             {{ editMode ? 'تحديث' : 'إضافة' }}
           </v-btn>
         </v-card-actions>
@@ -360,7 +368,7 @@
     </v-dialog>
 
     <!-- Snooze Dialog -->
-    <v-dialog v-model="showSnoozeDialog" max-width="400">
+    <v-dialog v-model="showSnoozeDialog" max-width="400" :persistent="snoozingTask">
       <v-card class="rounded-xl">
         <v-card-title class="pa-5">
           <v-icon color="warning" class="me-2">mdi-alarm-snooze</v-icon>
@@ -369,6 +377,9 @@
         <v-divider></v-divider>
         <v-card-text class="pa-5">
           <p class="mb-4">اختر مدة التأجيل لمهمة: <strong>{{ selectedTask?.name }}</strong></p>
+          <v-alert v-if="snoozeError" type="error" variant="tonal" class="mb-4" role="alert">
+            {{ snoozeError }}
+          </v-alert>
           <div class="snooze-options">
             <v-btn
               v-for="option in snoozeOptions"
@@ -376,6 +387,7 @@
               :variant="snoozeDuration === option.value ? 'flat' : 'tonal'"
               :color="snoozeDuration === option.value ? 'primary' : undefined"
               class="ma-1"
+              :disabled="snoozingTask"
               @click="snoozeDuration = option.value"
             >
               {{ option.label }}
@@ -385,8 +397,8 @@
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showSnoozeDialog = false">إلغاء</v-btn>
-          <v-btn color="warning" @click="confirmSnooze">تأجيل</v-btn>
+          <v-btn variant="text" :disabled="snoozingTask" @click="showSnoozeDialog = false">إلغاء</v-btn>
+          <v-btn color="warning" :loading="snoozingTask" :disabled="snoozingTask || !selectedTask" @click="confirmSnooze">تأجيل</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -458,8 +470,8 @@
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showDeleteDialog = false">إلغاء</v-btn>
-          <v-btn color="error" @click="deleteTask">حذف</v-btn>
+          <v-btn variant="text" :disabled="deletingTask" @click="showDeleteDialog = false">إلغاء</v-btn>
+          <v-btn color="error" :loading="deletingTask" :disabled="deletingTask" @click="deleteTask">حذف</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -503,6 +515,8 @@ const showTaskDialog = ref(false)
 const taskFormValid = ref(false)
 const editMode = ref(false)
 const editingTaskId = ref(null)
+const savingTask = ref(false)
+const taskSaveError = ref('')
 
 const typeOptions = [
   { title: 'بالمسافة', value: 'distance' },
@@ -539,6 +553,7 @@ function getEmptyTaskForm() {
 }
 
 function editTask(task) {
+  taskSaveError.value = ''
   editMode.value = true
   editingTaskId.value = task.id
   taskFormData.value = {
@@ -554,43 +569,77 @@ function editTask(task) {
   showTaskDialog.value = true
 }
 
-function closeTaskDialog() {
+function closeTaskDialog(force = false) {
+  if (savingTask.value && !force) return
   showTaskDialog.value = false
   editMode.value = false
   editingTaskId.value = null
   taskFormData.value = getEmptyTaskForm()
+  taskSaveError.value = ''
 }
 
-function saveTask() {
-  if (editMode.value) {
-    tasksStore.updateTask(editingTaskId.value, taskFormData.value)
-    showSnackbar('تم تحديث المهمة بنجاح')
-  } else {
-    tasksStore.addTask(taskFormData.value)
-    showSnackbar('تم إضافة المهمة بنجاح')
+async function saveTask() {
+  if (!taskFormValid.value || savingTask.value) return
+  savingTask.value = true
+  taskSaveError.value = ''
+  try {
+    if (editMode.value) {
+      await tasksStore.updateTask(editingTaskId.value, taskFormData.value)
+      showSnackbar('تم تحديث المهمة بنجاح')
+    } else {
+      await tasksStore.addTask(taskFormData.value)
+      showSnackbar('تم إضافة المهمة بنجاح')
+    }
+    closeTaskDialog(true)
+  } catch (error) {
+    taskSaveError.value = /[\u0600-\u06FF]/.test(error.message || '')
+      ? error.message
+      : 'تعذر حفظ المهمة. بقيت البيانات في النموذج؛ أعد المحاولة.'
+  } finally {
+    savingTask.value = false
   }
-  closeTaskDialog()
 }
 
 // Snooze Dialog
 const showSnoozeDialog = ref(false)
 const selectedTask = ref(null)
 const snoozeDuration = ref('week')
+const snoozingTask = ref(false)
+const cancelingTaskId = ref(null)
+const snoozeError = ref('')
 
 function openSnoozeDialog(task) {
+  snoozeError.value = ''
   selectedTask.value = task
   showSnoozeDialog.value = true
 }
 
-function confirmSnooze() {
-  tasksStore.snoozeTask(selectedTask.value.id, snoozeDuration.value)
-  showSnoozeDialog.value = false
-  showSnackbar('تم تأجيل التنبيه')
+async function confirmSnooze() {
+  if (!selectedTask.value || snoozingTask.value) return
+  snoozingTask.value = true
+  snoozeError.value = ''
+  try {
+    await tasksStore.snoozeTask(selectedTask.value.id, snoozeDuration.value)
+    showSnoozeDialog.value = false
+    showSnackbar('تم تأجيل التنبيه')
+  } catch {
+    snoozeError.value = 'تعذر تأجيل التنبيه. لم يتغير موعد المهمة؛ أعد المحاولة.'
+  } finally {
+    snoozingTask.value = false
+  }
 }
 
-function cancelSnooze(task) {
-  tasksStore.cancelSnooze(task.id)
-  showSnackbar('تم إلغاء التأجيل')
+async function cancelSnooze(task) {
+  if (cancelingTaskId.value || snoozingTask.value) return
+  cancelingTaskId.value = task.id
+  try {
+    await tasksStore.cancelSnooze(task.id)
+    showSnackbar('تم إلغاء التأجيل')
+  } catch {
+    showSnackbar('تعذر إلغاء التأجيل. أعد المحاولة.', 'error')
+  } finally {
+    cancelingTaskId.value = null
+  }
 }
 
 // Record Dialog
@@ -627,23 +676,35 @@ async function saveRecord() {
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
     } catch (error) {
       console.error('Maintenance completion failed:', error)
-      recordSaveError.value = error.message || 'تعذر تسجيل الصيانة. بقيت البيانات كما هي؛ أعد المحاولة.'
+      recordSaveError.value = /[\u0600-\u06FF]/.test(error.message || '')
+        ? error.message
+        : 'تعذر تسجيل الصيانة. بقيت البيانات كما هي؛ أعد المحاولة.'
     }
   })
 }
 
 // Delete Dialog
 const showDeleteDialog = ref(false)
+const deletingTask = ref(false)
 
 function confirmDelete(task) {
   selectedTask.value = task
   showDeleteDialog.value = true
 }
 
-function deleteTask() {
-  tasksStore.deleteTask(selectedTask.value.id)
-  showDeleteDialog.value = false
-  showSnackbar('تم حذف المهمة')
+async function deleteTask() {
+  if (!selectedTask.value || deletingTask.value) return
+  deletingTask.value = true
+  try {
+    await tasksStore.deleteTask(selectedTask.value.id)
+    showDeleteDialog.value = false
+    showSnackbar('تم حذف المهمة')
+  } catch (error) {
+    const message = /[\u0600-\u06FF]/.test(error.message || '') ? error.message : 'تعذر حذف المهمة. أعد المحاولة.'
+    showSnackbar(message, 'error')
+  } finally {
+    deletingTask.value = false
+  }
 }
 
 // Helpers

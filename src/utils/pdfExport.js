@@ -10,7 +10,7 @@
  * @param {Object} carData - Car data for filename
  * @param {Object} extraData - Additional data (unused in this strategy but kept for interface compatibility)
  */
-export async function exportToPDF(element, carData, extraData = {}) {
+export async function exportToPDF(element, carData, _extraData = {}) {
     try {
         // Dynamic imports to ensure potential dependency issues don't crash the app on load
         const [jsPDFModule, html2canvasModule] = await Promise.all([

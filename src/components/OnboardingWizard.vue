@@ -9,6 +9,7 @@
           color="white" 
           position="absolute" 
           class="close-btn"
+          aria-label="إغلاق إعداد السيارة"
           @click="dialog = false"
         ></v-btn>
         
@@ -37,29 +38,33 @@
             <div class="mb-4">
               <label class="text-body-2 text-medium-emphasis mb-2 d-block">الشركة الصانعة</label>
               <div class="brands-grid">
-                <div 
+                <button
+                  type="button"
                   v-for="brand in carBrands" 
                   :key="brand.value"
                   class="brand-item"
                   :class="{ 'brand-selected': carData.make === brand.value }"
+                  :aria-pressed="carData.make === brand.value"
                   @click="selectBrand(brand.value)"
                 >
                   <div class="brand-logo">
                     <img :src="brand.logo" :alt="brand.label" />
                   </div>
                   <span class="brand-name">{{ brand.label }}</span>
-                </div>
+                </button>
                 <!-- Other option -->
-                <div 
+                <button
+                  type="button"
                   class="brand-item"
                   :class="{ 'brand-selected': showCustomMake }"
+                  :aria-pressed="showCustomMake"
                   @click="selectOtherBrand"
                 >
                   <div class="brand-logo other-logo">
                     <v-icon size="32" color="primary">mdi-plus</v-icon>
                   </div>
                   <span class="brand-name">أخرى</span>
-                </div>
+                </button>
               </div>
               <!-- Custom manufacturer input -->
               <v-text-field
@@ -145,14 +150,19 @@
             <p class="text-caption text-medium-emphasis">تقدير المسافة التي تقطعها يومياً يساعد في التنبؤات الذكية</p>
           </div>
 
-          <v-radio-group v-model="dailyUsage" class="usage-options">
+          <div class="usage-options" role="group" aria-label="تقدير الاستخدام اليومي">
             <v-row justify="center">
               <v-col cols="12" sm="4" v-for="option in usageOptions" :key="option.value">
                 <v-card 
                   variant="outlined" 
                   class="h-100 cursor-pointer text-center pa-4 transition-all"
                   :class="{ 'border-primary bg-primary-lighten-5': dailyUsage === option.value }"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="`${option.label}: ${option.desc}, نحو ${option.value} كم يوميًا`"
+                  :aria-pressed="dailyUsage === option.value"
                   @click="dailyUsage = option.value"
+                  @keydown.enter.space.prevent="dailyUsage = option.value"
                 >
                   <v-icon size="40" color="primary" class="mb-3">{{ option.icon }}</v-icon>
                   <div class="text-h6 font-weight-bold mb-1">{{ option.label }}</div>
@@ -161,7 +171,7 @@
                 </v-card>
               </v-col>
             </v-row>
-          </v-radio-group>
+          </div>
         </v-window-item>
 
         <!-- Step 4: Maintenance Plan -->
@@ -472,6 +482,9 @@ async function finishWizard() {
   background: rgba(var(--v-theme-surface-variant), 0.3);
   border: 2px solid transparent;
   cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: center;
   transition: all 0.2s ease;
 }
 

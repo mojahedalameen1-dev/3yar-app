@@ -346,23 +346,9 @@ export const backend = {
                     return { data: { publicUrl: null, pathname: path }, error: null }
                 }
             }
-        }
-    },
-    async rpc(name, args) {
-        if (name === 'get_public_maintenance_tasks') {
-            try {
-                const cars = await getDocs(query(
-                    collection(firestore, 'cars'),
-                    where('share_token', '==', args.p_token),
-                    where('public_share_enabled', '==', true),
-                    limit(1)
-                ))
-                if (cars.empty) return { data: [], error: null }
-                const carId = cars.docs[0].id
-                const tasks = await getDocs(query(collection(firestore, 'maintenance_tasks'), where('car_id', '==', carId)))
-                return { data: tasks.docs.map(rowFromSnapshot), error: null }
-            } catch (error) { return { data: null, error } }
-        }
+    }
+},
+async rpc(name, args) {
         const functionNames = {
             create_user_profile_admin: 'createUserProfileAdmin',
             delete_user_by_admin: 'deleteUserByAdmin'

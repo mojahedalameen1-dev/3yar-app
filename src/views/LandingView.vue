@@ -13,7 +13,7 @@
         <nav class="nav-links">
           <a href="#features" class="nav-link">المميزات</a>
           <a href="#how" class="nav-link">كيف يعمل</a>
-          <a href="#qr" class="nav-link">QR Pass</a>
+          <a href="#overview" class="nav-link">نظرة عامة</a>
         </nav>
         
         <div class="header-actions">
@@ -34,8 +34,8 @@
         </h1>
         
         <p class="hero-subtitle">
-          نظام متكامل لتتبع صيانة سيارتك، إدارة مصاريفها، 
-          ومشاركة حالتها عبر رمز QR الذكي
+          نظّم صيانة سيارتك ووثائقها وسجلّ مصاريفها في مكان واحد،
+          وتابع ما تحتاجه بخطوات واضحة.
         </p>
         
         <div class="hero-cta">
@@ -81,39 +81,28 @@
       </div>
     </section>
 
-    <!-- QR Pass Section -->
-    <section id="qr" class="qr-section">
+    <!-- Product overview; intentionally illustrative and contains no vehicle data. -->
+    <section id="overview" class="overview-section">
       <div class="section-container">
-        <div class="qr-content">
-          <div class="qr-text">
-            <span class="section-badge">نظام الباركود</span>
-            <h2 class="section-title">QR Vehicle Pass</h2>
-            <p class="qr-desc">
-              احصل على رمز QR فريد لسيارتك يمكن مشاركته مع المشترين المحتملين أو مراكز الصيانة. 
-              يعرض حالة السيارة وتاريخ صيانتها بشكل آمن دون الكشف عن معلوماتك الشخصية.
+        <div class="overview-card">
+          <div class="overview-copy">
+            <span class="section-badge">نظرة عامة</span>
+            <h2 class="section-title">صورة أوضح لاحتياجات سيارتك</h2>
+            <p class="overview-desc">
+              أضف بيانات سيارتك لتجميع مهام الصيانة والوثائق وسجل الأعمال في لوحة واحدة،
+              ثم حدّثها وقت الحاجة.
             </p>
-            <ul class="qr-features">
-              <li><v-icon color="success" size="18" class="me-2">mdi-check-circle</v-icon> عداد المسافات المحدث</li>
-              <li><v-icon color="success" size="18" class="me-2">mdi-check-circle</v-icon> حالة الصيانة الدورية</li>
-              <li><v-icon color="success" size="18" class="me-2">mdi-check-circle</v-icon> صلاحية الوثائق</li>
-            </ul>
-          </div>
-          <div class="qr-visual">
-            <div class="qr-phone">
-              <div class="phone-screen">
-                <div class="phone-header">
-                  <v-icon color="primary" size="20">mdi-car</v-icon>
-                  <span>حالة السيارة</span>
-                </div>
-                <div class="phone-qr">
-                  <v-icon size="80" color="primary">mdi-qrcode</v-icon>
-                </div>
-                <div class="phone-stats">
-                  <div class="stat"><span>العداد</span><strong>45,230 كم</strong></div>
-                  <div class="stat"><span>الزيت</span><strong class="text-success">جيد</strong></div>
-                </div>
-              </div>
+            <div class="overview-points">
+              <span><v-icon color="success" size="18">mdi-check-circle</v-icon> متابعة المهام القادمة</span>
+              <span><v-icon color="success" size="18">mdi-check-circle</v-icon> تنظيم الوثائق ومواعيد انتهائها</span>
+              <span><v-icon color="success" size="18">mdi-check-circle</v-icon> سجل واضح للصيانة والمصاريف</span>
             </div>
+          </div>
+          <div class="overview-illustration" aria-hidden="true">
+            <div class="illustration-icon"><v-icon size="58" color="primary">mdi-car-cog</v-icon></div>
+            <div class="illustration-line"><v-icon color="success">mdi-check-circle</v-icon><span></span><v-icon color="primary">mdi-file-document</v-icon></div>
+            <div class="illustration-line"><v-icon color="warning">mdi-wrench-clock</v-icon><span></span><v-icon color="primary">mdi-history</v-icon></div>
+            <small>تصوير توضيحي — لا يعرض بيانات سيارة حقيقية</small>
           </div>
         </div>
       </div>
@@ -141,7 +130,7 @@
     <section class="cta-section">
       <div class="cta-container">
         <h2 class="cta-title">ابدأ إدارة سيارتك بذكاء</h2>
-        <p class="cta-desc">مجاني بالكامل • بدون بطاقة ائتمان</p>
+        <p class="cta-desc">ابدأ بإضافة بيانات سيارتك واحتياجاتها</p>
         <v-btn color="white" size="x-large" to="/register" class="cta-btn-white">
           إنشاء حساب مجاني
         </v-btn>
@@ -166,29 +155,29 @@ import ayarLogo from '@/assets/ayar-logo.png'
 
 const features = [
   {
-    icon: 'mdi-qrcode-scan',
-    gradient: 'linear-gradient(135deg, #1976D2, #42a5f5)',
-    title: 'نظام الباركود الذكي',
-    desc: 'شارك حالة سيارتك عبر رمز QR فريد مع المشترين أو مراكز الفحص'
-  },
-  {
     icon: 'mdi-wrench-clock',
-    gradient: 'linear-gradient(135deg, #43A047, #66BB6A)',
-    title: 'متابعة الصيانة الدورية',
-    desc: 'تنبيهات ذكية قبل موعد الصيانة لجميع مهام سيارتك'
+    gradient: 'linear-gradient(135deg, #1976D2, #42a5f5)',
+    title: 'متابعة الصيانة',
+    desc: 'نظّم مهام الصيانة وتابع مواعيدها وحالتها من لوحة واحدة'
   },
   {
     icon: 'mdi-file-document-check',
+    gradient: 'linear-gradient(135deg, #43A047, #66BB6A)',
+    title: 'إدارة الوثائق',
+    desc: 'رتّب وثائق سيارتك وتابع تواريخ انتهائها'
+  },
+  {
+    icon: 'mdi-cash-multiple',
     gradient: 'linear-gradient(135deg, #FB8C00, #FFA726)',
-    title: 'إدارة المصاريف والوثائق',
-    desc: 'احفظ جميع فواتير الصيانة ووثائق السيارة في مكان واحد'
+    title: 'سجل الصيانة والمصاريف',
+    desc: 'احتفظ بسجل للأعمال المنفذة وتكاليفها'
   }
 ]
 
 const steps = [
   { title: 'سجّل حسابك', desc: 'أنشئ حساب مجاني في ثوانٍ' },
   { title: 'أضف سيارتك', desc: 'أدخل بيانات سيارتك الأساسية' },
-  { title: 'تتبع وشارك', desc: 'استلم التنبيهات وشارك حالة سيارتك' }
+  { title: 'تابع احتياجاتها', desc: 'راجع مهام الصيانة ووثائق السيارة عند الحاجة' }
 ]
 </script>
 
@@ -424,88 +413,79 @@ const steps = [
   line-height: 1.7;
 }
 
-/* QR Section */
-.qr-section {
+.overview-section {
   padding: 100px 0;
   background: #0d2137;
 }
 
-.qr-content {
+.overview-card {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 60px;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 48px;
   align-items: center;
+  padding: clamp(24px, 5vw, 56px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.035);
 }
 
-.qr-desc {
+.overview-desc {
   color: rgba(255, 255, 255, 0.7);
   font-size: 1.05rem;
   line-height: 1.8;
   margin-top: 16px;
 }
 
-.qr-features {
-  list-style: none;
-  padding: 0;
+.overview-points {
+  display: grid;
+  gap: 12px;
   margin-top: 24px;
 }
 
-.qr-features li {
-  display: flex;
-  align-items: center;
-  margin-bottom: 12px;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.qr-phone {
-  background: linear-gradient(135deg, #1a2744, #0d2137);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 32px;
-  padding: 12px;
-  max-width: 280px;
-  margin: 0 auto;
-}
-
-.phone-screen {
-  background: #0a1929;
-  border-radius: 24px;
-  padding: 20px;
-}
-
-.phone-header {
+.overview-points span {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 20px;
-  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
 }
 
-.phone-qr {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  margin-bottom: 20px;
+.overview-illustration {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, #1a2744, #0d2137);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 32px 24px 20px;
+  min-height: 280px;
+}
+
+.illustration-icon {
+  width: 100px;
+  height: 100px;
+  display: grid;
+  place-items: center;
+  border-radius: 28px;
+  background: rgba(25, 118, 210, 0.14);
+}
+
+.illustration-line {
   display: flex;
-  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  width: min(100%, 250px);
 }
 
-.phone-stats {
-  display: flex;
-  justify-content: space-around;
+.illustration-line span {
+  flex: 1;
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.12);
 }
 
-.phone-stats .stat {
+.overview-illustration small {
+  color: rgba(255, 255, 255, 0.58);
   text-align: center;
-}
-
-.phone-stats .stat span {
-  display: block;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.phone-stats .stat strong {
-  font-size: 0.95rem;
 }
 
 /* How Section */
@@ -611,12 +591,16 @@ const steps = [
   .nav-links {
     display: none;
   }
-  
-  .qr-content {
+
+  .overview-card {
     grid-template-columns: 1fr;
     text-align: center;
   }
-  
+
+  .overview-points span {
+    justify-content: center;
+  }
+
   .steps-grid {
     grid-template-columns: 1fr;
   }

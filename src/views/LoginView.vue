@@ -38,8 +38,22 @@
           </div>
           <div class="form-group password-group">
             <label class="form-label" for="login-password">كلمة المرور</label>
-            <v-text-field id="login-password" v-model="password" :type="showPassword ? 'text' : 'password'" placeholder="أدخل كلمة المرور" prepend-inner-icon="mdi-lock-outline" :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'" :rules="passwordRules" variant="outlined" density="comfortable" dir="ltr" class="auth-input" hide-details="auto" autocomplete="current-password" @click:append-inner="showPassword = !showPassword" @keydown.enter="handleLogin"></v-text-field>
-            <button type="button" class="forgot-link" @click="showForgotPassword = true">نسيت كلمة المرور؟</button>
+          <v-text-field id="login-password" v-model="password" :type="showPassword ? 'text' : 'password'" placeholder="أدخل كلمة المرور" prepend-inner-icon="mdi-lock-outline" :rules="passwordRules" variant="outlined" density="comfortable" dir="ltr" class="auth-input" hide-details="auto" autocomplete="current-password" @keydown.enter="handleLogin">
+            <template #append-inner>
+              <v-btn
+                icon
+                variant="text"
+                size="x-small"
+                type="button"
+                :aria-label="showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'"
+                :aria-pressed="showPassword"
+                @click="showPassword = !showPassword"
+              >
+                <v-icon size="20">{{ showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline' }}</v-icon>
+              </v-btn>
+            </template>
+          </v-text-field>
+            <button type="button" class="forgot-link" @click="openForgotPassword">نسيت كلمة المرور؟</button>
             <p class="migration-note">للحسابات المنقولة من النظام السابق، استخدم «نسيت كلمة المرور؟» لتعيين كلمة مرور جديدة.</p>
           </div>
           <v-btn color="primary" size="x-large" block :loading="loading" :disabled="!formValid || loading" type="submit" class="auth-btn primary-btn"><span>تسجيل الدخول</span><v-icon end size="20">mdi-arrow-left</v-icon></v-btn>
@@ -63,7 +77,10 @@
         <v-divider></v-divider>
         <v-card-text class="dialog-content">
           <p>أدخل بريدك الإلكتروني وسنرسل لك رابطًا آمنًا لإعادة تعيين كلمة المرور.</p>
-          <v-text-field v-model="resetEmail" label="البريد الإلكتروني" type="email" prepend-inner-icon="mdi-email-outline" variant="outlined" dir="ltr" class="auth-input" hide-details="auto" autocomplete="email"></v-text-field>
+          <v-alert v-if="resetErrorMessage" type="error" variant="tonal" density="comfortable" class="mb-4" role="alert">
+            {{ resetErrorMessage }}
+          </v-alert>
+          <v-text-field v-model="resetEmail" label="البريد الإلكتروني" type="email" prepend-inner-icon="mdi-email-outline" variant="outlined" dir="ltr" class="auth-input" hide-details="auto" autocomplete="email" @update:model-value="resetErrorMessage = ''"></v-text-field>
         </v-card-text>
         <v-divider></v-divider>
         <v-card-actions class="dialog-actions"><v-btn variant="text" @click="showForgotPassword = false">إلغاء</v-btn><v-btn color="primary" :loading="loading" :disabled="!resetEmail" @click="handleResetPassword">إرسال الرابط</v-btn></v-card-actions>
@@ -91,6 +108,7 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const showForgotPassword = ref(false)
 const resetEmail = ref('')
+const resetErrorMessage = ref('')
 // Google provider is intentionally opt-in; Firebase currently has it disabled.
 const googleAuthEnabled = import.meta.env.VITE_FIREBASE_GOOGLE_ENABLED === 'true'
 
@@ -104,7 +122,7 @@ async function handleLogin() {
   successMessage.value = ''
   const result = await authStore.signIn(email.value.trim(), password.value)
   loading.value = false
-  if (result.success) router.push(route.query.redirect || '/dashboard')
+  if (result.success) router.replace(getSafeRedirect())
   else errorMessage.value = getErrorMessage(result.error)
 }
 
@@ -112,16 +130,29 @@ async function handleGoogleLogin() {
   if (loading.value) return
   loading.value = true
   errorMessage.value = ''
-  const result = await authStore.signInWithGoogle()
-  if (!result.success) {
+  try {
+    const result = await authStore.signInWithGoogle()
+    if (result.success) {
+      await router.replace(getSafeRedirect())
+    } else {
+      errorMessage.value = getErrorMessage(result.error)
+    }
+  } finally {
     loading.value = false
-    errorMessage.value = getErrorMessage(result.error)
   }
+}
+
+function getSafeRedirect() {
+  const redirect = route.query.redirect
+  return typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
+    ? redirect
+    : '/dashboard'
 }
 
 async function handleResetPassword() {
   if (!resetEmail.value || loading.value) return
   loading.value = true
+  resetErrorMessage.value = ''
   errorMessage.value = ''
   const result = await authStore.resetPassword(resetEmail.value.trim())
   loading.value = false
@@ -129,7 +160,13 @@ async function handleResetPassword() {
     showForgotPassword.value = false
     successMessage.value = 'تم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني.'
     resetEmail.value = ''
-  } else errorMessage.value = getErrorMessage(result.error)
+  } else resetErrorMessage.value = getErrorMessage(result.error)
+}
+
+function openForgotPassword() {
+  resetEmail.value = email.value.trim()
+  resetErrorMessage.value = ''
+  showForgotPassword.value = true
 }
 
 function getErrorMessage(error) {
@@ -142,10 +179,12 @@ function getErrorMessage(error) {
     'auth/user-not-found': 'لا يوجد حساب بهذا البريد الإلكتروني.',
     'auth/wrong-password': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
     'auth/too-many-requests': 'محاولات كثيرة. انتظر قليلًا ثم حاول مرة أخرى.',
+    'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة.',
     'auth/network-request-failed': 'تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة.',
     'auth/popup-closed-by-user': 'أغلقت نافذة Google قبل إكمال الدخول.',
     'auth/popup-blocked': 'المتصفح منع نافذة Google. اسمح بالنوافذ المنبثقة ثم حاول مجددًا.',
-    'auth/account-exists-with-different-credential': 'هذا البريد مرتبط بطريقة دخول أخرى. استخدم البريد وكلمة المرور.'
+    'auth/account-exists-with-different-credential': 'هذا البريد مرتبط بطريقة دخول أخرى. استخدم البريد وكلمة المرور.',
+    'auth/user-disabled': 'هذا الحساب موقوف حاليًا. تواصل مع الدعم للمساعدة.'
   }
   return errorMap[code] || 'تعذر تسجيل الدخول. تحقق من بياناتك وحاول مرة أخرى.'
 }
@@ -218,5 +257,13 @@ function getErrorMessage(error) {
 .dialog-content p { color: #718096; line-height: 1.8; font-size: .88rem; margin: 0 0 17px; }
 .dialog-actions { justify-content: flex-start; gap: 8px; padding: 16px 24px 20px; }
 @media (max-width: 850px) { .login-page { padding: 0 16px 16px; } .auth-header { height: 72px; } .auth-shell { min-height: auto; grid-template-columns: 1fr; border-radius: 24px; } .auth-story { min-height: 285px; padding: 35px 30px; } .auth-story h1 { font-size: 2.4rem; } .auth-story > p { margin: 15px 0 22px; font-size: .9rem; line-height: 1.7; } .story-points { grid-template-columns: 1fr 1fr; gap: 10px; } .story-point { align-items: flex-start; gap: 8px; } .point-icon { width: 34px; height: 34px; flex: 0 0 34px; } .story-point strong { font-size: .78rem; } .story-point small { font-size: .68rem; line-height: 1.4; } .auth-panel { padding: 36px 25px 34px; } .panel-logo { margin-bottom: 21px; } }
-@media (max-width: 430px) { .header-action { font-size: .8rem; } .auth-story { min-height: 300px; } .story-points { grid-template-columns: 1fr; } .story-point small { font-size: .72rem; } .auth-panel { padding-inline: 19px; } }
+@media (max-width: 430px) {
+  .header-action { font-size: .8rem; }
+  .auth-story { min-height: 0; padding: 20px 20px 22px; }
+  .auth-story h1 { font-size: 1.55rem; line-height: 1.3; }
+  .auth-story > p, .story-points, .story-orbit { display: none; }
+  .auth-panel { padding: 22px 19px 26px; }
+  .panel-logo { display: none; }
+  .panel-heading { margin-bottom: 20px; }
+}
 </style>

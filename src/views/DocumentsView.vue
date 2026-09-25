@@ -15,7 +15,7 @@
 
     <v-alert v-if="documentsStore.error" type="error" variant="tonal" class="mb-4" role="alert">
       تعذر تحديث الوثائق. {{ documentsStore.documents.length ? 'نعرض آخر بيانات محفوظة.' : 'لم نتمكن من التحقق من وجود وثائق.' }}
-      <v-btn class="ms-2" size="small" variant="text" :loading="documentsStore.loading" @click="documentsStore.fetchDocuments()">إعادة المحاولة</v-btn>
+      <v-btn class="ms-2" size="small" variant="text" :loading="documentsStore.loading" :disabled="documentsStore.loading" @click="documentsStore.fetchDocuments()">إعادة المحاولة</v-btn>
     </v-alert>
     <v-card v-else-if="documentsStore.loading && !documentsStore.documents.length" class="glass-card pa-8 text-center mb-6">
       <v-progress-circular indeterminate color="primary" aria-label="جارٍ تحميل الوثائق" />
@@ -81,7 +81,7 @@
           class="document-card glass-card h-100"
           :class="`status-${getDocument(type).statusInfo.status}`"
         >
-          <div v-if="getDocument(type).image" class="document-image-wrapper" @click="openViewDialog(getDocument(type))">
+          <div v-if="getDocument(type).image" class="document-image-wrapper" role="button" tabindex="0" :aria-label="`عرض ${documentsStore.DOCUMENT_LABELS[type]}`" @click="openViewDialog(getDocument(type))" @keydown.enter.space.prevent="openViewDialog(getDocument(type))">
             <template v-if="isPdf(getDocument(type).image)">
               <div class="document-icon-placeholder bg-grey-lighten-4">
                 <v-icon size="64" color="error">mdi-file-pdf-box</v-icon>
@@ -113,7 +113,7 @@
               <v-btn variant="tonal" size="small" class="flex-grow-1" @click="openEditDialog(getDocument(type))">
                 <v-icon start>mdi-pencil</v-icon>تعديل
               </v-btn>
-              <v-btn icon variant="text" size="small" color="error" @click="confirmDelete(getDocument(type))">
+              <v-btn icon variant="text" size="small" color="error" :aria-label="`حذف ${documentsStore.DOCUMENT_LABELS[type]}`" @click="confirmDelete(getDocument(type))">
                 <v-icon>mdi-delete</v-icon>
               </v-btn>
             </div>
@@ -121,14 +121,14 @@
         </v-card>
         
         <!-- Empty State Card -->
-        <v-card v-else-if="!documentsStore.error && !documentsStore.loading" class="document-card glass-card h-100 document-empty" @click="openAddDialog(type)">
+        <v-card v-else-if="!documentsStore.error && !documentsStore.loading" class="document-card glass-card h-100 document-empty">
           <v-card-text class="pa-8 text-center h-100 d-flex flex-column justify-center align-center">
             <div class="empty-icon mb-4" :class="`bg-${documentsStore.DOCUMENT_COLORS[type]}`">
               <v-icon size="36" color="white">{{ documentsStore.DOCUMENT_ICONS[type] }}</v-icon>
             </div>
             <h3 class="text-subtitle-1 font-weight-bold mb-1">{{ documentsStore.DOCUMENT_LABELS[type] }}</h3>
             <p class="text-body-2 text-medium-emphasis mb-4">لم تتم الإضافة</p>
-            <v-btn :color="documentsStore.DOCUMENT_COLORS[type]" size="small" variant="flat">
+            <v-btn :color="documentsStore.DOCUMENT_COLORS[type]" size="small" variant="flat" :aria-label="`إضافة ${documentsStore.DOCUMENT_LABELS[type]}`" @click="openAddDialog(type)">
               <v-icon start>mdi-plus</v-icon>إضافة
             </v-btn>
           </v-card-text>
@@ -142,7 +142,7 @@
       <v-row>
         <v-col v-for="doc in customDocuments" :key="doc.id" cols="12" md="6" lg="3">
           <v-card class="document-card glass-card h-100" :class="`status-${doc.statusInfo.status}`">
-            <div v-if="doc.image" class="document-image-wrapper" @click="openViewDialog(doc)">
+            <div v-if="doc.image" class="document-image-wrapper" role="button" tabindex="0" :aria-label="`عرض ${doc.title || documentsStore.DOCUMENT_LABELS[doc.type] || 'الوثيقة'}`" @click="openViewDialog(doc)" @keydown.enter.space.prevent="openViewDialog(doc)">
               <template v-if="isPdf(doc.image)">
                 <div class="document-icon-placeholder bg-grey-lighten-4">
                   <v-icon size="64" color="error">mdi-file-pdf-box</v-icon>
@@ -174,7 +174,7 @@
                 <v-btn variant="tonal" size="small" class="flex-grow-1" @click="openEditDialog(doc)">
                   <v-icon start>mdi-pencil</v-icon>تعديل
                 </v-btn>
-                <v-btn icon variant="text" size="small" color="error" @click="confirmDelete(doc)">
+                <v-btn icon variant="text" size="small" color="error" :aria-label="`حذف ${doc.title || documentsStore.DOCUMENT_LABELS[doc.type] || 'الوثيقة'}`" @click="confirmDelete(doc)">
                   <v-icon>mdi-delete</v-icon>
                 </v-btn>
               </div>
@@ -201,7 +201,7 @@
           <v-alert v-if="saveError" type="error" variant="tonal" class="mb-4" role="alert">{{ saveError }}</v-alert>
           <!-- Image Upload -->
           <div class="image-upload-section mb-5">
-            <div class="image-upload-area" @click="triggerImageUpload">
+            <div class="image-upload-area" role="button" tabindex="0" aria-label="اختيار صورة أو ملف للوثيقة" @click="triggerImageUpload" @keydown.enter.space.prevent="triggerImageUpload">
               <template v-if="formData.image">
                 <div v-if="isPdf(formData.image)" class="d-flex flex-column align-center justify-center bg-grey-lighten-4 rounded-lg" style="height: 180px">
                   <v-icon size="64" color="error">mdi-file-pdf-box</v-icon>
@@ -265,7 +265,7 @@
             <v-icon :color="viewDocument.typeColor" class="me-2">{{ viewDocument.typeIcon }}</v-icon>
             <span>{{ viewDocument.typeLabel }}</span>
           </div>
-          <v-btn icon variant="text" @click="showViewDialog = false"><v-icon>mdi-close</v-icon></v-btn>
+          <v-btn icon variant="text" aria-label="إغلاق معاينة الوثيقة" @click="showViewDialog = false"><v-icon>mdi-close</v-icon></v-btn>
         </v-card-title>
         <v-divider></v-divider>
         <div v-if="viewDocument.image" class="bg-grey-darken-4 d-flex align-center justify-center" style="min-height: 400px; max-height: 80vh">
@@ -451,7 +451,9 @@ async function saveDocument() {
     showDialog.value = false
     formData.value = getEmptyForm()
   } catch (error) {
-    saveError.value = error.message || 'تعذر حفظ الوثيقة. بقيت البيانات في النموذج؛ أعد المحاولة.'
+    saveError.value = /[\u0600-\u06FF]/.test(error.message || '')
+      ? error.message
+      : 'تعذر حفظ الوثيقة. بقيت البيانات في النموذج؛ أعد المحاولة.'
   } finally {
     savingDocument.value = false
   }
@@ -483,7 +485,8 @@ async function deleteDocument() {
     showDeleteDialog.value = false
     showSnackbar('تم حذف الوثيقة')
   } catch (error) {
-    showSnackbar(error.message || 'تعذر حذف الوثيقة. أعد المحاولة.', 'error')
+    const message = /[\u0600-\u06FF]/.test(error.message || '') ? error.message : 'تعذر حذف الوثيقة. أعد المحاولة.'
+    showSnackbar(message, 'error')
   } finally { deletingDocument.value = false }
 }
 

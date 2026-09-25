@@ -19,6 +19,7 @@
 
       <!-- Form -->
       <v-card-text class="pa-6 pt-8">
+        <v-alert v-if="saveError" type="error" variant="tonal" class="mb-4" role="alert">{{ saveError }}</v-alert>
         <v-form ref="form" v-model="valid" @submit.prevent>
           <div class="row-inputs d-flex gap-4">
             <v-text-field
@@ -64,7 +65,7 @@
           variant="flat"
           block
           :loading="loading"
-          :disabled="!valid"
+          :disabled="!valid || loading"
           @click="saveProfile"
           rounded="lg"
         >
@@ -77,7 +78,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useProfileStore } from '@/stores/profile'
 import { useAuthStore } from '@/stores/auth'
 
@@ -86,6 +87,7 @@ const authStore = useAuthStore()
 
 const valid = ref(false)
 const loading = ref(false)
+const saveError = ref('')
 const formData = ref({
   firstName: '',
   lastName: '',
@@ -114,19 +116,25 @@ watch(() => profileStore.profile, (newProfile) => {
 }, { immediate: true })
 
 async function saveProfile() {
-  if (!valid.value) return
+  if (!valid.value || loading.value) return
   
   loading.value = true
+  saveError.value = ''
   try {
-    const success = await profileStore.updateProfile({
+    const result = await profileStore.updateProfile({
       firstName: formData.value.firstName,
       lastName: formData.value.lastName,
       phone: formData.value.phone
     })
+
+    if (!result.success) {
+      saveError.value = 'تعذر حفظ الملف الشخصي. بقيت البيانات في النموذج؛ أعد المحاولة.'
+    }
     
     // Dialog will close automatically because isComplete will become true
   } catch (error) {
     console.error('Error saving profile:', error)
+    saveError.value = 'تعذر حفظ الملف الشخصي. بقيت البيانات في النموذج؛ أعد المحاولة.'
   } finally {
     loading.value = false
   }

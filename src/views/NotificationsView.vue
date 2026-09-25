@@ -1,7 +1,7 @@
 <template>
   <div class="notifications-view">
     <div class="d-flex align-center mb-6">
-      <v-btn icon="mdi-arrow-right" variant="text" class="me-2" @click="$router.back()"></v-btn>
+      <v-btn icon="mdi-arrow-right" variant="text" class="me-2" aria-label="العودة" @click="$router.back()"></v-btn>
       <h1 class="text-h4 font-weight-bold">الإشعارات</h1>
       <v-spacer></v-spacer>
       <v-chip v-if="notificationsStore.unreadCount > 0" color="error" variant="flat">

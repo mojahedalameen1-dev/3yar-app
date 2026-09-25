@@ -96,19 +96,24 @@ function runGuard() {
         return
     }
 
-    let vercelIgnore = ''
-    let gitIgnore = ''
-    try {
-        vercelIgnore = readFileSync(join(root, '.vercelignore'), 'utf8')
-        gitIgnore = readFileSync(join(root, '.gitignore'), 'utf8')
-    } catch {
-        reportFailure('required deployment ignore files are missing.')
-        return
-    }
+    // Vercel excludes .gitignore from the uploaded build source. Validate ignore
+    // coverage before upload locally, then keep scanning the deployed source for
+    // credential files regardless of where this guard runs.
+    if (process.env.VERCEL !== '1') {
+        let vercelIgnore = ''
+        let gitIgnore = ''
+        try {
+            vercelIgnore = readFileSync(join(root, '.vercelignore'), 'utf8')
+            gitIgnore = readFileSync(join(root, '.gitignore'), 'utf8')
+        } catch {
+            reportFailure('required deployment ignore files are missing.')
+            return
+        }
 
-    if (!hasRequiredIgnoreCoverage(vercelIgnore, gitIgnore)) {
-        reportFailure('credential filename patterns are not covered by both .gitignore and .vercelignore.')
-        return
+        if (!hasRequiredIgnoreCoverage(vercelIgnore, gitIgnore)) {
+            reportFailure('credential filename patterns are not covered by both .gitignore and .vercelignore.')
+            return
+        }
     }
 
     const files = findDeploymentCredentialFiles(root)

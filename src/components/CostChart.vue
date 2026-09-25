@@ -33,7 +33,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import {
   Chart as ChartJS,
   Title,
@@ -57,8 +57,6 @@ const props = defineProps({
   },
   loading: Boolean
 })
-
-const emit = defineEmits(['add-record'])
 
 const hasData = computed(() => props.records && props.records.length > 0)
 
