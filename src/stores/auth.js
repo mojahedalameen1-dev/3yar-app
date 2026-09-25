@@ -35,9 +35,9 @@ export const useAuthStore = defineStore('auth', () => {
         useOdometerStore().$reset()
         useProfileStore().$reset()
 
-        // Clear Local Storage to remove any persisted state or tokens
-        localStorage.clear()
-        sessionStorage.clear()
+        // Keep user preferences such as the selected theme; clear only the
+        // legacy admin session marker when switching or ending user sessions.
+        sessionStorage.removeItem('adminKey')
     }
 
     // Initialize auth state
@@ -173,6 +173,8 @@ export const useAuthStore = defineStore('auth', () => {
             })
 
             if (err) throw err
+            user.value = data.user
+            session.value = data.session
             return { success: true, data }
         } catch (err) {
             error.value = err.message
@@ -187,9 +189,10 @@ export const useAuthStore = defineStore('auth', () => {
         loading.value = true
         error.value = null
         try {
-            const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/reset-password`
-            })
+            // Firebase's hosted action handler owns the reset flow. This app
+            // does not implement a /reset-password route, so don't advertise
+            // a return URL that would land on an unknown page.
+            const { error: err } = await supabase.auth.resetPasswordForEmail(email)
             if (err) throw err
             return { success: true }
         } catch (err) {

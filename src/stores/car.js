@@ -160,13 +160,11 @@ export const useCarStore = defineStore('car', () => {
             if (updates.image !== undefined) dbUpdates.image = updates.image
             if (updates.notes !== undefined) dbUpdates.notes = updates.notes
 
-            const { data, error: err } = await supabase
+            const { error: err } = await supabase
                 .from('cars')
                 .update(dbUpdates)
                 .eq('id', car.value.id)
                 .eq('user_id', userId)
-                .select()
-                .maybeSingle()
 
             if (err) throw err
 

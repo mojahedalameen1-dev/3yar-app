@@ -26,7 +26,7 @@
           <v-card-text v-if="carStore.hasCar" class="pa-5">
             <!-- Car Image -->
             <div class="car-image-section mb-5">
-              <div class="car-image-wrapper" @click="triggerImageUpload">
+              <div class="car-image-wrapper" role="button" tabindex="0" aria-label="تغيير صورة السيارة" @click="triggerImageUpload" @keydown.enter.space.prevent="triggerImageUpload">
                 <v-img
                 v-if="carData.image"
                   :src="carData.image"
@@ -450,12 +450,6 @@ async function deleteCar() {
   } catch (error) {
     deleteCarError.value = error.message || 'تعذر حذف السيارة. لم نعرض نجاحًا؛ أعد المحاولة.'
   } finally { deletingCar.value = false }
-}
-
-// Reset Tasks
-function resetTasks() {
-  tasksStore.resetTasks()
-  showSnackbar('تم إعادة تعيين المهام')
 }
 
 // Verify and Clear Data

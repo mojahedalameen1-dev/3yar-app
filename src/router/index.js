@@ -31,7 +31,7 @@ const routes = [
         path: '/status/:token',
         name: 'status',
         component: () => import('@/views/StatusView.vue'),
-        meta: { title: 'حالة السيارة', public: true }
+        meta: { title: 'المشاركة العامة غير متاحة', public: true }
     },
 
     // Onboarding route (auth required, no car required)

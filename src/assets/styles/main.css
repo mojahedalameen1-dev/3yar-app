@@ -372,17 +372,9 @@ body {
 
 /* Responsive Utilities */
 @media (max-width: 960px) {
-  .v-application {
-    background: #000000 !important;
-  }
-
-  .app-main {
-    background: #000000 !important;
-  }
-
   .surface-card {
-    background: #121212 !important;
-    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    background: rgb(var(--v-theme-surface)) !important;
+    border: 1px solid rgba(var(--v-theme-on-surface), 0.08) !important;
     border-radius: var(--radius-3xl) !important;
     box-shadow: none !important;
   }
@@ -395,7 +387,7 @@ body {
   .stat-value-large {
     font-size: 2.5rem !important;
     font-weight: 800 !important;
-    color: #ffffff !important;
+    color: rgb(var(--v-theme-on-surface)) !important;
     line-height: 1;
   }
 
@@ -459,17 +451,17 @@ body {
 /* 2. Premium Input Fields */
 .v-field--variant-outlined .v-field__outline {
   --v-field-border-opacity: 0.2 !important;
-  color: #2a2a2a !important;
+  color: rgb(var(--v-theme-on-surface)) !important;
 }
 
 .v-field--focused .v-field__outline {
   --v-field-border-opacity: 1 !important;
-  color: var(--electric-blue) !important;
+  color: rgb(var(--v-theme-primary)) !important;
 }
 
 .v-field__input {
-  background: #121212 !important;
-  /* Slightly lighter than #000000 */
+  background: rgb(var(--v-theme-surface)) !important;
+  color: rgb(var(--v-theme-on-surface)) !important;
   border-radius: var(--radius-md);
 }
 
@@ -484,4 +476,19 @@ body {
 
 .pt-safe {
   padding-top: env(safe-area-inset-top, 20px) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

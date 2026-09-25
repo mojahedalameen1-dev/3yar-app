@@ -25,8 +25,9 @@
         <v-card-text class="pa-6 pa-sm-8">
           <v-form ref="registerForm" v-model="formValid" @submit.prevent="handleRegister">
             <div class="form-group mb-4">
-              <label class="form-label">البريد الإلكتروني</label>
+              <label class="form-label" for="register-email">البريد الإلكتروني</label>
               <v-text-field
+                id="register-email"
                 v-model="email"
                 type="email"
                 placeholder="example@email.com"
@@ -41,8 +42,9 @@
             </div>
 
             <div class="form-group mb-4">
-              <label class="form-label">كلمة المرور</label>
+              <label class="form-label" for="register-password">كلمة المرور</label>
               <v-text-field
+                id="register-password"
                 v-model="password"
                 :type="showPassword ? 'text' : 'password'"
                 placeholder="6 أحرف على الأقل"
@@ -59,8 +61,9 @@
             </div>
 
             <div class="form-group mb-6">
-              <label class="form-label">تأكيد كلمة المرور</label>
+              <label class="form-label" for="register-confirm-password">تأكيد كلمة المرور</label>
               <v-text-field
+                id="register-confirm-password"
                 v-model="confirmPassword"
                 :type="showPassword ? 'text' : 'password'"
                 placeholder="أعد كتابة كلمة المرور"
@@ -79,7 +82,7 @@
               size="x-large"
               block
               :loading="loading"
-              :disabled="!formValid"
+              :disabled="!formValid || loading"
               type="submit"
               class="auth-btn mb-4"
             >
@@ -116,6 +119,7 @@
               border
               @click="handleGoogleSignUp"
               :loading="loading"
+              :disabled="loading"
             >
               <template #prepend>
                 <div class="google-logo-wrapper">
@@ -173,10 +177,12 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import ayarLogo from '@/assets/ayar-logo.png'
 
 const authStore = useAuthStore()
+const router = useRouter()
 
 // Form state
 const registerForm = ref(null)
@@ -210,12 +216,12 @@ const confirmPasswordRules = [
 ]
 
 async function handleRegister() {
-  if (!formValid.value) return
+  if (!formValid.value || loading.value) return
 
   loading.value = true
   errorMessage.value = ''
 
-  const result = await authStore.signUp(email.value, password.value)
+  const result = await authStore.signUp(email.value.trim(), password.value)
   
   loading.value = false
   
@@ -228,26 +234,37 @@ async function handleRegister() {
 }
 
 async function handleGoogleSignUp() {
+  if (loading.value) return
   loading.value = true
   errorMessage.value = ''
-  
-  // Use the same signInWithGoogle function as login
-  // Firebase handles Google sign-in and first-time account creation.
-  const result = await authStore.signInWithGoogle()
-  
-  if (!result.success && result.error) {
+  try {
+    // Firebase creates the account on the first successful Google sign-in.
+    const result = await authStore.signInWithGoogle()
+    if (result.success) {
+      await router.replace('/dashboard')
+    } else {
+      errorMessage.value = getErrorMessage(result.error)
+    }
+  } finally {
     loading.value = false
-    errorMessage.value = getErrorMessage(result.error)
   }
 }
 
 function getErrorMessage(error) {
+  const raw = typeof error === 'string' ? error : error?.code || error?.message || ''
+  const code = raw.match(/auth\/[a-z-]+/)?.[0] || raw
   const errorMap = {
-    'User already registered': 'هذا البريد مسجل بالفعل',
-    'Password should be at least 6 characters': 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
-    'Unable to validate email address': 'البريد الإلكتروني غير صحيح'
+    'auth/email-already-in-use': 'هذا البريد مسجل بالفعل. سجّل الدخول أو استخدم بريدًا آخر.',
+    'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة.',
+    'auth/weak-password': 'كلمة المرور قصيرة جدًا. استخدم ستة أحرف على الأقل.',
+    'auth/operation-not-allowed': 'إنشاء الحساب بالبريد غير مفعّل حاليًا. حاول لاحقًا أو استخدم طريقة دخول أخرى.',
+    'auth/too-many-requests': 'محاولات كثيرة. انتظر قليلًا ثم حاول مرة أخرى.',
+    'auth/network-request-failed': 'تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة.',
+    'auth/popup-closed-by-user': 'أغلقت نافذة Google قبل إكمال التسجيل.',
+    'auth/popup-blocked': 'المتصفح منع نافذة Google. اسمح بالنوافذ المنبثقة ثم حاول مجددًا.',
+    'auth/account-exists-with-different-credential': 'هذا البريد مرتبط بطريقة دخول أخرى. استخدم طريقة الدخول السابقة.'
   }
-  return errorMap[error] || error || 'حدث خطأ، يرجى المحاولة مرة أخرى'
+  return errorMap[code] || 'تعذر إنشاء الحساب. تحقق من البيانات وحاول مرة أخرى.'
 }
 </script>
 

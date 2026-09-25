@@ -11,9 +11,11 @@
             <div class="text-h6 font-weight-bold">{{ profileStore.firstName || 'مستخدم' }}</div>
           </div>
 
-          <v-avatar size="40" class="avatar-glow cursor-pointer" @click="router.push('/settings')">
-            <v-img :src="profileStore.profile?.avatar_url || 'https://randomuser.me/api/portraits/lego/1.jpg'"></v-img>
-          </v-avatar>
+          <v-btn icon variant="text" to="/settings" aria-label="فتح الإعدادات">
+            <v-avatar size="40" class="avatar-glow">
+              <v-img :src="profileStore.profile?.avatar_url || 'https://randomuser.me/api/portraits/lego/1.jpg'"></v-img>
+            </v-avatar>
+          </v-btn>
         </div>
       </v-app-bar>
 
@@ -119,7 +121,7 @@
           </v-list>
           
           <!-- User Profile -->
-          <UserProfile v-if="authStore.isAuthenticated" @logout="handleLogout" />
+          <UserProfile v-if="authStore.isAuthenticated" />
         </template>
       </v-navigation-drawer>
 
@@ -133,11 +135,13 @@
         elevation="0"
       >
         <v-btn
-          v-for="item in navItems.slice(0, 5)"
+          v-for="item in mobileNavItems"
           :key="item.route"
           :value="item.name"
-          :to="item.route"
+          :to="item.route || undefined"
           class="nav-btn-mobile"
+          :aria-label="item.title"
+          @click="handleMobileNavItem(item)"
         >
           <v-icon>{{ item.icon }}</v-icon>
           <span class="text-caption">{{ item.title }}</span>
@@ -151,6 +155,29 @@
           ></v-badge>
         </v-btn>
       </v-bottom-navigation>
+
+      <v-bottom-sheet v-model="showMoreMenu">
+        <v-card rounded="t-xl" class="mobile-more-sheet">
+          <v-card-title class="text-subtitle-1 font-weight-bold px-5 pt-5">المزيد</v-card-title>
+          <v-list nav class="px-3 pb-4">
+            <v-list-item
+              v-for="item in moreNavItems"
+              :key="item.route"
+              :to="item.route"
+              :prepend-icon="item.icon"
+              :title="item.title"
+              rounded="lg"
+              @click="showMoreMenu = false"
+            ></v-list-item>
+            <v-list-item
+              :prepend-icon="themeStore.currentTheme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
+              :title="themeStore.currentTheme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'"
+              rounded="lg"
+              @click="toggleTheme(); showMoreMenu = false"
+            ></v-list-item>
+          </v-list>
+        </v-card>
+      </v-bottom-sheet>
     </template>
 
     <!-- Main Content -->
@@ -191,21 +218,12 @@
       </template>
     </v-snackbar>
 
-    <v-fab
-      v-if="isMobile && showNavigation && $route.name === 'tasks'"
-      icon="mdi-plus"
-      color="primary"
-      location="bottom center"
-      size="x-large"
-      class="fab-button-mobile"
-      @click="handleFabClick"
-    ></v-fab>
   </v-app>
 </template>
 
 <script setup>
 import { ref, computed, provide, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTasksStore } from '@/stores/tasks'
 import { useCarStore } from '@/stores/car'
@@ -221,7 +239,6 @@ import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import ayarLogo from '@/assets/ayar-logo.png'
 
 const route = useRoute()
-const router = useRouter()
 const authStore = useAuthStore()
 const tasksStore = useTasksStore()
 const carStore = useCarStore()
@@ -256,10 +273,11 @@ function toggleTheme() {
 const isMobile = ref(false)
 const drawer = ref(true)
 const rail = ref(false)
+const showMoreMenu = ref(false)
 const activeNav = ref('dashboard')
 
 watch(() => route.name, (val) => {
-  activeNav.value = val
+  activeNav.value = ['notifications', 'settings'].includes(val) ? 'more' : (val || 'dashboard')
 }, { immediate: true })
 
 function checkMobile() {
@@ -366,6 +384,7 @@ const navItems = computed(() => [
     title: 'وثائق السيارة', 
     icon: 'mdi-file-document-multiple', 
     route: '/documents', 
+    name: 'documents',
     badge: documentsStore.alertDocuments.length
   },
   {  
@@ -377,20 +396,19 @@ const navItems = computed(() => [
   }
 ])
 
-// FAB Handler
-function handleFabClick() {
-  if (route.name === 'dashboard' && !carStore.hasCar) {
-    router.push('/settings')
-  } else if (route.name === 'tasks') {
-    // Emit event for tasks page
-  }
-}
+const mobileNavItems = computed(() => [
+  ...navItems.value.filter(item => ['dashboard', 'tasks', 'records', 'documents'].includes(item.name)),
+  { title: 'المزيد', icon: 'mdi-dots-horizontal', route: null, name: 'more', badge: notificationsStore.unreadCount }
+])
 
-// Handle logout
-async function handleLogout() {
-  await authStore.signOut()
-  router.push('/login')
-  showSnackbar('تم تسجيل الخروج بنجاح')
+const moreNavItems = computed(() => navItems.value.filter(item => ['notifications', 'settings'].includes(item.name)))
+
+function handleMobileNavItem(item) {
+  if (item.name === 'more') {
+    showMoreMenu.value = true
+    return
+  }
+  showMoreMenu.value = false
 }
 
 // Snackbar
@@ -420,9 +438,9 @@ provide('isMobile', isMobile)
 
 <style scoped>
 .app-bar-mobile-premium {
-  background: rgba(0, 0, 0, 0.8) !important;
+  background: rgb(var(--v-theme-surface)) !important;
   backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12) !important;
   height: 90px !important; /* Increased for safe area + content */
 }
 
@@ -433,9 +451,9 @@ provide('isMobile', isMobile)
 
 .mobile-bottom-nav {
   height: 85px !important;
-  background: rgba(0, 0, 0, 0.85) !important;
+  background: rgb(var(--v-theme-surface)) !important;
   backdrop-filter: blur(25px);
-  border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12) !important;
   padding-bottom: env(safe-area-inset-bottom, 20px); /* Safe area for home indicator */
 }
 
@@ -450,7 +468,7 @@ provide('isMobile', isMobile)
 
 .nav-btn-mobile {
   min-width: 0 !important;
-  color: #888 !important;
+  color: rgba(var(--v-theme-on-surface), 0.72) !important;
   position: relative;
 }
 
@@ -460,19 +478,19 @@ provide('isMobile', isMobile)
 }
 
 .nav-btn-mobile.v-btn--active {
-  color: var(--electric-blue) !important;
+  color: rgb(var(--v-theme-primary)) !important;
 }
 
 .active-dot {
   width: 4px;
   height: 4px;
-  background: var(--electric-blue);
+  background: rgb(var(--v-theme-primary));
   border-radius: 50%;
   position: absolute;
   bottom: 0px;
   left: 50%;
   transform: translateX(-50%);
-  box-shadow: 0 0 8px var(--electric-blue);
+  box-shadow: 0 0 8px rgb(var(--v-theme-primary));
 }
 
 .nav-badge-mobile {
@@ -554,6 +572,10 @@ provide('isMobile', isMobile)
   min-height: 100vh;
 }
 
+.mobile-more-sheet {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 .loading-overlay {
   display: flex;
   flex-direction: column;
@@ -585,11 +607,6 @@ provide('isMobile', isMobile)
   border-radius: 12px;
 }
 
-.fab-button {
-  margin-bottom: 16px;
-  margin-left: 16px;
-}
-
 .logo-wrapper-new {
   background: white;
   border-radius: 12px;
@@ -601,9 +618,9 @@ provide('isMobile', isMobile)
   height: 48px;
 }
 
-@media (max-width: 600px) {
-  .fab-button {
-    margin-bottom: 24px;
+@media (max-width: 959px) {
+  .app-main {
+    padding-bottom: calc(85px + env(safe-area-inset-bottom, 0px));
   }
 }
 </style>

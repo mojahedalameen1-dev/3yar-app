@@ -953,7 +953,7 @@ const theme = useTheme()
 function toggleTheme() {
   themeStore.toggleTheme()
   // Force update to ensure reactivity if store lags
-  theme.global.name.value = themeStore.currentTheme
+  theme.change(themeStore.currentTheme)
 }
 // State
 const drawer = ref(true) // Sidebar toggle

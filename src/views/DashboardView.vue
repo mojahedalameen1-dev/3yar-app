@@ -2,7 +2,7 @@
   <div class="dashboard">
     <v-alert v-if="tasksStore.error || recordsStore.error || documentsStore.error" type="error" variant="tonal" class="mb-4" role="alert">
       تعذر تحديث بعض بيانات لوحة التحكم. نعرض آخر البيانات المحفوظة إن توفرت.
-      <v-btn size="small" variant="text" @click="retryDashboardData">إعادة المحاولة</v-btn>
+      <v-btn size="small" variant="text" :loading="tasksStore.loading || recordsStore.loading || documentsStore.loading" :disabled="tasksStore.loading || recordsStore.loading || documentsStore.loading" @click="retryDashboardData">إعادة المحاولة</v-btn>
     </v-alert>
     <!-- Greeting Header -->
     <div class="d-flex flex-wrap justify-space-between align-center mb-6 px-1 animate-slide-up" v-if="!isMobile">
@@ -58,7 +58,7 @@
         <!-- Car Card with Image -->
         <v-col cols="12" lg="4">
           <v-card :class="['car-card animate-slide-up', isMobile ? 'surface-card' : 'glass-card h-100']">
-            <div class="car-image-wrapper" @click="triggerImageUpload">
+            <div class="car-image-wrapper" role="button" tabindex="0" aria-label="تغيير صورة السيارة" @click="triggerImageUpload" @keydown.enter.space.prevent="triggerImageUpload">
               <v-img
                 v-if="carStore.car.image"
                 :src="carStore.car.image"
@@ -105,7 +105,7 @@
               </p>
               
               <!-- Odometer Display -->
-              <div :class="['pa-4 rounded-xl text-center', isMobile ? 'bg-black-lighten-1' : 'odometer-card']">
+              <div class="pa-4 rounded-xl text-center odometer-card">
                 <v-icon size="28" color="primary" class="mb-2">mdi-speedometer</v-icon>
                 <div :class="['font-weight-bold primary--text mb-1', isMobile ? 'stat-value-large' : 'text-h3']">
                   {{ formattedOdometer }}
@@ -119,19 +119,8 @@
                 </div>
               </div>
               
-              <!-- Share & Update Buttons -->
+              <!-- Car actions -->
               <div class="d-flex gap-3 mt-4">
-                <v-btn
-                  color="info"
-                  variant="tonal"
-                  class="flex-grow-1 action-btn-mobile"
-                  prepend-icon="mdi-qrcode"
-                  @click="openShareDialog"
-                  :height="isMobile ? 52 : 40"
-                  rounded="xl"
-                >
-                  مشاركة
-                </v-btn>
                 <v-btn
                   color="primary"
                   class="flex-grow-1 action-btn-mobile"
@@ -268,7 +257,7 @@
                   <div class="stat-icon mx-auto mb-2" :class="`bg-${stat.color}`">
                     <v-icon color="white" size="22">{{ stat.icon }}</v-icon>
                   </div>
-                  <div :class="['font-weight-bold mb-1', isMobile ? 'text-white' : `text-${stat.color}`]" :style="{ fontSize: isMobile ? '1.5rem' : '2.125rem' }">
+                  <div :class="['font-weight-bold mb-1', `text-${stat.color}`]" :style="{ fontSize: isMobile ? '1.5rem' : '2.125rem' }">
                     {{ stat.value }}
                   </div>
                   <div class="text-caption text-medium-emphasis">{{ stat.title }}</div>
@@ -447,16 +436,6 @@
       </v-row>
     </template>
 
-    <!-- QR Share Dialog -->
-    <Teleport to="body">
-      <div v-if="showQRDialog" :key="Date.now()" style="position: relative; z-index: 99999;">
-        <QRShareDialog 
-          v-model="showQRDialog"
-          :car="carStore.car"
-        />
-      </div>
-    </Teleport>
-
     <!-- Add Car Dialog -->
     <v-dialog v-model="showCarDialog" max-width="600" persistent>
       <v-card class="rounded-xl">
@@ -474,7 +453,7 @@
           <v-alert v-if="carDialogError" type="error" variant="tonal" class="mb-4" role="alert">{{ carDialogError }}</v-alert>
           <v-form ref="carForm" v-model="carFormValid">
             <!-- Image Upload -->
-            <div class="image-upload-area mb-4" @click="triggerDialogImageUpload">
+            <div class="image-upload-area mb-4" role="button" tabindex="0" aria-label="اختيار صورة السيارة" @click="triggerDialogImageUpload" @keydown.enter.space.prevent="triggerDialogImageUpload">
               <v-img
                 v-if="carFormData.image"
                 :src="carFormData.image"
@@ -707,7 +686,7 @@
 </template>
 
 <script setup>
-import { ref, computed, inject, defineAsyncComponent, onMounted, nextTick } from 'vue'
+import { ref, computed, inject, defineAsyncComponent, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCarStore } from '@/stores/car'
 import { useOdometerStore } from '@/stores/odometer'
@@ -716,7 +695,6 @@ import { useRecordsStore } from '@/stores/records'
 import { useDocumentsStore } from '@/stores/documents'
 import { useProfileStore } from '@/stores/profile'
 import OnboardingWizard from '@/components/OnboardingWizard.vue'
-import QRShareDialog from '@/components/QRShareDialog.vue'
 const CostChart = defineAsyncComponent(() => import('@/components/CostChart.vue'))
 import confetti from 'canvas-confetti'
 import dayjs from 'dayjs'
@@ -799,8 +777,6 @@ const statsCards = computed(() => [
 
 // Wizard
 const showWizard = ref(false)
-const showQRDialog = ref(false)
-
 function onWizardFinished() {
   showSnackbar('تم إعداد حسابك بنجاح! 🎉')
 }
@@ -901,7 +877,6 @@ function confirmSnooze() {
 
 // Record Dialog
 const showRecordDialog = ref(false)
-const recordFormValid = ref(false)
 const recordFormData = ref({ odometerReading: 0, cost: 0, serviceCenter: '', notes: '' })
 const savingRecord = ref(false)
 const recordSaveError = ref('')
@@ -927,27 +902,18 @@ async function confirmRecord() {
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
     } catch (error) {
       console.error('Maintenance completion failed:', error)
-      recordSaveError.value = error.message || 'تعذر تسجيل الصيانة. بقيت البيانات كما هي؛ أعد المحاولة.'
+      recordSaveError.value = /[\u0600-\u06FF]/.test(error.message || '')
+        ? error.message
+        : 'تعذر تسجيل الصيانة. بقيت البيانات كما هي؛ أعد المحاولة.'
     }
   })
 }
 
 // Navigation
 const router = useRouter()
-function openShareDialog() {
-  showQRDialog.value = true
-  // console.log("Modal state updated to:", showQRDialog.value);
-}
 
 function goToAddMaintenance() {
   router.push('/tasks')
-}
-
-function handleShareUpdate(updates) {
-  if (carStore.car) {
-    carStore.car = { ...carStore.car, ...updates }
-    showSnackbar(updates.publicShareEnabled ? 'تم تفعيل المشاركة' : 'تم إيقاف المشاركة')
-  }
 }
 
 // Helpers
@@ -1231,10 +1197,6 @@ function formatDate(date) { return dayjs(date).format('DD/MM/YYYY') }
     font-weight: bold;
     color: #fff;
     border: 1px solid rgba(255,255,255,0.1);
-  }
-
-  .bg-black-lighten-1 {
-    background: #1a1a1a !important;
   }
 
   .action-btn-mobile :deep(.v-btn__content) {

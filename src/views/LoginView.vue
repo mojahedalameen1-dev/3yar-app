@@ -104,7 +104,7 @@ async function handleLogin() {
   successMessage.value = ''
   const result = await authStore.signIn(email.value.trim(), password.value)
   loading.value = false
-  if (result.success) router.push(route.query.redirect || '/dashboard')
+  if (result.success) router.replace(getSafeRedirect())
   else errorMessage.value = getErrorMessage(result.error)
 }
 
@@ -112,11 +112,23 @@ async function handleGoogleLogin() {
   if (loading.value) return
   loading.value = true
   errorMessage.value = ''
-  const result = await authStore.signInWithGoogle()
-  if (!result.success) {
+  try {
+    const result = await authStore.signInWithGoogle()
+    if (result.success) {
+      await router.replace(getSafeRedirect())
+    } else {
+      errorMessage.value = getErrorMessage(result.error)
+    }
+  } finally {
     loading.value = false
-    errorMessage.value = getErrorMessage(result.error)
   }
+}
+
+function getSafeRedirect() {
+  const redirect = route.query.redirect
+  return typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
+    ? redirect
+    : '/dashboard'
 }
 
 async function handleResetPassword() {
@@ -142,10 +154,12 @@ function getErrorMessage(error) {
     'auth/user-not-found': 'لا يوجد حساب بهذا البريد الإلكتروني.',
     'auth/wrong-password': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
     'auth/too-many-requests': 'محاولات كثيرة. انتظر قليلًا ثم حاول مرة أخرى.',
+    'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة.',
     'auth/network-request-failed': 'تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة.',
     'auth/popup-closed-by-user': 'أغلقت نافذة Google قبل إكمال الدخول.',
     'auth/popup-blocked': 'المتصفح منع نافذة Google. اسمح بالنوافذ المنبثقة ثم حاول مجددًا.',
-    'auth/account-exists-with-different-credential': 'هذا البريد مرتبط بطريقة دخول أخرى. استخدم البريد وكلمة المرور.'
+    'auth/account-exists-with-different-credential': 'هذا البريد مرتبط بطريقة دخول أخرى. استخدم البريد وكلمة المرور.',
+    'auth/user-disabled': 'هذا الحساب موقوف حاليًا. تواصل مع الدعم للمساعدة.'
   }
   return errorMap[code] || 'تعذر تسجيل الدخول. تحقق من بياناتك وحاول مرة أخرى.'
 }
@@ -218,5 +232,13 @@ function getErrorMessage(error) {
 .dialog-content p { color: #718096; line-height: 1.8; font-size: .88rem; margin: 0 0 17px; }
 .dialog-actions { justify-content: flex-start; gap: 8px; padding: 16px 24px 20px; }
 @media (max-width: 850px) { .login-page { padding: 0 16px 16px; } .auth-header { height: 72px; } .auth-shell { min-height: auto; grid-template-columns: 1fr; border-radius: 24px; } .auth-story { min-height: 285px; padding: 35px 30px; } .auth-story h1 { font-size: 2.4rem; } .auth-story > p { margin: 15px 0 22px; font-size: .9rem; line-height: 1.7; } .story-points { grid-template-columns: 1fr 1fr; gap: 10px; } .story-point { align-items: flex-start; gap: 8px; } .point-icon { width: 34px; height: 34px; flex: 0 0 34px; } .story-point strong { font-size: .78rem; } .story-point small { font-size: .68rem; line-height: 1.4; } .auth-panel { padding: 36px 25px 34px; } .panel-logo { margin-bottom: 21px; } }
-@media (max-width: 430px) { .header-action { font-size: .8rem; } .auth-story { min-height: 300px; } .story-points { grid-template-columns: 1fr; } .story-point small { font-size: .72rem; } .auth-panel { padding-inline: 19px; } }
+@media (max-width: 430px) {
+  .header-action { font-size: .8rem; }
+  .auth-story { min-height: 0; padding: 20px 20px 22px; }
+  .auth-story h1 { font-size: 1.55rem; line-height: 1.3; }
+  .auth-story > p, .story-points, .story-orbit { display: none; }
+  .auth-panel { padding: 22px 19px 26px; }
+  .panel-logo { display: none; }
+  .panel-heading { margin-bottom: 20px; }
+}
 </style>
