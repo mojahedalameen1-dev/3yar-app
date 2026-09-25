@@ -1,5 +1,6 @@
 import { collection, doc, runTransaction } from 'firebase/firestore'
 import { firebaseAuth, firestore } from './firebase'
+import { MAINTENANCE_BASELINE_TYPE } from './maintenance-baseline-v1'
 
 function requiredNumber(value, fieldLabel) {
     const number = Number(value)
@@ -66,6 +67,7 @@ export async function commitMaintenanceCompletionV1({ taskId, record }) {
         transaction.update(taskRef, {
             last_maintenance_date: completedAt,
             last_maintenance_odometer: odometerReading,
+            baseline_type: MAINTENANCE_BASELINE_TYPE.MAINTENANCE_RECORD,
             snoozed_until: null,
             updated_at: completedAt
         })
@@ -76,7 +78,13 @@ export async function commitMaintenanceCompletionV1({ taskId, record }) {
         return {
             record: completedRecord,
             reading: odometerEntry,
-            task: { id: String(taskId), last_maintenance_date: completedAt, last_maintenance_odometer: odometerReading, snoozed_until: null },
+            task: {
+                id: String(taskId),
+                last_maintenance_date: completedAt,
+                last_maintenance_odometer: odometerReading,
+                baseline_type: MAINTENANCE_BASELINE_TYPE.MAINTENANCE_RECORD,
+                snoozed_until: null
+            },
             car: { id: String(task.car_id), current_odometer: Math.max(Number(car.current_odometer || 0), odometerReading) }
         }
     })

@@ -123,7 +123,15 @@
 
           <!-- Progress Section -->
           <div class="pa-4">
-            <div class="progress-section mb-4">
+            <div v-if="task.statusInfo.needsSetup" class="needs-setup-panel mb-4">
+              <v-alert type="info" variant="tonal" density="comfortable" class="mb-3">
+                تحتاج هذه المهمة إلى معلومات آخر صيانة حتى نحسب موعدها بشكل موثوق.
+              </v-alert>
+              <v-btn color="primary" variant="tonal" prepend-icon="mdi-wrench-clock" @click="openBaselineSetup(task)">
+                إعداد المهمة
+              </v-btn>
+            </div>
+            <div v-else class="progress-section mb-4">
               <div class="d-flex justify-space-between align-center mb-2">
                 <span class="text-caption text-medium-emphasis">نسبة الاكتمال</span>
                 <div class="d-flex align-center gap-2">
@@ -171,8 +179,8 @@
                 <span>كل {{ task.intervalMonths }} شهر</span>
               </div>
               <div v-if="task.lastMaintenanceDate" class="detail-item">
-                <v-icon size="16" color="grey" class="me-2">mdi-history</v-icon>
-                <span>آخر صيانة: {{ formatDate(task.lastMaintenanceDate) }}</span>
+                <v-icon size="16" color="grey" class="me-2">{{ task.baselineType === 'tracking_start' ? 'mdi-play-circle-outline' : 'mdi-history' }}</v-icon>
+                <span>{{ task.baselineType === 'tracking_start' ? 'بداية متابعة' : task.baselineType === 'reported_maintenance' ? 'آخر صيانة معروفة' : 'آخر صيانة' }}: {{ formatDate(task.lastMaintenanceDate) }}</span>
               </div>
               <div class="detail-item">
                 <v-icon size="16" :color="getPriorityColor(task.priority)" class="me-2">mdi-flag</v-icon>
@@ -197,7 +205,7 @@
                 تم
               </v-btn>
               <v-btn
-                v-if="!task.statusInfo.isSnoozed && task.statusInfo.status !== 'good'"
+                v-if="!task.statusInfo.isSnoozed && !task.statusInfo.needsSetup && task.statusInfo.status !== 'good'"
                 color="warning"
                 variant="tonal"
                 size="small"
@@ -329,31 +337,6 @@
               class="mb-4"
             ></v-switch>
 
-            <v-expansion-panels variant="accordion">
-              <v-expansion-panel title="تاريخ آخر صيانة (اختياري)">
-                <v-expansion-panel-text>
-                  <v-row>
-                    <v-col cols="12" md="6">
-                      <v-text-field
-                        v-model="taskFormData.lastMaintenanceDate"
-                        label="تاريخ آخر صيانة"
-                        type="date"
-                        prepend-inner-icon="mdi-calendar"
-                      ></v-text-field>
-                    </v-col>
-                    <v-col cols="12" md="6">
-                      <v-text-field
-                        v-model.number="taskFormData.lastMaintenanceOdometer"
-                        label="العداد عند آخر صيانة"
-                        type="number"
-                        suffix="كم"
-                        prepend-inner-icon="mdi-speedometer"
-                      ></v-text-field>
-                    </v-col>
-                  </v-row>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-            </v-expansion-panels>
           </v-form>
         </v-card-text>
         <v-divider></v-divider>
@@ -475,15 +458,25 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <MaintenanceBaselineDialog
+      v-model="showBaselineDialog"
+      :task="baselineTask"
+      :current-odometer="Number(carStore.car?.currentOdometer) || 0"
+      :loading="savingBaseline"
+      @save="saveBaseline"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, inject } from 'vue'
+import { useRoute } from 'vue-router'
 import { useCarStore } from '@/stores/car'
 import { useTasksStore } from '@/stores/tasks'
 import { completeMaintenanceV1 } from '@/services/maintenance-completion-v1'
 import { runSingleFlight } from '@/lib/single-flight'
+import MaintenanceBaselineDialog from '@/components/MaintenanceBaselineDialog.vue'
 import confetti from 'canvas-confetti'
 import dayjs from 'dayjs'
 
@@ -491,15 +484,17 @@ const showSnackbar = inject('showSnackbar')
 
 const carStore = useCarStore()
 const tasksStore = useTasksStore()
+const route = useRoute()
 
 // Filter
-const activeFilter = ref('all')
+const activeFilter = ref(route.query.filter === 'needs_setup' ? 'needs_setup' : 'all')
 
 const statsCards = computed(() => [
   { status: 'all', label: 'الكل', icon: 'mdi-view-grid', color: 'primary', count: tasksStore.taskStats.total },
   { status: 'late', label: 'متأخر', icon: 'mdi-alert-circle', color: 'error', count: tasksStore.taskStats.late },
   { status: 'due', label: 'مستحق', icon: 'mdi-clock-alert', color: 'warning', count: tasksStore.taskStats.due },
   { status: 'soon', label: 'قريب', icon: 'mdi-clock-outline', color: 'amber-darken-2', count: tasksStore.taskStats.soon },
+  { status: 'needs_setup', label: 'تحتاج إعداد', icon: 'mdi-wrench-clock', color: 'info', count: tasksStore.taskStats.needsSetup },
   { status: 'good', label: 'على ما يرام', icon: 'mdi-check-circle', color: 'success', count: tasksStore.taskStats.good },
   { status: 'snoozed', label: 'مؤجل', icon: 'mdi-alarm-snooze', color: 'grey', count: tasksStore.taskStats.snoozed }
 ])
@@ -546,9 +541,7 @@ function getEmptyTaskForm() {
     intervalKm: 5000,
     intervalMonths: 3,
     priority: 'medium',
-    isRecurring: true,
-    lastMaintenanceDate: null,
-    lastMaintenanceOdometer: null
+    isRecurring: true
   }
 }
 
@@ -562,9 +555,7 @@ function editTask(task) {
     intervalKm: task.intervalKm,
     intervalMonths: task.intervalMonths,
     priority: task.priority,
-    isRecurring: task.isRecurring,
-    lastMaintenanceDate: task.lastMaintenanceDate ? dayjs(task.lastMaintenanceDate).format('YYYY-MM-DD') : null,
-    lastMaintenanceOdometer: task.lastMaintenanceOdometer
+    isRecurring: task.isRecurring
   }
   showTaskDialog.value = true
 }
@@ -653,6 +644,29 @@ const recordData = ref({
 const savingRecord = ref(false)
 const recordSaveError = ref('')
 
+const showBaselineDialog = ref(false)
+const baselineTask = ref(null)
+const savingBaseline = ref(false)
+
+function openBaselineSetup(task) {
+  baselineTask.value = task
+  showBaselineDialog.value = true
+}
+
+async function saveBaseline(baseline) {
+  if (!baselineTask.value || savingBaseline.value) return
+  savingBaseline.value = true
+  try {
+    await tasksStore.updateTask(baselineTask.value.id, baseline)
+    showBaselineDialog.value = false
+    showSnackbar(baseline.baselineType === 'unknown' ? 'ستبقى المهمة تحتاج إعداد' : 'تم حفظ إعداد المهمة', 'success')
+  } catch (error) {
+    showSnackbar(/[\u0600-\u06FF]/.test(error.message || '') ? error.message : 'تعذر حفظ إعداد المهمة. أعد المحاولة.', 'error')
+  } finally {
+    savingBaseline.value = false
+  }
+}
+
 function openRecordDialog(task) {
   selectedTask.value = task
   recordSaveError.value = ''
@@ -709,12 +723,12 @@ async function deleteTask() {
 
 // Helpers
 function getStatusColor(status) {
-  const colors = { late: 'error', due: 'warning', soon: 'amber-darken-2', good: 'success' }
+  const colors = { late: 'error', due: 'warning', soon: 'amber-darken-2', needs_setup: 'info', good: 'success' }
   return colors[status] || 'grey'
 }
 
 function getStatusIcon(status) {
-  const icons = { late: 'mdi-alert-circle', due: 'mdi-clock-alert', soon: 'mdi-clock-outline', good: 'mdi-check-circle' }
+  const icons = { late: 'mdi-alert-circle', due: 'mdi-clock-alert', soon: 'mdi-clock-outline', needs_setup: 'mdi-wrench-clock', good: 'mdi-check-circle' }
   return icons[status] || 'mdi-help-circle'
 }
 
@@ -769,6 +783,7 @@ function formatDate(date) {
 .task-late { border-top-color: rgb(var(--v-theme-error)); }
 .task-due { border-top-color: rgb(var(--v-theme-warning)); }
 .task-soon { border-top-color: #F9A825; }
+.task-needs_setup { border-top-color: rgb(var(--v-theme-info)); }
 .task-good { border-top-color: rgb(var(--v-theme-success)); }
 
 .task-card-header {

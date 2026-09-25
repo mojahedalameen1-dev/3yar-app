@@ -40,6 +40,7 @@ describe('atomic V1 maintenance completion', () => {
         ])
         expect(result.record.car_id).toBe('car-1')
         expect(result.reading.source_record_id).toBe(result.record.id)
+        expect(result.task.baseline_type).toBe('maintenance_record')
         expect(result.car.current_odometer).toBe(12500)
     })
 
