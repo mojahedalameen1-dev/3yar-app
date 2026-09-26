@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/firebase'
 import { useCarStore } from './car'
-import dayjs from 'dayjs'
+import { calculateOdometerInsightsV1 } from '../lib/odometer-insights-v1'
+import { commitOdometerReadingV1 } from '../lib/odometer-entry-v1'
 
 export const useOdometerStore = defineStore('odometer', () => {
     // State
@@ -24,45 +25,22 @@ export const useOdometerStore = defineStore('odometer', () => {
     }
 
     // Getters
-    const sortedReadings = computed(() => {
-        return [...readings.value].sort((a, b) =>
-            new Date(b.date) - new Date(a.date)
-        )
-    })
+    const insights = computed(() => calculateOdometerInsightsV1(readings.value))
+    const sortedReadings = computed(() => insights.value.history)
 
     const latestReading = computed(() => {
-        if (readings.value.length === 0) return null
-        return sortedReadings.value[0]
+        return sortedReadings.value.find(reading => reading.valid) || null
     })
 
     const totalDistance = computed(() => {
-        if (readings.value.length < 2) return 0
-        const sorted = sortedReadings.value
-        return sorted[0].reading - sorted[sorted.length - 1].reading
+        const accepted = insights.value.analysisReadings
+        if (accepted.length < 2) return 0
+        return accepted.at(-1).reading - accepted[0].reading
     })
 
-    const averageDailyKm = computed(() => {
-        if (readings.value.length < 2) return 0
-        const sorted = sortedReadings.value
-        const firstDate = dayjs(sorted[sorted.length - 1].date)
-        const lastDate = dayjs(sorted[0].date)
-        const days = lastDate.diff(firstDate, 'day') || 1
-        return Math.round(totalDistance.value / days)
-    })
+    const averageDailyKm = computed(() => insights.value.averageDailyKm)
 
-    const readingsWithDistance = computed(() => {
-        const sorted = sortedReadings.value
-        return sorted.map((reading, index) => {
-            const prevReading = sorted[index + 1]
-            const distanceSinceLast = prevReading
-                ? reading.reading - prevReading.reading
-                : 0
-            return {
-                ...reading,
-                distanceSinceLast
-            }
-        })
-    })
+    const readingsWithDistance = computed(() => sortedReadings.value)
 
     // Database mapping
     function mapFromDb(row) {
@@ -72,14 +50,6 @@ export const useOdometerStore = defineStore('odometer', () => {
             date: row.date,
             notes: row.notes,
             createdAt: row.created_at
-        }
-    }
-
-    function mapToDb(reading) {
-        return {
-            reading: reading.reading,
-            date: reading.date || new Date().toISOString(),
-            notes: reading.notes || ''
         }
     }
 
@@ -105,7 +75,6 @@ export const useOdometerStore = defineStore('odometer', () => {
                 .select('*')
                 .eq('user_id', userId)
                 .eq('car_id', carId)
-                .order('date', { ascending: false })
 
             if (err) throw err
 
@@ -118,26 +87,24 @@ export const useOdometerStore = defineStore('odometer', () => {
         }
     }
 
-    async function addReading(readingData) {
+    async function addReading(readingData, { allowCurrentBaseline = false } = {}) {
         const carStore = useCarStore()
-        const currentOdometer = carStore.car?.currentOdometer || 0
-
-        if (readingData.reading <= currentOdometer && readings.value.length > 0) {
-            throw new Error('قراءة العداد يجب أن تكون أكبر من القراءة السابقة')
+        const carId = carStore.car?.id
+        if (allowCurrentBaseline && readings.value.length > 0) {
+            throw new Error('لا يمكن إضافة قراءة بداية متابعة بعد وجود قراءات سابقة.')
         }
 
         try {
-            const { data, error: err } = await supabase
-                .from('odometer_readings')
-                .insert([mapToDb(readingData)])
-                .select()
-                .maybeSingle()
-
-            if (err) throw err
-
-            const newReading = mapFromDb(data)
-            readings.value.push(newReading)
-            await carStore.updateOdometer(readingData.reading)
+            const result = await commitOdometerReadingV1({
+                carId,
+                readingData,
+                allowCurrentBaseline
+            })
+            const newReading = mapFromDb(result.reading)
+            if (!readings.value.some(item => String(item.id) === String(newReading.id))) {
+                readings.value.push(newReading)
+            }
+            carStore.applyCommittedOdometer(result.car.current_odometer)
             return newReading
         } catch (err) {
             error.value = err.message
@@ -196,6 +163,7 @@ export const useOdometerStore = defineStore('odometer', () => {
         latestReading,
         totalDistance,
         averageDailyKm,
+        insights,
         readingsWithDistance,
         fetchReadings,
         addReading,

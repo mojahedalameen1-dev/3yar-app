@@ -247,7 +247,7 @@ async function finishSetup() {
         reading: currentOdometer,
         date: new Date().toISOString(),
         notes: initialReadingNotes
-      })
+      }, { allowCurrentBaseline: true })
       initialReadingSaved.value = true
     }
 

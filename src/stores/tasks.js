@@ -54,8 +54,9 @@ export const useTasksStore = defineStore('tasks', () => {
         const carStore = useCarStore()
         const odometerStore = useOdometerStore()
         return calculateTaskStatusV1(task, {
-            currentOdometer: carStore.car?.currentOdometer || 0,
-            averageDailyKm: odometerStore.averageDailyKm
+            currentOdometer: carStore.car?.currentOdometer,
+            averageDailyKm: odometerStore.insights.averageDailyKm,
+            usageConfidence: odometerStore.insights.confidence
         })
     }
 
