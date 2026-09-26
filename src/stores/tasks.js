@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { supabase } from '../lib/firebase'
 import { useCarStore } from './car'
 import { useOdometerStore } from './odometer'
+import { calculateTaskStatusV1, TASK_STATUS_V1 } from '../lib/task-status-v1'
+import { MAINTENANCE_BASELINE_TYPE } from '../lib/maintenance-baseline-v1'
 import dayjs from 'dayjs'
 
 export const useTasksStore = defineStore('tasks', () => {
@@ -26,6 +28,7 @@ export const useTasksStore = defineStore('tasks', () => {
 
     // Status constants
     const STATUS = {
+        NEEDS_SETUP: TASK_STATUS_V1.NEEDS_SETUP,
         LATE: 'late',
         DUE: 'due',
         SOON: 'soon',
@@ -33,6 +36,7 @@ export const useTasksStore = defineStore('tasks', () => {
     }
 
     const STATUS_LABELS = {
+        needs_setup: 'تحتاج إعداد',
         late: 'متأخر',
         due: 'مستحق الآن',
         soon: 'قريب',
@@ -49,95 +53,10 @@ export const useTasksStore = defineStore('tasks', () => {
     function calculateTaskStatus(task) {
         const carStore = useCarStore()
         const odometerStore = useOdometerStore()
-        const currentOdometer = carStore.car?.currentOdometer || 0
-        const today = dayjs()
-
-        let distanceProgress = 0
-        let timeProgress = 0
-        let estimatedDate = null
-        let kmRemaining = null
-        let hasNoMaintenanceHistory = false
-
-        const hasDistanceHistory = task.lastMaintenanceOdometer !== null
-        const hasTimeHistory = task.lastMaintenanceDate !== null
-
-        if (task.type === 'distance' || task.type === 'both') {
-            if (hasDistanceHistory && task.intervalKm) {
-                const kmSinceLast = currentOdometer - task.lastMaintenanceOdometer
-                kmRemaining = Math.max(0, task.intervalKm - kmSinceLast)
-                distanceProgress = (kmSinceLast / task.intervalKm) * 100
-
-                if (odometerStore.averageDailyKm > 0 && kmRemaining > 0) {
-                    const daysRemaining = Math.ceil(kmRemaining / odometerStore.averageDailyKm)
-                    estimatedDate = dayjs().add(daysRemaining, 'day').toISOString()
-                }
-            } else if (!hasDistanceHistory && task.intervalKm) {
-                hasNoMaintenanceHistory = true
-                distanceProgress = 100
-                kmRemaining = 0
-            }
-        }
-
-        if (task.type === 'time' || task.type === 'both') {
-            if (hasTimeHistory && task.intervalMonths) {
-                const lastDate = dayjs(task.lastMaintenanceDate)
-                const monthsSinceLast = today.diff(lastDate, 'month', true)
-                timeProgress = (monthsSinceLast / task.intervalMonths) * 100
-            } else if (!hasTimeHistory && task.intervalMonths) {
-                hasNoMaintenanceHistory = true
-                timeProgress = 100
-            }
-        }
-
-        const progress = Math.max(distanceProgress, timeProgress)
-
-        if (task.type === 'time' || task.type === 'both') {
-            if (hasTimeHistory && task.intervalMonths) {
-                const lastDate = dayjs(task.lastMaintenanceDate)
-                const nextDueDate = lastDate.add(task.intervalMonths, 'month')
-
-                if (estimatedDate) {
-                    if (nextDueDate.isBefore(dayjs(estimatedDate))) {
-                        estimatedDate = nextDueDate.toISOString()
-                    }
-                } else {
-                    estimatedDate = nextDueDate.toISOString()
-                }
-            }
-        }
-
-        if (task.snoozedUntil && dayjs(task.snoozedUntil).isAfter(today)) {
-            return {
-                status: STATUS.GOOD,
-                progress: Math.min(progress, 100),
-                isSnoozed: true,
-                snoozedUntil: task.snoozedUntil,
-                kmRemaining,
-                hasNoMaintenanceHistory
-            }
-        }
-
-        let status
-        if (progress >= 100 || hasNoMaintenanceHistory) {
-            status = STATUS.LATE
-        } else if (progress >= 90) {
-            status = STATUS.DUE
-        } else if (progress >= 75) {
-            status = STATUS.SOON
-        } else {
-            status = STATUS.GOOD
-        }
-
-        return {
-            status,
-            progress: Math.min(progress, 150),
-            isSnoozed: false,
-            distanceProgress,
-            timeProgress,
-            estimatedDate,
-            kmRemaining,
-            hasNoMaintenanceHistory
-        }
+        return calculateTaskStatusV1(task, {
+            currentOdometer: carStore.car?.currentOdometer || 0,
+            averageDailyKm: odometerStore.averageDailyKm
+        })
     }
 
     // Getters
@@ -150,7 +69,7 @@ export const useTasksStore = defineStore('tasks', () => {
     })
 
     const sortedTasks = computed(() => {
-        const statusOrder = { late: 0, due: 1, soon: 2, good: 3 }
+        const statusOrder = { late: 0, due: 1, soon: 2, needs_setup: 3, good: 4 }
         const priorityOrder = { high: 0, medium: 1, low: 2 }
 
         return [...tasksWithStatus.value].sort((a, b) => {
@@ -163,10 +82,11 @@ export const useTasksStore = defineStore('tasks', () => {
     })
 
     const alertTasks = computed(() => {
-        return sortedTasks.value.filter(
-            task => task.statusInfo.status !== STATUS.GOOD && !task.statusInfo.isSnoozed
-        )
+        return sortedTasks.value.filter(task => [STATUS.LATE, STATUS.DUE, STATUS.SOON].includes(task.statusInfo.status)
+            && !task.statusInfo.isSnoozed)
     })
+
+    const needsSetupTasks = computed(() => sortedTasks.value.filter(task => task.statusInfo.status === STATUS.NEEDS_SETUP))
 
     const snoozedTasks = computed(() => {
         return tasksWithStatus.value.filter(task => task.statusInfo.isSnoozed)
@@ -179,6 +99,7 @@ export const useTasksStore = defineStore('tasks', () => {
             late: all.filter(t => t.statusInfo.status === STATUS.LATE).length,
             due: all.filter(t => t.statusInfo.status === STATUS.DUE).length,
             soon: all.filter(t => t.statusInfo.status === STATUS.SOON).length,
+            needsSetup: all.filter(t => t.statusInfo.status === STATUS.NEEDS_SETUP).length,
             good: all.filter(t => t.statusInfo.status === STATUS.GOOD).length,
             snoozed: snoozedTasks.value.length
         }
@@ -196,6 +117,8 @@ export const useTasksStore = defineStore('tasks', () => {
             isRecurring: row.is_recurring,
             lastMaintenanceDate: row.last_maintenance_date,
             lastMaintenanceOdometer: row.last_maintenance_odometer,
+            baselineType: row.baseline_type || null,
+            setupKey: row.setup_key || null,
             snoozedUntil: row.snoozed_until,
             createdAt: row.created_at
         }
@@ -210,7 +133,9 @@ export const useTasksStore = defineStore('tasks', () => {
             priority: task.priority || 'medium',
             is_recurring: task.isRecurring !== false,
             last_maintenance_date: task.lastMaintenanceDate || null,
-            last_maintenance_odometer: task.lastMaintenanceOdometer || null,
+            last_maintenance_odometer: task.lastMaintenanceOdometer ?? null,
+            baseline_type: task.baselineType || null,
+            setup_key: task.setupKey || null,
             snoozed_until: task.snoozedUntil || null
         }
     }
@@ -294,6 +219,7 @@ export const useTasksStore = defineStore('tasks', () => {
             if (updates.isRecurring !== undefined) dbUpdates.is_recurring = updates.isRecurring
             if (updates.lastMaintenanceDate !== undefined) dbUpdates.last_maintenance_date = updates.lastMaintenanceDate
             if (updates.lastMaintenanceOdometer !== undefined) dbUpdates.last_maintenance_odometer = updates.lastMaintenanceOdometer
+            if (updates.baselineType !== undefined) dbUpdates.baseline_type = updates.baselineType
             if (updates.snoozedUntil !== undefined) dbUpdates.snoozed_until = updates.snoozedUntil
 
             const { data, error: err } = await supabase
@@ -358,6 +284,7 @@ export const useTasksStore = defineStore('tasks', () => {
         await updateTask(taskId, {
             lastMaintenanceDate: maintenanceDate,
             lastMaintenanceOdometer: currentOdometer,
+            baselineType: MAINTENANCE_BASELINE_TYPE.REPORTED_MAINTENANCE,
             snoozedUntil: null
         })
     }
@@ -367,6 +294,7 @@ export const useTasksStore = defineStore('tasks', () => {
         if (!task) return
         task.lastMaintenanceDate = updates.last_maintenance_date
         task.lastMaintenanceOdometer = updates.last_maintenance_odometer
+        task.baselineType = updates.baseline_type || MAINTENANCE_BASELINE_TYPE.MAINTENANCE_RECORD
         task.snoozedUntil = null
     }
 
@@ -414,6 +342,8 @@ export const useTasksStore = defineStore('tasks', () => {
         alertTasks,
         snoozedTasks,
         taskStats,
+        needsSetupTasks,
+        getDefaultTasks,
         fetchTasks,
         addTask,
         updateTask,

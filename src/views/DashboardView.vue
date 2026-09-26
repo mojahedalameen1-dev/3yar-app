@@ -35,7 +35,7 @@
           size="x-large"
           class="px-8"
           prepend-icon="mdi-plus"
-          @click="showWizard = true"
+          @click="router.push({ name: 'setup-car' })"
         >
           إضافة سيارتك الأولى
         </v-btn>
@@ -265,6 +265,32 @@
               </v-card>
             </v-col>
 
+            <v-col v-if="needsSetupTasks.length" cols="12">
+              <v-card class="needs-setup-card" variant="tonal">
+                <v-card-text class="d-flex flex-column flex-sm-row align-start align-sm-center ga-4 pa-5">
+                  <div class="needs-setup-icon">
+                    <v-icon color="info" size="26">mdi-wrench-clock</v-icon>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="d-flex align-center flex-wrap ga-2 mb-1">
+                      <h2 class="text-subtitle-1 font-weight-bold">مهام تحتاج إعداد</h2>
+                      <v-chip size="small" color="info" variant="tonal">{{ tasksStore.taskStats.needsSetup }}</v-chip>
+                    </div>
+                    <p class="text-body-2 text-medium-emphasis mb-0">
+                      لا تتوفر معلومات كافية عن آخر صيانة لبعض المهام، لذلك لا نحسبها كمتأخرة.
+                    </p>
+                    <div class="text-caption text-medium-emphasis mt-2">
+                      {{ needsSetupTasks.slice(0, 3).map(task => task.name).join(' · ') }}
+                      <span v-if="needsSetupTasks.length > 3">…</span>
+                    </div>
+                  </div>
+                  <v-btn color="primary" variant="tonal" prepend-icon="mdi-wrench-clock" :to="{ name: 'tasks', query: { filter: 'needs_setup' } }">
+                    إكمال إعداد الصيانة
+                  </v-btn>
+                </v-card-text>
+              </v-card>
+            </v-col>
+
             <!-- Cost Chart (New Feature) -->
             <v-col cols="12">
               <CostChart :records="recordsStore.records" />
@@ -341,7 +367,9 @@
                         <v-icon size="48" color="white">mdi-check</v-icon>
                       </div>
                       <p class="text-subtitle-1 font-weight-bold mb-1">لا توجد تنبيهات!</p>
-                      <p class="text-body-2 text-medium-emphasis">جميع المهام على ما يرام</p>
+                      <p class="text-body-2 text-medium-emphasis">
+                        {{ tasksStore.taskStats.needsSetup ? 'المهام الأخرى تحتاج إعدادًا قبل حساب مواعيدها.' : 'جميع المهام على ما يرام' }}
+                      </p>
                     </div>
                   </template>
                 </v-card-text>
@@ -689,10 +717,6 @@
       </v-card>
     </v-dialog>
 
-    <!-- Onboarding Wizard -->
-    <OnboardingWizard v-model="showWizard" @finished="onWizardFinished" />
-
-
   </div>
 </template>
 
@@ -705,7 +729,6 @@ import { useTasksStore } from '@/stores/tasks'
 import { useRecordsStore } from '@/stores/records'
 import { useDocumentsStore } from '@/stores/documents'
 import { useProfileStore } from '@/stores/profile'
-import OnboardingWizard from '@/components/OnboardingWizard.vue'
 const CostChart = defineAsyncComponent(() => import('@/components/CostChart.vue'))
 import confetti from 'canvas-confetti'
 import dayjs from 'dayjs'
@@ -769,14 +792,14 @@ const snoozeOptions = [
 const formattedDate = computed(() => dayjs().format('DD MMMM YYYY'))
 const formattedOdometer = computed(() => (carStore.car?.currentOdometer || 0).toLocaleString())
 const alertTasks = computed(() => tasksStore.alertTasks)
+const needsSetupTasks = computed(() => tasksStore.needsSetupTasks)
 const recentRecords = computed(() => recordsStore.recentRecords)
 const regulatoryStatus = computed(() => documentsStore.regulatoryStatus)
 
 const nextMaintenance = computed(() => {
   const alerts = tasksStore.alertTasks
   if (alerts.length > 0) return alerts[0]
-  const sorted = tasksStore.sortedTasks
-  return sorted.length > 0 ? sorted[0] : null
+  return tasksStore.sortedTasks.find(task => !task.statusInfo.needsSetup) || null
 })
 
 const statsCards = computed(() => [
@@ -785,12 +808,6 @@ const statsCards = computed(() => [
   { title: 'قريب', value: tasksStore.taskStats.soon, icon: 'mdi-clock-outline', color: 'amber-darken-2' },
   { title: 'على ما يرام', value: tasksStore.taskStats.good, icon: 'mdi-check-circle', color: 'success' }
 ])
-
-// Wizard
-const showWizard = ref(false)
-function onWizardFinished() {
-  showSnackbar('تم إعداد حسابك بنجاح! 🎉')
-}
 
 // Car Dialog
 const showCarDialog = ref(false)
@@ -953,11 +970,11 @@ function goToAddMaintenance() {
 
 // Helpers
 function getStatusColor(status) {
-  return { late: 'error', due: 'warning', soon: 'amber-darken-2', good: 'success' }[status] || 'grey'
+  return { late: 'error', due: 'warning', soon: 'amber-darken-2', needs_setup: 'info', good: 'success' }[status] || 'grey'
 }
 
 function getStatusIcon(status) {
-  return { late: 'mdi-alert-circle', due: 'mdi-clock-alert', soon: 'mdi-clock-outline', good: 'mdi-check-circle' }[status] || 'mdi-help-circle'
+  return { late: 'mdi-alert-circle', due: 'mdi-clock-alert', soon: 'mdi-clock-outline', needs_setup: 'mdi-wrench-clock', good: 'mdi-check-circle' }[status] || 'mdi-help-circle'
 }
 
 function formatDate(date) { return dayjs(date).format('DD/MM/YYYY') }
@@ -968,6 +985,20 @@ function formatDate(date) { return dayjs(date).format('DD/MM/YYYY') }
 .welcome-card {
   background: linear-gradient(135deg, rgba(var(--v-theme-surface), 0.95), rgba(var(--v-theme-surface), 0.9));
   border: 1px solid rgba(var(--v-theme-primary), 0.1);
+}
+
+.needs-setup-card {
+  border: 1px solid rgba(var(--v-theme-info), .32);
+}
+
+.needs-setup-icon {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(var(--v-theme-info), .12);
 }
 
 .welcome-icon {
