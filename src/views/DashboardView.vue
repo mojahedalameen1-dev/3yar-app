@@ -55,6 +55,21 @@
     <!-- Main Dashboard -->
     <template v-else>
       <v-row :class="{ 'gap-6': isMobile }">
+        <v-col v-if="primaryDocumentAction" cols="12">
+          <v-card :color="primaryDocumentActionColor" variant="tonal" class="document-action-card">
+            <v-card-text class="d-flex flex-column flex-sm-row align-start align-sm-center ga-3 pa-4">
+              <v-avatar :color="primaryDocumentActionColor" variant="tonal" size="44" class="flex-shrink-0">
+                <v-icon aria-hidden="true">{{ primaryDocumentAction.statusInfo.status === 'needs_expiry' ? 'mdi-calendar-question' : 'mdi-file-alert-outline' }}</v-icon>
+              </v-avatar>
+              <div class="flex-grow-1">
+                <h2 class="text-subtitle-1 font-weight-bold mb-1">{{ primaryDocumentActionTitle }}</h2>
+                <p class="text-body-2 mb-0">{{ primaryDocumentActionMessage }}</p>
+              </div>
+              <v-btn color="primary" variant="tonal" to="/documents" class="flex-shrink-0">عرض الوثائق</v-btn>
+            </v-card-text>
+          </v-card>
+        </v-col>
+
         <!-- Car Card with Image -->
         <v-col cols="12" lg="4">
           <v-card :class="['car-card animate-slide-up', isMobile ? 'surface-card' : 'glass-card h-100']">
@@ -783,6 +798,8 @@ import { readFileAsDataUrl, validateDataUrlFile } from '@/lib/data-url-upload'
 import { completeMaintenanceV1 } from '@/services/maintenance-completion-v1'
 import { runSingleFlight } from '@/lib/single-flight'
 import { ODOMETER_CONFIDENCE_V1 } from '@/lib/odometer-insights-v1'
+import { formatDocumentDaysTextV1 } from '@/lib/document-status-v1'
+import { getTopDocumentActionV1 } from '@/lib/action-reminders-v1'
 
 dayjs.locale('ar')
 
@@ -852,6 +869,20 @@ const alertTasks = computed(() => tasksStore.alertTasks)
 const needsSetupTasks = computed(() => tasksStore.needsSetupTasks)
 const recentRecords = computed(() => recordsStore.recentRecords)
 const regulatoryStatus = computed(() => documentsStore.regulatoryStatus)
+const primaryDocumentAction = computed(() => getTopDocumentActionV1(documentsStore.documentsWithStatus))
+const primaryDocumentActionColor = computed(() => ({ expired: 'error', expiring_soon: 'warning', needs_expiry: 'info' })[primaryDocumentAction.value?.statusInfo.status] || 'info')
+const primaryDocumentActionTitle = computed(() => {
+  const document = primaryDocumentAction.value
+  if (!document) return ''
+  if (document.statusInfo.status === 'needs_expiry') return `${document.typeLabel} تحتاج تاريخ انتهاء`
+  if (document.statusInfo.status === 'expired') return `${document.typeLabel} منتهية`
+  return `${document.typeLabel} — ${formatDocumentDaysTextV1(document.statusInfo.daysLeft)}`
+})
+const primaryDocumentActionMessage = computed(() => primaryDocumentAction.value?.statusInfo.status === 'needs_expiry'
+  ? 'أضف تاريخ الانتهاء لعرض حالة الوثيقة بدقة.'
+  : primaryDocumentAction.value?.statusInfo.status === 'expired'
+    ? formatDocumentDaysTextV1(primaryDocumentAction.value.statusInfo.daysLeft)
+    : 'تابع تاريخ الوثيقة قبل انتهائها.')
 
 function formatOdometerRate(value) {
   const number = Number(value)

@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/firebase'
 import { useCarStore } from './car'
-import dayjs from 'dayjs'
+import { DOCUMENT_STATUS_V1, DOCUMENT_STATUS_LABELS_V1, DEFAULT_DOCUMENT_REMINDER_DAYS_V1, getDocumentStatusV1 } from '../lib/document-status-v1'
 
 const DOCUMENT_TYPES = {
     LICENSE: 'license',
@@ -37,16 +37,13 @@ const DOCUMENT_COLORS = {
 }
 
 const STATUS = {
-    EXPIRED: 'expired',
-    EXPIRING_SOON: 'expiring_soon',
-    VALID: 'valid'
+    NEEDS_EXPIRY: DOCUMENT_STATUS_V1.NEEDS_EXPIRY,
+    EXPIRED: DOCUMENT_STATUS_V1.EXPIRED,
+    EXPIRING_SOON: DOCUMENT_STATUS_V1.EXPIRING_SOON,
+    VALID: DOCUMENT_STATUS_V1.VALID
 }
 
-const STATUS_LABELS = {
-    [STATUS.EXPIRED]: 'منتهية',
-    [STATUS.EXPIRING_SOON]: 'قاربت على الانتهاء',
-    [STATUS.VALID]: 'سارية'
-}
+const STATUS_LABELS = DOCUMENT_STATUS_LABELS_V1
 
 export const useDocumentsStore = defineStore('documents', () => {
     const documents = ref([])
@@ -66,26 +63,14 @@ export const useDocumentsStore = defineStore('documents', () => {
         return session?.user?.id || null
     }
 
-    function getDocumentStatus(expiryDate) {
-        if (!expiryDate) return { status: STATUS.VALID, daysLeft: null }
-
-        const today = dayjs()
-        const expiry = dayjs(expiryDate)
-        const daysLeft = expiry.diff(today, 'day')
-
-        if (daysLeft < 0) {
-            return { status: STATUS.EXPIRED, daysLeft }
-        } else if (daysLeft <= 30) {
-            return { status: STATUS.EXPIRING_SOON, daysLeft }
-        } else {
-            return { status: STATUS.VALID, daysLeft }
-        }
+    function getDocumentStatus(expiryDate, reminderDays) {
+        return getDocumentStatusV1({ expiryDate, reminderDays })
     }
 
     const documentsWithStatus = computed(() => {
         return documents.value.map(doc => ({
             ...doc,
-            statusInfo: getDocumentStatus(doc.expiryDate),
+            statusInfo: getDocumentStatusV1({ expiryDate: doc.expiryDate, reminderDays: doc.reminderDays }),
             typeLabel: doc.type === DOCUMENT_TYPES.CUSTOM ? (doc.title || 'وثيقة مخصصة') : (DOCUMENT_LABELS[doc.type] || doc.type),
             typeIcon: DOCUMENT_ICONS[doc.type] || 'mdi-file',
             typeColor: DOCUMENT_COLORS[doc.type] || 'grey'
@@ -93,9 +78,15 @@ export const useDocumentsStore = defineStore('documents', () => {
     })
 
     const alertDocuments = computed(() => {
-        return documentsWithStatus.value.filter(
-            doc => doc.statusInfo.status !== STATUS.VALID
-        ).sort((a, b) => (a.statusInfo.daysLeft || 0) - (b.statusInfo.daysLeft || 0))
+        const priority = {
+            [STATUS.EXPIRED]: 0,
+            [STATUS.EXPIRING_SOON]: 1,
+            [STATUS.NEEDS_EXPIRY]: 2
+        }
+        return documentsWithStatus.value
+            .filter(doc => doc.statusInfo.status !== STATUS.VALID)
+            .sort((a, b) => priority[a.statusInfo.status] - priority[b.statusInfo.status]
+                || (a.statusInfo.daysLeft ?? Number.POSITIVE_INFINITY) - (b.statusInfo.daysLeft ?? Number.POSITIVE_INFINITY))
     })
 
     // Smart Regulatory Logic
@@ -113,10 +104,24 @@ export const useDocumentsStore = defineStore('documents', () => {
             icon: 'mdi-check-circle'
         }
 
-        if (!istimara) return result // Need Istimara to make judgements
+        if (!istimara) return result // No document data means no legal judgement.
+
+        const missingExpiry = istimara.statusInfo.status === STATUS.NEEDS_EXPIRY
+            || !fahas
+            || fahas.statusInfo.status === STATUS.NEEDS_EXPIRY
+        if (missingExpiry) {
+            return {
+                ...result,
+                hasAlert: true,
+                message: 'بيانات الوثائق غير مكتملة',
+                description: 'أضف تواريخ الانتهاء للوثائق لعرض حالتها بدقة.',
+                color: 'info',
+                icon: 'mdi-information-outline'
+            }
+        }
 
         const istimaraExpired = istimara.statusInfo.status === STATUS.EXPIRED || istimara.statusInfo.status === STATUS.EXPIRING_SOON
-        const fahasExpired = !fahas || fahas.statusInfo.status === STATUS.EXPIRED
+        const fahasExpired = fahas.statusInfo.status === STATUS.EXPIRED
 
         // Case 2: Istimara Expired/Expiring AND Fahas Expired/Missing -> CRITICAL
         if (istimaraExpired && fahasExpired) {
@@ -153,7 +158,8 @@ export const useDocumentsStore = defineStore('documents', () => {
             total: all.length,
             valid: all.filter(d => d.statusInfo.status === STATUS.VALID).length,
             expiringSoon: all.filter(d => d.statusInfo.status === STATUS.EXPIRING_SOON).length,
-            expired: all.filter(d => d.statusInfo.status === STATUS.EXPIRED).length
+            expired: all.filter(d => d.statusInfo.status === STATUS.EXPIRED).length,
+            needsExpiry: all.filter(d => d.statusInfo.status === STATUS.NEEDS_EXPIRY).length
         }
     })
 
@@ -180,7 +186,7 @@ export const useDocumentsStore = defineStore('documents', () => {
             expiry_date: doc.expiryDate || null,
             image: doc.image || null,
             notes: doc.notes || '',
-            reminder_days: doc.reminderDays || 30
+            reminder_days: doc.reminderDays ?? DEFAULT_DOCUMENT_REMINDER_DAYS_V1
         }
     }
 
