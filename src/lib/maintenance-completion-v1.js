@@ -1,6 +1,7 @@
 import { collection, doc, runTransaction } from 'firebase/firestore'
 import { firebaseAuth, firestore } from './firebase'
 import { MAINTENANCE_BASELINE_TYPE } from './maintenance-baseline-v1'
+import { normalizeMaintenanceCostInputV1 } from './maintenance-cost-insights-v1'
 
 function requiredNumber(value, fieldLabel) {
     const number = Number(value)
@@ -18,7 +19,7 @@ export async function commitMaintenanceCompletionV1({ taskId, record }) {
     const readingRef = doc(collection(firestore, 'odometer_readings'))
     const completedAt = record.date || new Date().toISOString()
     const odometerReading = requiredNumber(record.odometerReading, 'قراءة العداد')
-    const cost = requiredNumber(record.cost ?? 0, 'التكلفة')
+    const cost = normalizeMaintenanceCostInputV1(record.cost)
 
     return runTransaction(firestore, async transaction => {
         const taskSnapshot = await transaction.get(taskRef)

@@ -8,24 +8,26 @@
     </v-card-title>
     
     <v-card-text class="pb-6">
-      <div v-if="hasData" style="height: 250px; position: relative;">
-        <Bar :data="chartData" :options="chartOptions" />
+      <div v-if="insights.trendHasCostData" role="img" :aria-label="chartSummary" style="height: 250px; position: relative;">
+        <span class="sr-only">{{ chartSummary }}</span>
+        <Bar :data="chartData" :options="chartOptions" aria-hidden="true" />
       </div>
       <div v-else class="empty-chart-state d-flex flex-column align-center justify-center py-10">
         <div class="empty-icon mb-4">
           <v-icon size="48" color="white">mdi-chart-areaspline</v-icon>
         </div>
-        <h4 class="text-h6 font-weight-bold mb-2">لا توجد مصاريف مسجلة</h4>
+        <h4 class="text-h6 font-weight-bold mb-2">{{ emptyTitle }}</h4>
         <p class="text-body-2 text-medium-emphasis mb-4 text-center" style="max-width: 280px;">
-          سجّل أول صيانة لسيارتك لتبدأ في رؤية تحليل المصاريف
+          {{ emptyDescription }}
         </p>
         <v-btn 
+          v-if="records.length === 0"
           color="primary" 
           variant="tonal"
           prepend-icon="mdi-plus"
-          @click="$emit('add-record')"
+          @click="emit('add-record')"
         >
-          أضف أول صيانة
+          سجّل أول صيانة
         </v-btn>
       </div>
     </v-card-text>
@@ -46,6 +48,7 @@ import {
 import { Bar } from 'vue-chartjs'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ar'
+import { computeMaintenanceCostInsightsV1 } from '@/lib/maintenance-cost-insights-v1'
 
 // Register ChartJS components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
@@ -57,41 +60,33 @@ const props = defineProps({
   },
   loading: Boolean
 })
+const emit = defineEmits(['add-record'])
 
-const hasData = computed(() => props.records && props.records.length > 0)
+const insights = computed(() => computeMaintenanceCostInsightsV1(props.records))
+const emptyTitle = computed(() => {
+  if (props.records.length === 0) return 'لا توجد سجلات صيانة بعد'
+  if (insights.value.knownCostRecords === 0) return 'لا توجد تكاليف مسجلة'
+  return 'لا توجد تكاليف مسجلة خلال آخر 6 أشهر'
+})
+const emptyDescription = computed(() => {
+  if (props.records.length === 0) return 'سجّل أول صيانة لسيارتك لتبدأ في متابعة مصاريفها.'
+  if (insights.value.knownCostRecords === 0) return 'أضف تكلفة لبعض عمليات الصيانة لعرض تحليل المصاريف.'
+  return 'توجد تكاليف مسجلة، لكن لا توجد عمليات بتكلفة معروفة ضمن الفترة المعروضة.'
+})
+const chartSummary = computed(() => {
+  const total = insights.value.monthlyTrend.reduce((sum, bucket) => sum + bucket.totalCost, 0)
+  return `مصاريف الصيانة خلال آخر 6 أشهر، الإجمالي ${total.toLocaleString('ar-SA')} ريال سعودي.`
+})
 
 const chartData = computed(() => {
-  // 1. Prepare last 6 months labels
-  const months = []
-  const costMap = {}
-  
-  for (let i = 5; i >= 0; i--) {
-    const d = dayjs().subtract(i, 'month')
-    const key = d.format('YYYY-MM')
-    months.push({
-      key: key,
-      label: d.locale('ar').format('MMMM') // e.g. "يناير"
-    })
-    costMap[key] = 0 // Init
-  }
-
-  // 2. Fill data
-  props.records.forEach(record => {
-    const key = dayjs(record.date).format('YYYY-MM')
-    if (costMap[key] !== undefined) {
-      costMap[key] += Number(record.cost || 0)
-    }
-  })
-
-  // 3. Construct Chart.js data
   return {
-    labels: months.map(m => m.label),
+    labels: insights.value.monthlyTrend.map(bucket => dayjs(bucket.date).locale('ar').format('MMM YY')),
     datasets: [
       {
         label: 'مصاريف الصيانة (ريال)',
         backgroundColor: '#0D3C61', // Primary Navy
         borderRadius: 6,
-        data: months.map(m => costMap[m.key])
+        data: insights.value.monthlyTrend.map(bucket => bucket.totalCost)
       }
     ]
   }
@@ -102,7 +97,8 @@ const chartOptions = {
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      display: false
+      display: true,
+      position: 'top'
     },
     tooltip: {
       backgroundColor: '#1E1E1E',

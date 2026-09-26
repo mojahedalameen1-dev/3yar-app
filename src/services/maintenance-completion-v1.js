@@ -13,6 +13,7 @@ export async function completeMaintenanceV1(task, formData) {
             odometerReading: formData.odometerReading,
             cost: formData.cost,
             serviceCenter: formData.serviceCenter,
+            invoiceNumber: formData.invoiceNumber,
             notes: formData.notes
         }
     })

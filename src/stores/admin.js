@@ -1,6 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/firebase'
+import {
+    computeMaintenanceCostInsightsV1,
+    normalizeMaintenanceCostInputV1
+} from '../lib/maintenance-cost-insights-v1'
 
 export const useAdminStore = defineStore('admin', () => {
     // State
@@ -25,6 +29,7 @@ export const useAdminStore = defineStore('admin', () => {
         taskDistribution: {},
         last24hGrowth: 0
     })
+    const costInsights = computed(() => computeMaintenanceCostInsightsV1(records.value))
 
     // Reset store
     function $reset() {
@@ -370,7 +375,7 @@ export const useAdminStore = defineStore('admin', () => {
                     user_id: recordData.user_id,
                     car_id: recordData.car_id,
                     task_name: recordData.task_name,
-                    cost: recordData.cost,
+                    cost: normalizeMaintenanceCostInputV1(recordData.cost),
                     date: recordData.date,
                     service_center: recordData.service_center,
                     notes: recordData.notes
@@ -527,9 +532,13 @@ export const useAdminStore = defineStore('admin', () => {
     // Update Maintenance Record
     async function updateRecord(recordId, updates) {
         try {
+            const safeUpdates = { ...updates }
+            if (Object.hasOwn(safeUpdates, 'cost')) {
+                safeUpdates.cost = normalizeMaintenanceCostInputV1(safeUpdates.cost)
+            }
             const { data, error: err } = await supabase
                 .from('maintenance_records')
-                .update(updates)
+                .update(safeUpdates)
                 .eq('id', recordId)
                 .select()
                 .single()
@@ -631,9 +640,9 @@ export const useAdminStore = defineStore('admin', () => {
     // COMPUTED HELPERS
     // =====================================================
 
-    const formattedTotalCost = computed(() => {
-        return analytics.value.totalCost.toLocaleString('ar-SA')
-    })
+    const formattedTotalCost = computed(() => costInsights.value.knownCostRecords > 0
+        ? costInsights.value.totalKnownCost.toLocaleString('ar-SA', { maximumFractionDigits: 2 })
+        : 'لا توجد تكاليف مسجلة')
 
     // Get user details by ID
     function getUserById(userId) {
@@ -664,6 +673,7 @@ export const useAdminStore = defineStore('admin', () => {
         announcements,
         activityFeed,
         analytics,
+        costInsights,
         loading,
         error,
 

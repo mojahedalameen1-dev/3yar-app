@@ -63,6 +63,9 @@ describe('owner access', () => {
     it('may create/update its own active-car data, but cannot change car ownership', async () => {
         const db = environment.authenticatedContext('owner-1').firestore()
         await assertSucceeds(setDoc(doc(db, 'maintenance_tasks/new-task'), { user_id: 'owner-1', car_id: 'car-owner', name: 'فرامل' }))
+        await assertSucceeds(setDoc(doc(db, 'maintenance_records/unknown-cost-record'), {
+            user_id: 'owner-1', car_id: 'car-owner', cost: null
+        }))
         await assertFails(setDoc(doc(db, 'maintenance_tasks/foreign-task'), { user_id: 'owner-1', car_id: 'car-other' }))
         await assertSucceeds(updateDoc(doc(db, 'cars/car-owner'), { make: 'Test' }))
         await assertFails(updateDoc(doc(db, 'cars/car-owner'), { user_id: 'other-1' }))

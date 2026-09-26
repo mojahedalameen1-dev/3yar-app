@@ -31,7 +31,7 @@
             <div class="d-flex align-center justify-space-between">
               <div>
                 <div class="text-caption text-medium-emphasis mb-1">{{ stat.title }}</div>
-                <div class="text-h4 font-weight-bold" :class="`text-${stat.color}`">
+                <div :class="[stat.isUnknown ? 'text-body-2' : 'text-h4', 'font-weight-bold', `text-${stat.color}`]">
                   {{ stat.value }}
                 </div>
                 <div v-if="stat.suffix" class="text-caption text-medium-emphasis">{{ stat.suffix }}</div>
@@ -45,6 +45,23 @@
       </v-col>
     </v-row>
 
+    <v-card v-if="costInsights.topMaintenanceCosts.length" class="glass-card mb-6">
+      <v-card-title class="d-flex align-center pa-4">
+        <v-icon color="warning" class="me-2">mdi-trending-up</v-icon>
+        <span class="text-subtitle-1 font-weight-bold">أكثر الصيانات تكلفة</span>
+      </v-card-title>
+      <v-divider></v-divider>
+      <v-list class="bg-transparent py-0">
+        <v-list-item v-for="item in costInsights.topMaintenanceCosts.slice(0, 3)" :key="item.taskName">
+          <v-list-item-title class="font-weight-medium">{{ item.taskName }}</v-list-item-title>
+          <v-list-item-subtitle>{{ item.records }} عمليات بتكلفة مسجلة</v-list-item-subtitle>
+          <template #append>
+            <span class="font-weight-bold text-no-wrap">{{ formatMoney(item.totalCost) }} ر.س</span>
+          </template>
+        </v-list-item>
+      </v-list>
+    </v-card>
+
     <!-- Filters -->
     <v-card class="glass-card mb-6">
       <v-card-text class="pa-4">
@@ -53,7 +70,7 @@
             <v-text-field
               v-model="searchQuery"
               label="بحث في السجلات"
-              placeholder="اسم الصيانة أو المركز"
+              placeholder="الصيانة أو المركز أو الملاحظات أو رقم الفاتورة"
               prepend-inner-icon="mdi-magnify"
               hide-details
               density="compact"
@@ -109,7 +126,7 @@
             <div class="ms-3">
               <div class="text-subtitle-1 font-weight-bold">{{ group.month }}</div>
               <div class="text-caption text-medium-emphasis">
-                {{ group.records.length }} صيانة • {{ group.totalCost.toLocaleString() }} ر.س
+                {{ group.records.length }} صيانة • {{ group.knownCostRecords > 0 ? `المصروف المسجل ${formatMoney(group.totalCost)} ر.س` : 'لا توجد تكاليف مسجلة' }}
               </div>
             </div>
           </div>
@@ -142,15 +159,20 @@
                             <v-icon size="14" class="me-1">mdi-map-marker</v-icon>
                             {{ record.serviceCenter }}
                           </span>
+                          <span v-if="record.invoiceNumber">
+                            <v-icon size="14" class="me-1">mdi-receipt-text-outline</v-icon>
+                            {{ record.invoiceNumber }}
+                          </span>
                         </div>
                       </div>
                       <div class="d-flex align-center gap-2 flex-wrap">
                         <v-btn variant="text" size="small" color="primary" :aria-label="`عرض تفاصيل ${record.taskName}`" @click="viewRecord(record)">
                           التفاصيل
                         </v-btn>
-                        <v-chip color="success" size="small" variant="flat">
-                          {{ record.cost?.toLocaleString() || 0 }} ر.س
+                        <v-chip v-if="normalizeKnownCostV1(record.cost) !== null" color="success" size="small" variant="flat">
+                          {{ formatMoney(normalizeKnownCostV1(record.cost)) }} ر.س
                         </v-chip>
+                        <span v-else class="text-caption text-medium-emphasis">التكلفة غير مسجلة</span>
                         <v-btn
                           icon
                           variant="text"
@@ -180,9 +202,10 @@
                 <v-avatar color="primary" size="44">
                   <v-icon>mdi-wrench</v-icon>
                 </v-avatar>
-                <v-chip color="success" variant="flat">
-                  {{ record.cost?.toLocaleString() || 0 }} ر.س
+                <v-chip v-if="normalizeKnownCostV1(record.cost) !== null" color="success" variant="flat">
+                  {{ formatMoney(normalizeKnownCostV1(record.cost)) }} ر.س
                 </v-chip>
+                <span v-else class="text-caption text-medium-emphasis">التكلفة غير مسجلة</span>
               </div>
               <h3 class="text-h6 font-weight-bold mb-2">{{ record.taskName }}</h3>
               <div class="record-details">
@@ -197,6 +220,10 @@
                 <div v-if="record.serviceCenter" class="detail-item">
                   <v-icon size="16" color="grey">mdi-map-marker</v-icon>
                   <span>{{ record.serviceCenter }}</span>
+                </div>
+                <div v-if="record.invoiceNumber" class="detail-item">
+                  <v-icon size="16" color="grey">mdi-receipt-text-outline</v-icon>
+                  <span>{{ record.invoiceNumber }}</span>
                 </div>
               </div>
             </v-card-text>
@@ -267,12 +294,19 @@
             <v-list-item>
               <template #prepend><v-icon color="success">mdi-cash</v-icon></template>
               <v-list-item-title>التكلفة</v-list-item-title>
-              <v-list-item-subtitle>{{ selectedRecord.cost?.toLocaleString() || 0 }} ريال سعودي</v-list-item-subtitle>
+              <v-list-item-subtitle>
+                {{ normalizeKnownCostV1(selectedRecord.cost) === null ? 'التكلفة غير مسجلة' : `${formatMoney(normalizeKnownCostV1(selectedRecord.cost))} ريال سعودي` }}
+              </v-list-item-subtitle>
             </v-list-item>
             <v-list-item v-if="selectedRecord.serviceCenter">
               <template #prepend><v-icon color="purple">mdi-map-marker</v-icon></template>
               <v-list-item-title>مركز الصيانة</v-list-item-title>
               <v-list-item-subtitle>{{ selectedRecord.serviceCenter }}</v-list-item-subtitle>
+            </v-list-item>
+            <v-list-item v-if="selectedRecord.invoiceNumber">
+              <template #prepend><v-icon color="purple">mdi-receipt-text-outline</v-icon></template>
+              <v-list-item-title>رقم الفاتورة</v-list-item-title>
+              <v-list-item-subtitle>{{ selectedRecord.invoiceNumber }}</v-list-item-subtitle>
             </v-list-item>
             <v-list-item v-if="selectedRecord.notes">
               <template #prepend><v-icon color="grey">mdi-note-text</v-icon></template>
@@ -322,6 +356,12 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
 import { useRecordsStore } from '@/stores/records'
+import {
+  matchesMaintenanceRecordSearchV1,
+  normalizeKnownCostV1,
+  parseMaintenanceRecordDateV1
+} from '@/lib/maintenance-cost-insights-v1'
+import { maintenanceRecordsToCsvV1 } from '@/lib/maintenance-record-export-v1'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ar'
 
@@ -329,6 +369,7 @@ dayjs.locale('ar')
 
 const showSnackbar = inject('showSnackbar')
 const recordsStore = useRecordsStore()
+const costInsights = computed(() => recordsStore.costInsights)
 
 // View Mode
 const viewMode = ref('timeline')
@@ -355,46 +396,58 @@ const statsCards = computed(() => [
     color: 'primary' 
   },
   { 
-    title: 'إجمالي التكاليف', 
-    value: recordsStore.stats.totalCost.toLocaleString(), 
-    suffix: 'ريال',
+    title: 'إجمالي المصروف المعروف',
+    value: costInsights.value.knownCostRecords > 0 ? formatMoney(costInsights.value.totalKnownCost) : 'لا توجد تكاليف مسجلة',
+    suffix: costInsights.value.knownCostRecords > 0 ? 'ريال' : '',
+    isUnknown: costInsights.value.knownCostRecords === 0,
     icon: 'mdi-cash-multiple', 
-    color: 'error' 
+    color: 'error'
   },
   { 
-    title: 'هذا الشهر', 
-    value: recordsStore.stats.thisMonthCost.toLocaleString(), 
-    suffix: 'ريال',
+    title: 'هذا العام',
+    value: costInsights.value.thisYearKnownCostRecords > 0 ? formatMoney(costInsights.value.thisYearCost) : 'لا توجد تكاليف مسجلة',
+    suffix: costInsights.value.thisYearKnownCostRecords > 0 ? 'ريال' : '',
+    isUnknown: costInsights.value.thisYearKnownCostRecords === 0,
     icon: 'mdi-calendar-month', 
-    color: 'warning' 
+    color: 'warning'
   },
   { 
-    title: 'متوسط التكلفة', 
-    value: recordsStore.stats.averageCost.toLocaleString(), 
-    suffix: 'ريال',
+    title: 'متوسط العملية المسجلة',
+    value: costInsights.value.averageKnownCost !== null ? formatMoney(costInsights.value.averageKnownCost) : 'لا توجد تكاليف مسجلة',
+    suffix: costInsights.value.averageKnownCost !== null ? 'ريال' : '',
+    isUnknown: costInsights.value.averageKnownCost === null,
     icon: 'mdi-chart-line', 
     color: 'success' 
   }
 ])
+
+function formatMoney(value) {
+  return Number(value).toLocaleString('ar-SA', { maximumFractionDigits: 2 })
+}
 
 // Filtered Records
 const filteredRecords = computed(() => {
   let records = recordsStore.sortedRecords
   
   if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    records = records.filter(r => 
-      r.taskName?.toLowerCase().includes(query) || 
-      r.serviceCenter?.toLowerCase().includes(query)
-    )
+    records = records.filter(record => matchesMaintenanceRecordSearchV1(record, searchQuery.value))
   }
   
   if (filterDateFrom.value) {
-    records = records.filter(r => dayjs(r.date).isAfter(dayjs(filterDateFrom.value).subtract(1, 'day')))
+    const startDate = parseMaintenanceRecordDateV1(filterDateFrom.value)
+    records = records.filter(record => {
+      const date = parseMaintenanceRecordDateV1(record.date)
+      return startDate && date && date >= startDate
+    })
   }
   
   if (filterDateTo.value) {
-    records = records.filter(r => dayjs(r.date).isBefore(dayjs(filterDateTo.value).add(1, 'day')))
+    const endDate = parseMaintenanceRecordDateV1(filterDateTo.value)
+    if (endDate) endDate.setHours(23, 59, 59, 999)
+    records = records.filter(record => {
+      const date = parseMaintenanceRecordDateV1(record.date)
+      return endDate && date && date <= endDate
+    })
   }
   
   return records
@@ -404,18 +457,28 @@ const filteredRecords = computed(() => {
 const groupedRecords = computed(() => {
   const grouped = {}
   filteredRecords.value.forEach(record => {
-    const monthKey = dayjs(record.date).format('YYYY-MM')
+    const date = parseMaintenanceRecordDateV1(record.date)
+    const monthKey = date ? dayjs(date).format('YYYY-MM') : 'invalid-date'
     if (!grouped[monthKey]) {
       grouped[monthKey] = {
-        month: dayjs(record.date).format('MMMM YYYY'),
+        month: date ? dayjs(date).format('MMMM YYYY') : 'تاريخ غير صالح',
         records: [],
-        totalCost: 0
+        totalCost: 0,
+        knownCostRecords: 0
       }
     }
     grouped[monthKey].records.push(record)
-    grouped[monthKey].totalCost += record.cost || 0
+    const cost = normalizeKnownCostV1(record.cost)
+    if (cost !== null) {
+      grouped[monthKey].totalCost += cost
+      grouped[monthKey].knownCostRecords += 1
+    }
   })
-  return grouped
+  return Object.fromEntries(Object.entries(grouped).sort(([left], [right]) => {
+    if (left === 'invalid-date') return 1
+    if (right === 'invalid-date') return -1
+    return right.localeCompare(left)
+  }))
 })
 
 // Dialogs
@@ -442,36 +505,27 @@ function deleteRecord() {
 
 // Export
 function exportData() {
-  const data = filteredRecords.value.map(r => ({
-    'نوع الصيانة': r.taskName,
-    'التاريخ': formatDate(r.date),
-    'العداد': r.odometerReading,
-    'التكلفة': r.cost,
-    'المركز': r.serviceCenter,
-    'ملاحظات': r.notes
-  }))
-  
-  const csv = [
-    Object.keys(data[0] || {}).join(','),
-    ...data.map(row => Object.values(row).join(','))
-  ].join('\n')
-  
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+  const csv = maintenanceRecordsToCsvV1(filteredRecords.value)
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement('a')
-  link.href = URL.createObjectURL(blob)
+  const objectUrl = URL.createObjectURL(blob)
+  link.href = objectUrl
   link.download = `سجل_الصيانة_${dayjs().format('YYYY-MM-DD')}.csv`
   link.click()
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
   
   showSnackbar('تم تصدير البيانات')
 }
 
 // Formatters
 function formatDate(date) {
-  return date ? dayjs(date).format('DD/MM/YYYY') : '-'
+  const parsed = parseMaintenanceRecordDateV1(date)
+  return parsed ? dayjs(parsed).format('DD/MM/YYYY') : '-'
 }
 
 function formatFullDate(date) {
-  return date ? dayjs(date).format('DD MMMM YYYY') : '-'
+  const parsed = parseMaintenanceRecordDateV1(date)
+  return parsed ? dayjs(parsed).format('DD MMMM YYYY') : '-'
 }
 </script>
 
