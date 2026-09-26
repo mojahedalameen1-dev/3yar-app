@@ -33,7 +33,11 @@ export async function commitOdometerReadingV1({ carId, readingData, allowCurrent
     const date = toIsoDate(readingData?.date, 'تاريخ القراءة')
     const createdAt = new Date().toISOString()
     const carRef = doc(firestore, 'cars', String(carId))
-    // The onboarding baseline has a stable ID so an interrupted retry cannot create a duplicate.
+    // The onboarding baseline has a stable ID so an interrupted retry reuses one document.
+    // Do not read it first: Firestore owner rules cannot authorize get() on a missing
+    // document because it has no user_id/car_id to evaluate. The transaction already
+    // verifies car ownership, and the deterministic set remains subject to create/update
+    // rules for the reading itself.
     const readingRef = allowCurrentBaseline
         ? doc(firestore, 'odometer_readings', `initial_${String(carId)}`)
         : doc(collection(firestore, 'odometer_readings'))
@@ -55,19 +59,6 @@ export async function commitOdometerReadingV1({ carId, readingData, allowCurrent
         }
 
         if (allowCurrentBaseline) {
-            const existingSnapshot = await transaction.get(readingRef)
-            if (existingSnapshot.exists()) {
-                const existing = existingSnapshot.data()
-                if (existing.user_id === user.uid
-                    && existing.car_id === String(carId)
-                    && Number(existing.reading) === reading) {
-                    return {
-                        reading: { ...existing, id: existing.id || readingRef.id },
-                        car: { id: String(carId), current_odometer: currentOdometer }
-                    }
-                }
-                throw new Error('تم حفظ قراءة بداية المتابعة مسبقًا بقيمة مختلفة.')
-            }
             if (reading !== currentOdometer) {
                 throw new Error('قراءة بداية المتابعة يجب أن تطابق العداد الحالي.')
             }

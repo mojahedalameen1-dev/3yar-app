@@ -80,7 +80,7 @@ describe('V1 odometer reading commit', () => {
         expect(state.car.current_odometer).toBe(80000)
     })
 
-    it('allows only an explicit idempotent onboarding baseline at the current value', async () => {
+    it('allows only an explicit onboarding baseline at the current value and reuses its stable document', async () => {
         const args = {
             carId: 'car-1',
             allowCurrentBaseline: true,
@@ -92,7 +92,8 @@ describe('V1 odometer reading commit', () => {
         expect(first.reading.id).toBe('initial_car-1')
         expect(retry.reading.id).toBe(first.reading.id)
         expect([...state.readings.values()]).toHaveLength(1)
-        expect(state.writes.map(write => write.operation)).toEqual(['set'])
+        expect(state.writes.map(write => write.operation)).toEqual(['set', 'set'])
+        expect(state.writes.map(write => write.id)).toEqual(['initial_car-1', 'initial_car-1'])
     })
 
     it('prevents concurrent duplicate submissions from creating duplicate readings', async () => {
