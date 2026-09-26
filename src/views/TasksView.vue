@@ -172,7 +172,17 @@
               </div>
               <div v-if="task.statusInfo.estimatedDate" class="detail-item">
                 <v-icon size="16" color="info" class="me-2">mdi-calendar-arrow-right</v-icon>
-                <span>المتوقع: {{ formatDate(task.statusInfo.estimatedDate) }}</span>
+                <span>
+                  {{ task.statusInfo.estimatedDateSource === 'distance' ? 'الموعد المتوقع تقريبًا:' : 'موعد الصيانة حسب المدة:' }}
+                  {{ formatDate(task.statusInfo.estimatedDate) }}
+                </span>
+              </div>
+              <div
+                v-else-if="task.type !== 'time' && task.intervalKm && task.statusInfo.kmRemaining > 0 && !task.statusInfo.needsSetup"
+                class="detail-item text-medium-emphasis"
+              >
+                <v-icon size="16" color="info" class="me-2">mdi-information-outline</v-icon>
+                <span>المسافة المتبقية ظاهرة؛ نحتاج قراءات أكثر لتقدير الموعد.</span>
               </div>
               <div v-if="task.intervalMonths" class="detail-item">
                 <v-icon size="16" color="primary" class="me-2">mdi-calendar-clock</v-icon>

@@ -111,12 +111,28 @@
                   {{ formattedOdometer }}
                 </div>
                 <div class="text-body-2 text-medium-emphasis">كيلومتر</div>
-                <div v-if="odometerStore.averageDailyKm > 0" class="mt-2">
-                  <v-chip size="x-small" color="info" variant="tonal" class="rounded-pill">
-                    <v-icon start size="12">mdi-trending-up</v-icon>
-                    {{ odometerStore.averageDailyKm }} كم/يوم
-                  </v-chip>
+                <div v-if="lastOdometerUpdate" class="text-caption text-medium-emphasis mt-1">
+                  آخر تحديث {{ lastOdometerUpdate }}
                 </div>
+                <div v-if="hasReliableOdometerUsage" class="odometer-usage-summary mt-3">
+                  <div class="text-caption text-medium-emphasis">متوسط استخدامك</div>
+                  <v-chip size="small" color="info" variant="tonal" class="rounded-pill mt-1">
+                    <v-icon start size="14">mdi-trending-up</v-icon>
+                    {{ formatOdometerRate(odometerStore.insights.averageDailyKm) }} كم/يوم
+                  </v-chip>
+                  <div class="text-caption text-medium-emphasis mt-1">
+                    نحو {{ formatOdometerRate(odometerStore.insights.averageMonthlyKm) }} كم/شهر
+                  </div>
+                  <div class="text-caption text-medium-emphasis">
+                    حسب {{ odometerStore.insights.sampleReadings }} قراءات خلال {{ formatSampleDays(odometerStore.insights.sampleDays) }} يومًا
+                  </div>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ odometerStore.insights.source === 'recent' ? 'اعتمادًا على القراءات الحديثة' : 'اعتمادًا على سجل القراءات المتاح' }}
+                  </div>
+                </div>
+                <p v-else class="text-caption text-medium-emphasis mt-3 mb-0">
+                  نحتاج قراءات أكثر لحساب معدل الاستخدام. أضف قراءة أخرى لاحقًا لتحسين توقعات الصيانة.
+                </p>
               </div>
               
               <!-- Car actions -->
@@ -129,7 +145,7 @@
                   :height="isMobile ? 52 : 40"
                   rounded="xl"
                 >
-                  تحديث العداد
+                  سجل العداد وتحديثه
                 </v-btn>
               </div>
             </v-card-text>
@@ -578,7 +594,7 @@
     </v-dialog>
 
     <!-- Odometer Dialog -->
-    <v-dialog v-model="showOdometerDialog" max-width="400" :persistent="savingOdometer">
+    <v-dialog v-model="showOdometerDialog" max-width="440" scrollable :persistent="savingOdometer">
       <v-card class="rounded-xl">
         <v-card-title class="d-flex align-center pa-5">
           <div class="dialog-icon me-3">
@@ -604,6 +620,8 @@
             suffix="كم"
             prepend-inner-icon="mdi-speedometer"
             autofocus
+            hint="أدخل قراءة أعلى من العداد الحالي؛ لن تُسجّل قراءة مكررة."
+            persistent-hint
             :disabled="savingOdometer"
           ></v-text-field>
           <v-textarea
@@ -613,6 +631,34 @@
             class="mt-2"
             :disabled="savingOdometer"
           ></v-textarea>
+
+          <v-divider class="my-3"></v-divider>
+          <div class="d-flex align-center justify-space-between mb-1">
+            <div class="text-subtitle-2 font-weight-bold">آخر القراءات</div>
+            <span class="text-caption text-medium-emphasis">{{ odometerHistory.length }}</span>
+          </div>
+          <v-list v-if="odometerHistory.length" density="compact" class="odometer-history-list pa-0">
+            <v-list-item v-for="reading in odometerHistory" :key="reading.id" class="px-0">
+              <v-list-item-title class="text-body-2 font-weight-medium">
+                {{ formatOdometerRate(reading.reading) }} كم
+              </v-list-item-title>
+              <v-list-item-subtitle>
+                {{ formatOdometerDate(reading.date) }}
+                <span v-if="reading.excludeReason === 'same_day'"> · قراءة أخرى في اليوم نفسه</span>
+                <span v-else-if="reading.excludeReason === 'odometer_decreased'"> · مستبعدة من حساب الاستخدام لانخفاض العداد</span>
+                <span v-else-if="reading.excludeReason === 'invalid_reading'"> · قيمة غير صالحة، مستبعدة من التحليل</span>
+                <span v-else-if="reading.excludeReason === 'invalid_date'"> · التاريخ غير صالح، مستبعدة من التحليل</span>
+                <span v-else-if="reading.excludeReason === 'future_date'"> · تاريخ مستقبلي، مستبعدة من التحليل</span>
+                <span v-else-if="reading.distanceSincePrevious !== null"> · +{{ formatOdometerRate(reading.distanceSincePrevious) }} كم منذ القراءة السابقة</span>
+              </v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
+          <div v-else class="text-body-2 text-medium-emphasis py-2">
+            لا توجد قراءات سابقة. ستظهر هنا بعد تسجيل قراءة العداد.
+          </div>
+          <v-alert v-if="odometerStore.insights.excludedReadings > 0" type="info" variant="tonal" density="compact" class="mt-2">
+            استُبعدت {{ odometerStore.insights.excludedReadings }} قراءة غير مناسبة من حساب الاستخدام، دون حذفها.
+          </v-alert>
         </v-card-text>
         <v-divider></v-divider>
         <v-card-actions class="pa-4">
@@ -736,6 +782,7 @@ import 'dayjs/locale/ar'
 import { readFileAsDataUrl, validateDataUrlFile } from '@/lib/data-url-upload'
 import { completeMaintenanceV1 } from '@/services/maintenance-completion-v1'
 import { runSingleFlight } from '@/lib/single-flight'
+import { ODOMETER_CONFIDENCE_V1 } from '@/lib/odometer-insights-v1'
 
 dayjs.locale('ar')
 
@@ -791,10 +838,36 @@ const snoozeOptions = [
 // Computed
 const formattedDate = computed(() => dayjs().format('DD MMMM YYYY'))
 const formattedOdometer = computed(() => (carStore.car?.currentOdometer || 0).toLocaleString())
+const hasReliableOdometerUsage = computed(() => odometerStore.insights.confidence !== ODOMETER_CONFIDENCE_V1.INSUFFICIENT)
+const odometerHistory = computed(() => odometerStore.readingsWithDistance.slice(0, 5))
+const lastOdometerUpdate = computed(() => {
+  const date = odometerStore.latestReading?.date
+  if (!date || !dayjs(date).isValid()) return null
+  const days = Math.max(0, dayjs().startOf('day').diff(dayjs(date).startOf('day'), 'day'))
+  if (days === 0) return 'اليوم'
+  if (days === 1) return 'أمس'
+  return `منذ ${days.toLocaleString('ar-SA')} يومًا`
+})
 const alertTasks = computed(() => tasksStore.alertTasks)
 const needsSetupTasks = computed(() => tasksStore.needsSetupTasks)
 const recentRecords = computed(() => recordsStore.recentRecords)
 const regulatoryStatus = computed(() => documentsStore.regulatoryStatus)
+
+function formatOdometerRate(value) {
+  const number = Number(value)
+  return Number.isFinite(number)
+    ? number.toLocaleString('ar-SA', { maximumFractionDigits: 1 })
+    : '—'
+}
+
+function formatSampleDays(value) {
+  const number = Number(value)
+  return Number.isFinite(number) ? Math.round(number).toLocaleString('ar-SA') : '—'
+}
+
+function formatOdometerDate(value) {
+  return dayjs(value).isValid() ? dayjs(value).format('DD MMM YYYY') : 'تاريخ غير متاح'
+}
 
 const nextMaintenance = computed(() => {
   const alerts = tasksStore.alertTasks
@@ -1057,6 +1130,11 @@ function formatDate(date) { return dayjs(date).format('DD/MM/YYYY') }
 
 .odometer-card {
   background: linear-gradient(135deg, rgba(var(--v-theme-primary), 0.1), rgba(var(--v-theme-primary), 0.05));
+}
+
+.odometer-history-list {
+  max-height: 210px;
+  overflow-y: auto;
 }
 
 /* Next Maintenance */

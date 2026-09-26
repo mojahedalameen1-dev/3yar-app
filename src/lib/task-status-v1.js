@@ -1,5 +1,6 @@
 import dayjs from 'dayjs'
 import { MAINTENANCE_BASELINE_TYPE, taskNeedsDistanceBaseline, taskNeedsTimeBaseline } from './maintenance-baseline-v1'
+import { ODOMETER_CONFIDENCE_V1 } from './odometer-insights-v1'
 
 export const TASK_STATUS_V1 = Object.freeze({
     NEEDS_SETUP: 'needs_setup',
@@ -35,8 +36,9 @@ export function hasValidTaskBaselineV1(task) {
 }
 
 export function calculateTaskStatusV1(task, {
-    currentOdometer = 0,
-    averageDailyKm = 0,
+    currentOdometer = null,
+    averageDailyKm = null,
+    usageConfidence = ODOMETER_CONFIDENCE_V1.INSUFFICIENT,
     now = new Date()
 } = {}) {
     if (!hasValidTaskBaselineV1(task)) {
@@ -47,38 +49,62 @@ export function calculateTaskStatusV1(task, {
             needsSetup: true,
             hasNoMaintenanceHistory: true,
             estimatedDate: null,
+            estimatedDateSource: null,
             kmRemaining: null,
             distanceProgress: null,
             timeProgress: null
         }
     }
 
-    const today = dayjs(now)
+    const parsedNow = dayjs(now)
+    const today = parsedNow.isValid() ? parsedNow : dayjs()
     let distanceProgress = 0
     let timeProgress = 0
     let estimatedDate = null
+    let estimatedDateSource = null
     let kmRemaining = null
 
     if (taskNeedsDistanceBaseline(task)) {
-        const kmSinceLast = Math.max(0, Number(currentOdometer || 0) - Number(task.lastMaintenanceOdometer))
-        kmRemaining = Math.max(0, Number(task.intervalKm) - kmSinceLast)
-        distanceProgress = (kmSinceLast / Number(task.intervalKm)) * 100
+        const current = Number(currentOdometer)
+        const baseline = Number(task.lastMaintenanceOdometer)
+        const intervalKm = Number(task.intervalKm)
+        if (hasOdometer(currentOdometer)
+            && Number.isFinite(baseline) && baseline >= 0
+            && Number.isFinite(intervalKm) && intervalKm > 0) {
+            const kmSinceLast = Math.max(0, current - baseline)
+            kmRemaining = Math.max(0, intervalKm - kmSinceLast)
+            distanceProgress = (kmSinceLast / intervalKm) * 100
 
-        if (averageDailyKm > 0 && kmRemaining > 0) {
-            estimatedDate = today.add(Math.ceil(kmRemaining / averageDailyKm), 'day').toISOString()
+            const dailyRate = Number(averageDailyKm)
+            const hasReliableUsage = [ODOMETER_CONFIDENCE_V1.BASIC, ODOMETER_CONFIDENCE_V1.GOOD].includes(usageConfidence)
+            if (hasReliableUsage && Number.isFinite(dailyRate) && dailyRate > 0 && kmRemaining > 0) {
+                const daysRemaining = kmRemaining / dailyRate
+                if (Number.isFinite(daysRemaining) && daysRemaining > 0) {
+                    const forecast = today.add(Math.ceil(daysRemaining), 'day')
+                    if (forecast.isValid()) {
+                        estimatedDate = forecast.toISOString()
+                        estimatedDateSource = 'distance'
+                    }
+                }
+            }
         }
     }
 
     if (taskNeedsTimeBaseline(task)) {
         const lastDate = dayjs(task.lastMaintenanceDate)
-        timeProgress = (today.diff(lastDate, 'month', true) / Number(task.intervalMonths)) * 100
-        const nextDueDate = lastDate.add(Number(task.intervalMonths), 'month')
-        if (!estimatedDate || nextDueDate.isBefore(dayjs(estimatedDate))) {
-            estimatedDate = nextDueDate.toISOString()
+        const intervalMonths = Number(task.intervalMonths)
+        if (lastDate.isValid() && Number.isFinite(intervalMonths) && intervalMonths > 0) {
+            timeProgress = (today.diff(lastDate, 'month', true) / intervalMonths) * 100
+            const nextDueDate = lastDate.add(intervalMonths, 'month')
+            if (nextDueDate.isValid() && (!estimatedDate || nextDueDate.isBefore(dayjs(estimatedDate)))) {
+                estimatedDate = nextDueDate.toISOString()
+                estimatedDateSource = 'time'
+            }
         }
     }
 
-    const progress = Math.max(distanceProgress, timeProgress)
+    const rawProgress = Math.max(distanceProgress, timeProgress)
+    const progress = Number.isFinite(rawProgress) ? rawProgress : 0
     if (task.snoozedUntil && dayjs(task.snoozedUntil).isAfter(today)) {
         return {
             status: TASK_STATUS_V1.GOOD,
@@ -89,7 +115,8 @@ export function calculateTaskStatusV1(task, {
             kmRemaining,
             distanceProgress,
             timeProgress,
-            estimatedDate
+            estimatedDate,
+            estimatedDateSource
         }
     }
 
@@ -106,6 +133,7 @@ export function calculateTaskStatusV1(task, {
         distanceProgress,
         timeProgress,
         estimatedDate,
+        estimatedDateSource,
         kmRemaining,
         hasNoMaintenanceHistory: false
     }
