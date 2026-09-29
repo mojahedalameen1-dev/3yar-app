@@ -22,53 +22,21 @@
       <div class="text-body-2 text-medium-emphasis mt-3">جارٍ تحميل الوثائق…</div>
     </v-card>
 
-    <!-- Stats Overview -->
-    <v-row class="mb-6">
-      <v-col cols="6" sm="3">
-        <v-card class="stat-card glass-card h-100">
-          <v-card-text class="pa-4 text-center">
-            <div class="stat-icon mx-auto mb-2 bg-primary">
-              <v-icon color="white" size="22">mdi-file-document-multiple</v-icon>
-            </div>
-            <div class="text-h4 font-weight-bold text-primary">{{ stats.total }}</div>
-            <div class="text-caption text-medium-emphasis">إجمالي الوثائق</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="6" sm="3">
-        <v-card class="stat-card glass-card h-100">
-          <v-card-text class="pa-4 text-center">
-            <div class="stat-icon mx-auto mb-2 bg-success">
-              <v-icon color="white" size="22">mdi-check-circle</v-icon>
-            </div>
-            <div class="text-h4 font-weight-bold text-success">{{ stats.valid }}</div>
-            <div class="text-caption text-medium-emphasis">سارية</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="6" sm="3">
-        <v-card class="stat-card glass-card h-100">
-          <v-card-text class="pa-4 text-center">
-            <div class="stat-icon mx-auto mb-2 bg-warning">
-              <v-icon color="white" size="22">mdi-clock-alert</v-icon>
-            </div>
-            <div class="text-h4 font-weight-bold text-warning">{{ stats.expiringSoon }}</div>
-            <div class="text-caption text-medium-emphasis">قاربت على الانتهاء</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="6" sm="3">
-        <v-card class="stat-card glass-card h-100">
-          <v-card-text class="pa-4 text-center">
-            <div class="stat-icon mx-auto mb-2 bg-error">
-              <v-icon color="white" size="22">mdi-alert-circle</v-icon>
-            </div>
-            <div class="text-h4 font-weight-bold text-error">{{ stats.expired }}</div>
-            <div class="text-caption text-medium-emphasis">منتهية</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+    <!-- Compact status summary -->
+    <div class="document-stats d-flex flex-wrap ga-2 mb-6" role="list" aria-label="ملخص حالات الوثائق">
+      <v-chip
+        v-for="item in statsItems"
+        :key="item.key"
+        role="listitem"
+        :color="item.color"
+        variant="tonal"
+        size="large"
+        class="font-weight-medium"
+      >
+        <v-icon start size="18">{{ item.icon }}</v-icon>
+        {{ item.label }}: {{ item.value }}
+      </v-chip>
+    </div>
 
     <!-- Standard Documents Grid -->
     <h2 class="text-h6 font-weight-bold mb-4">الوثائق الأساسية</h2>
@@ -103,11 +71,17 @@
               </v-chip>
             </div>
             
-            <div class="text-body-2 mb-2">
-              <v-icon size="14" class="me-1">mdi-calendar</v-icon>ينتهي: {{ formatDate(getDocument(type).expiryDate) }}
+            <div v-if="getDocument(type).statusInfo.daysLeft !== null" class="text-body-2 mb-2">
+              <v-icon size="14" class="me-1" aria-hidden="true">mdi-calendar</v-icon>ينتهي: {{ formatDate(getDocument(type).expiryDate) }}
             </div>
             <div v-if="getDocument(type).statusInfo.daysLeft !== null" :class="`text-caption text-${getStatusColor(getDocument(type).statusInfo.status)} font-weight-medium`">
               {{ getDaysText(getDocument(type).statusInfo.daysLeft) }}
+            </div>
+            <div v-else class="expiry-missing mt-2">
+              <p class="text-body-2 text-medium-emphasis mb-1">لم يُحدد تاريخ الانتهاء بعد.</p>
+              <v-btn variant="text" size="small" color="info" class="px-0" @click="openEditDialog(getDocument(type))">
+                إضافة تاريخ انتهاء
+              </v-btn>
             </div>
             <div class="d-flex gap-2 mt-3">
               <v-btn variant="tonal" size="small" class="flex-grow-1" @click="openEditDialog(getDocument(type))">
@@ -164,11 +138,17 @@
                 </v-chip>
               </div>
               
-              <div class="text-body-2 mb-2">
-                <v-icon size="14" class="me-1">mdi-calendar</v-icon>ينتهي: {{ formatDate(doc.expiryDate) }}
+              <div v-if="doc.statusInfo.daysLeft !== null" class="text-body-2 mb-2">
+                <v-icon size="14" class="me-1" aria-hidden="true">mdi-calendar</v-icon>ينتهي: {{ formatDate(doc.expiryDate) }}
               </div>
               <div v-if="doc.statusInfo.daysLeft !== null" :class="`text-caption text-${getStatusColor(doc.statusInfo.status)} font-weight-medium`">
                 {{ getDaysText(doc.statusInfo.daysLeft) }}
+              </div>
+              <div v-else class="expiry-missing mt-2">
+                <p class="text-body-2 text-medium-emphasis mb-1">لم يُحدد تاريخ الانتهاء بعد.</p>
+                <v-btn variant="text" size="small" color="info" class="px-0" @click="openEditDialog(doc)">
+                  إضافة تاريخ انتهاء
+                </v-btn>
               </div>
               <div class="d-flex gap-2 mt-3">
                 <v-btn variant="tonal" size="small" class="flex-grow-1" @click="openEditDialog(doc)">
@@ -185,7 +165,7 @@
     </template>
 
     <!-- Add/Edit Dialog -->
-    <v-dialog v-model="showDialog" max-width="550" persistent>
+    <v-dialog v-model="showDialog" max-width="550" persistent scrollable>
       <v-card class="rounded-xl">
         <v-card-title class="pa-5 d-flex align-center">
           <div class="dialog-icon me-3" :class="`bg-${dialogColor}`">
@@ -240,11 +220,11 @@
               <v-text-field v-model="formData.issueDate" label="تاريخ الإصدار" type="date" prepend-inner-icon="mdi-calendar"></v-text-field>
             </v-col>
             <v-col cols="12" sm="6">
-              <v-text-field v-model="formData.expiryDate" label="تاريخ الانتهاء" type="date" prepend-inner-icon="mdi-calendar-alert" :rules="[v => !!v || 'تاريخ الانتهاء مطلوب']"></v-text-field>
+              <v-text-field v-model="formData.expiryDate" label="تاريخ الانتهاء" type="date" prepend-inner-icon="mdi-calendar-alert" hint="اختياري؛ ستظهر الوثيقة كـ«تحتاج تاريخ انتهاء» حتى تضيفه." persistent-hint></v-text-field>
             </v-col>
           </v-row>
 
-          <v-select v-model="formData.reminderDays" label="التذكير قبل الانتهاء بـ" :items="reminderOptions" prepend-inner-icon="mdi-bell" class="mb-3"></v-select>
+          <v-select v-model="formData.reminderDays" label="التذكير قبل الانتهاء بـ" :items="reminderOptions" prepend-inner-icon="mdi-bell" class="mb-3" @update:model-value="reminderDaysTouched = true"></v-select>
 
           <v-textarea v-model="formData.notes" label="ملاحظات" rows="2" prepend-inner-icon="mdi-note-text"></v-textarea>
         </v-card-text>
@@ -294,7 +274,7 @@
             </v-col>
             <v-col cols="6">
               <div class="text-caption text-medium-emphasis">تاريخ الانتهاء</div>
-              <div class="font-weight-medium">{{ formatDate(viewDocument.expiryDate) }}</div>
+              <div class="font-weight-medium">{{ viewDocument.statusInfo.daysLeft !== null ? formatDate(viewDocument.expiryDate) : 'غير محدد' }}</div>
             </v-col>
           </v-row>
         </v-card-text>
@@ -330,12 +310,20 @@ import { ref, computed, inject } from 'vue'
 import { useDocumentsStore } from '@/stores/documents'
 import V1BlobSource from '@/components/V1BlobSource.vue'
 import { readFileAsDataUrl, validateDataUrlFile } from '@/lib/data-url-upload'
+import { formatDocumentDaysTextV1, isIssueDateAfterExpiryDateV1 } from '@/lib/document-status-v1'
 import dayjs from 'dayjs'
 
 const showSnackbar = inject('showSnackbar')
 const documentsStore = useDocumentsStore()
 
 const stats = computed(() => documentsStore.stats)
+const statsItems = computed(() => [
+  { key: 'total', label: 'الإجمالي', value: stats.value.total, color: 'primary', icon: 'mdi-file-document-multiple' },
+  { key: 'valid', label: 'سارية', value: stats.value.valid, color: 'success', icon: 'mdi-check-circle' },
+  { key: 'expiring', label: 'قربت تنتهي', value: stats.value.expiringSoon, color: 'warning', icon: 'mdi-clock-alert' },
+  { key: 'expired', label: 'منتهية', value: stats.value.expired, color: 'error', icon: 'mdi-alert-circle' },
+  { key: 'needs-expiry', label: 'تحتاج تاريخ انتهاء', value: stats.value.needsExpiry, color: 'info', icon: 'mdi-calendar-question' }
+])
 
 // Standard document types to display in main grid
 const standardTypes = ['registration', 'fahas', 'insurance', 'license']
@@ -356,6 +344,8 @@ const imageInput = ref(null)
 const savingDocument = ref(false)
 const saveError = ref('')
 const deletingDocument = ref(false)
+const reminderDaysTouched = ref(false)
+const preserveReminderDaysFallback = ref(false)
 
 const dialogTitle = computed(() => {
   if (dialogType.value === 'custom' && formData.value.title) return formData.value.title
@@ -367,7 +357,7 @@ const dialogColor = computed(() => documentsStore.DOCUMENT_COLORS[dialogType.val
 
 const reminderOptions = [
   { title: '7 أيام', value: 7 },
-  { title: '15 يوم', value: 15 },
+  { title: '14 يومًا', value: 14 },
   { title: '30 يوم', value: 30 },
   { title: '60 يوم', value: 60 }
 ]
@@ -380,13 +370,22 @@ function openAddDialog(type = 'custom') {
   editMode.value = false
   dialogType.value = type
   formData.value = getEmptyForm()
+  reminderDaysTouched.value = false
+  preserveReminderDaysFallback.value = false
   saveError.value = ''
   showDialog.value = true
 }
 
 function openEditDialog(doc) {
+  const storedReminderDays = Number(doc.reminderDays)
+  const hasStoredReminderDays = doc.reminderDays !== null
+    && doc.reminderDays !== undefined
+    && Number.isInteger(storedReminderDays)
+    && storedReminderDays >= 0
   editMode.value = true
   dialogType.value = doc.type
+  reminderDaysTouched.value = false
+  preserveReminderDaysFallback.value = !hasStoredReminderDays
   formData.value = {
     id: doc.id,
     title: doc.title || '',
@@ -394,7 +393,7 @@ function openEditDialog(doc) {
     expiryDate: doc.expiryDate ? dayjs(doc.expiryDate).format('YYYY-MM-DD') : '',
     image: doc.image || null,
     notes: doc.notes || '',
-    reminderDays: doc.reminderDays || 30
+    reminderDays: hasStoredReminderDays ? storedReminderDays : 30
   }
   saveError.value = ''
   showDialog.value = true
@@ -424,14 +423,17 @@ async function saveDocument() {
   if (savingDocument.value) return
   saveError.value = ''
   const data = { type: dialogType.value, ...formData.value }
+  if (editMode.value && preserveReminderDaysFallback.value && !reminderDaysTouched.value) {
+    delete data.reminderDays
+  }
   
   // Validation for Custom Title
   if (dialogType.value === 'custom' && !data.title) {
     saveError.value = 'يرجى إدخال اسم الوثيقة.'
     return
   }
-  if (!data.expiryDate) {
-    saveError.value = 'يرجى إدخال تاريخ انتهاء الوثيقة.'
+  if (data.issueDate && data.expiryDate && isIssueDateAfterExpiryDateV1(data.issueDate, data.expiryDate)) {
+    saveError.value = 'تاريخ الانتهاء لا يمكن أن يسبق تاريخ الإصدار.'
     return
   }
 
@@ -496,7 +498,7 @@ function isPdf(url) {
 
 // Helpers
 function getStatusColor(status) {
-  return { expired: 'error', expiring_soon: 'warning', valid: 'success' }[status] || 'grey'
+  return { needs_expiry: 'info', expired: 'error', expiring_soon: 'warning', valid: 'success' }[status] || 'grey'
 }
 
 function formatDate(date) {
@@ -504,19 +506,13 @@ function formatDate(date) {
 }
 
 function getDaysText(days) {
-  if (days < 0) return `منتهية منذ ${Math.abs(days)} يوم`
-  return `متبقي ${days} يوم`
+  return formatDocumentDaysTextV1(days)
 }
 </script>
 
 <style scoped>
-.stat-card { transition: all 0.3s ease; }
-.stat-card:hover { transform: translateY(-4px); }
-
-.stat-icon {
-  width: 44px; height: 44px; border-radius: 12px;
-  display: flex; align-items: center; justify-content: center;
-}
+.document-stats { row-gap: 8px; }
+.expiry-missing { border-inline-start: 2px solid rgb(var(--v-theme-info)); padding-inline-start: 10px; }
 
 .document-card {
   border-radius: 16px; overflow: hidden; transition: all 0.3s ease;

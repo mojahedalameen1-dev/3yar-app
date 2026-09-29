@@ -1,27 +1,16 @@
 <template>
   <div class="dashboard">
-    <v-alert v-if="tasksStore.error || recordsStore.error || documentsStore.error" type="error" variant="tonal" class="mb-4" role="alert">
-      تعذر تحديث بعض بيانات لوحة التحكم. نعرض آخر البيانات المحفوظة إن توفرت.
-      <v-btn size="small" variant="text" :loading="tasksStore.loading || recordsStore.loading || documentsStore.loading" :disabled="tasksStore.loading || recordsStore.loading || documentsStore.loading" @click="retryDashboardData">إعادة المحاولة</v-btn>
-    </v-alert>
-    <!-- Greeting Header -->
-    <div class="d-flex flex-wrap justify-space-between align-center mb-6 px-1 animate-slide-up" v-if="!isMobile">
-      <div>
-        <h1 class="text-h4 font-weight-bold mb-1">{{ greeting }}</h1>
-        <p class="text-body-2 text-medium-emphasis">
-          {{ carStore.hasCar ? `إدارة صيانة ${carStore.car.make} ${carStore.car.model}` : 'ابدأ بإضافة سيارتك' }}
-        </p>
-      </div>
-      <div class="d-flex align-center gap-2">
-        <v-chip color="primary" variant="tonal" size="large" class="px-4">
-          <v-icon start>mdi-calendar</v-icon>
-          {{ formattedDate }}
-        </v-chip>
-      </div>
+    <div v-if="dashboardPrimaryState === 'loading'" class="py-8" role="status" aria-live="polite">
+      <v-skeleton-loader type="heading, paragraph, paragraph"></v-skeleton-loader>
+      <span class="sr-only">جارٍ تحميل بيانات السيارة</span>
     </div>
+    <v-alert v-else-if="dashboardPrimaryState === 'unavailable'" type="error" variant="tonal" class="mb-4" role="alert">
+      تعذر تحميل بيانات السيارة؛ لم نعرض حالة الإعداد حتى لا نخلط بين الخطأ وعدم وجود سيارة.
+      <v-btn size="small" variant="text" :loading="carStore.loading" :disabled="carStore.loading" @click="carStore.fetchCar()">إعادة المحاولة</v-btn>
+    </v-alert>
 
     <!-- No Car State -->
-    <template v-if="!carStore.hasCar">
+    <template v-else-if="dashboardPrimaryState === 'onboarding'">
       <v-card class="welcome-card pa-8 pa-md-12 text-center">
         <div class="welcome-icon mx-auto mb-6">
           <v-icon size="64" color="white">mdi-car-wrench</v-icon>
@@ -54,6 +43,145 @@
 
     <!-- Main Dashboard -->
     <template v-else>
+      <!-- Greeting and vehicle identity -->
+      <div class="d-flex flex-wrap justify-space-between align-center mb-4 px-1 animate-slide-up">
+        <div>
+          <h1 :class="[isMobile ? 'text-h6' : 'text-h4', 'font-weight-bold mb-1']">{{ greeting }}</h1>
+          <p class="text-body-2 text-medium-emphasis mb-0">
+            {{ carStore.car.make }} {{ carStore.car.model }} · {{ carStore.car.year }}
+          </p>
+        </div>
+        <div v-if="!isMobile" class="d-flex align-center gap-2">
+          <v-chip color="primary" variant="tonal" size="large" class="px-4">
+            <v-icon start aria-hidden="true">mdi-calendar</v-icon>
+            {{ formattedDate }}
+          </v-chip>
+        </div>
+      </div>
+
+      <v-alert v-if="carSourceState === 'degraded'" type="warning" variant="tonal" class="mb-4" role="alert">
+        تعذر تحديث بيانات السيارة؛ نعرض آخر البيانات المحمّلة.
+        <v-btn size="small" variant="text" :loading="carStore.loading" :disabled="carStore.loading" @click="carStore.fetchCar()">إعادة المحاولة</v-btn>
+      </v-alert>
+
+      <!-- Action Center -->
+      <v-card class="action-center-card mb-4" variant="tonal" :loading="actionCenterState === 'loading'">
+        <v-card-title class="d-flex align-center flex-wrap ga-2 pa-4">
+          <v-icon color="primary" aria-hidden="true">mdi-clipboard-alert-outline</v-icon>
+          <h2 class="text-subtitle-1 font-weight-bold mb-0">يحتاج انتباهك</h2>
+          <v-chip v-if="dashboardActions.length" size="small" color="primary" variant="tonal">
+            {{ dashboardActions.length.toLocaleString('ar-SA') }}
+          </v-chip>
+        </v-card-title>
+        <v-divider></v-divider>
+        <v-card-text class="pa-4">
+          <v-alert v-if="maintenanceSourceState === 'unavailable' || maintenanceSourceState === 'degraded'" type="warning" variant="tonal" density="compact" class="mb-3" role="alert">
+            تعذر تحديث بيانات مهام الصيانة.
+            <v-btn size="small" variant="text" :loading="tasksStore.loading" :disabled="tasksStore.loading" @click="tasksStore.fetchTasks()">إعادة المحاولة</v-btn>
+          </v-alert>
+          <v-alert v-if="documentsSourceState === 'unavailable' || documentsSourceState === 'degraded'" type="warning" variant="tonal" density="compact" class="mb-3" role="alert">
+            تعذر تحديث بيانات الوثائق.
+            <v-btn size="small" variant="text" :loading="documentsStore.loading" :disabled="documentsStore.loading" @click="documentsStore.fetchDocuments()">إعادة المحاولة</v-btn>
+          </v-alert>
+
+          <v-list v-if="dashboardActions.length" id="dashboard-action-list" class="bg-transparent pa-0">
+            <v-list-item
+              v-for="(action, index) in visibleDashboardActions"
+              :key="action.id"
+              class="dashboard-action-item rounded-lg px-2"
+              :class="{ 'border-b': index < visibleDashboardActions.length - 1 }"
+            >
+              <template #prepend>
+                <v-avatar :color="actionSeverityColor(action.severity)" variant="tonal" size="40" class="me-2">
+                  <v-icon aria-hidden="true">{{ actionSourceIcon(action.source) }}</v-icon>
+                </v-avatar>
+              </template>
+              <v-list-item-title class="font-weight-bold text-wrap">{{ action.title }}</v-list-item-title>
+              <v-list-item-subtitle class="text-wrap mt-1">{{ action.message }}</v-list-item-subtitle>
+              <template #append>
+                <v-btn
+                  v-if="action.actionKind === 'odometer'"
+                  color="primary"
+                  variant="text"
+                  size="small"
+                  class="dashboard-action-cta"
+                  @click="openOdometerDialog"
+                >
+                  {{ action.actionLabel }}
+                </v-btn>
+                <v-btn
+                  v-else
+                  :to="action.actionRoute"
+                  color="primary"
+                  variant="text"
+                  size="small"
+                  class="dashboard-action-cta"
+                >
+                  {{ action.actionLabel }}
+                </v-btn>
+              </template>
+            </v-list-item>
+            <div v-if="dashboardActions.length > 3" class="text-center pt-3">
+              <v-btn
+                variant="text"
+                color="primary"
+                :aria-expanded="showAllDashboardActions"
+                aria-controls="dashboard-action-list"
+                @click="showAllDashboardActions = !showAllDashboardActions"
+              >
+                {{ showAllDashboardActions ? 'عرض أقل' : 'عرض الكل' }}
+              </v-btn>
+            </div>
+          </v-list>
+
+          <div v-else-if="actionCenterState === 'loading'" class="py-2" role="status" aria-live="polite">
+            <v-skeleton-loader type="list-item-avatar-two-line, list-item-avatar-two-line"></v-skeleton-loader>
+            <span class="sr-only">جارٍ التحقق من المهام والوثائق</span>
+          </div>
+          <div v-else-if="actionCenterState === 'partial-empty'" class="text-body-2 text-medium-emphasis py-2" role="status">
+            لا توجد إجراءات ضمن البيانات المتاحة حاليًا. بعض المصادر لم تُحدّث.
+          </div>
+          <div v-else class="dashboard-no-action-state py-2" role="status" aria-live="polite">
+            <div class="font-weight-bold">لا توجد إجراءات عاجلة حاليًا</div>
+            <div v-if="nextMaintenance.state === 'ready'" class="text-body-2 text-medium-emphasis mt-1">
+              <span>الصيانة القادمة: {{ nextMaintenance.task.name }}</span>
+              <span v-if="nextMaintenance.expectedDate"> · موعد متوقع {{ formatDate(nextMaintenance.expectedDate) }}</span>
+            </div>
+          </div>
+        </v-card-text>
+      </v-card>
+
+      <!-- Small, direct actions; no placeholder buttons -->
+      <section class="mb-5" aria-labelledby="dashboard-quick-actions-title">
+        <h2 id="dashboard-quick-actions-title" class="text-subtitle-2 text-medium-emphasis mb-2">إجراءات سريعة</h2>
+        <v-row dense>
+          <v-col v-for="action in quickActions" :key="action.id" cols="12" sm="4">
+            <v-btn
+              v-if="action.kind === 'odometer'"
+              block
+              min-height="44"
+              variant="tonal"
+              color="primary"
+              :prepend-icon="action.icon"
+              @click="openOdometerDialog"
+            >
+              {{ action.title }}
+            </v-btn>
+            <v-btn
+              v-else
+              block
+              min-height="44"
+              variant="tonal"
+              color="primary"
+              :to="action.route"
+              :prepend-icon="action.icon"
+            >
+              {{ action.title }}
+            </v-btn>
+          </v-col>
+        </v-row>
+      </section>
+
       <v-row :class="{ 'gap-6': isMobile }">
         <!-- Car Card with Image -->
         <v-col cols="12" lg="4">
@@ -114,25 +242,17 @@
                 <div v-if="lastOdometerUpdate" class="text-caption text-medium-emphasis mt-1">
                   آخر تحديث {{ lastOdometerUpdate }}
                 </div>
-                <div v-if="hasReliableOdometerUsage" class="odometer-usage-summary mt-3">
-                  <div class="text-caption text-medium-emphasis">متوسط استخدامك</div>
-                  <v-chip size="small" color="info" variant="tonal" class="rounded-pill mt-1">
-                    <v-icon start size="14">mdi-trending-up</v-icon>
-                    {{ formatOdometerRate(odometerStore.insights.averageDailyKm) }} كم/يوم
-                  </v-chip>
-                  <div class="text-caption text-medium-emphasis mt-1">
-                    نحو {{ formatOdometerRate(odometerStore.insights.averageMonthlyKm) }} كم/شهر
-                  </div>
-                  <div class="text-caption text-medium-emphasis">
-                    حسب {{ odometerStore.insights.sampleReadings }} قراءات خلال {{ formatSampleDays(odometerStore.insights.sampleDays) }} يومًا
-                  </div>
-                  <div class="text-caption text-medium-emphasis">
-                    {{ odometerStore.insights.source === 'recent' ? 'اعتمادًا على القراءات الحديثة' : 'اعتمادًا على سجل القراءات المتاح' }}
-                  </div>
+                <div v-if="odometerSummary.state === 'loading'" class="mt-3" role="status" aria-live="polite">
+                  <v-skeleton-loader type="text" width="70%"></v-skeleton-loader>
+                  <span class="sr-only">جارٍ تحميل ملخص استخدام السيارة</span>
                 </div>
-                <p v-else class="text-caption text-medium-emphasis mt-3 mb-0">
-                  نحتاج قراءات أكثر لحساب معدل الاستخدام. أضف قراءة أخرى لاحقًا لتحسين توقعات الصيانة.
-                </p>
+                <div v-else class="odometer-usage-summary mt-3 text-body-2" aria-live="polite">
+                  {{ odometerSummary.message }}
+                </div>
+                <v-alert v-if="odometerSourceState === 'unavailable' || odometerSourceState === 'degraded'" type="warning" variant="tonal" density="compact" class="mt-3" role="alert">
+                  تعذر تحديث سجل العداد.
+                  <v-btn size="small" variant="text" :loading="odometerStore.loading" :disabled="odometerStore.loading" @click="odometerStore.fetchReadings()">إعادة المحاولة</v-btn>
+                </v-alert>
               </div>
               
               <!-- Car actions -->
@@ -156,7 +276,7 @@
         <v-col cols="12" lg="8">
           <v-row>
             <!-- Regulatory Alert (Saudi Fahas/Istimara Logic) -->
-            <v-col cols="12" v-if="regulatoryStatus.hasAlert">
+            <v-col cols="12" v-if="regulatoryStatus.isTechnicalViolation || regulatoryStatus.isRenewalBlocked">
               <v-card :color="regulatoryStatus.color" class="text-white">
                 <v-card-text class="d-flex align-start pa-4">
                   <v-icon size="40" color="white" class="me-4 mt-1">{{ regulatoryStatus.icon }}</v-icon>
@@ -184,210 +304,60 @@
               </v-card>
             </v-col>
 
-            <!-- Next Maintenance Card -->
-            <v-col cols="12">
-              <v-card 
-                v-if="nextMaintenance"
-                :class="['next-maintenance-card animate-slide-up', isMobile ? 'surface-card' : `status-${nextMaintenance.statusInfo.status}`]"
-              >
-                <v-card-text class="pa-5">
-                  <div class="d-flex align-center justify-space-between flex-wrap gap-4">
-                    <div class="d-flex align-center gap-4">
-                      <div 
-                        class="next-icon"
-                        :class="`bg-${getStatusColor(nextMaintenance.statusInfo.status)}`"
-                      >
-                        <v-icon size="28" color="white">{{ getStatusIcon(nextMaintenance.statusInfo.status) }}</v-icon>
-                      </div>
-                      <div>
-                        <div class="text-overline text-medium-emphasis">الصيانة القادمة</div>
-                        <div class="text-h5 font-weight-bold">{{ nextMaintenance.name }}</div>
-                        <div class="d-flex align-center gap-2 mt-1 flex-wrap">
-                          <v-chip 
-                            :color="getStatusColor(nextMaintenance.statusInfo.status)" 
-                            size="small"
-                            variant="flat"
-                            class="rounded-lg"
-                          >
-                            {{ tasksStore.STATUS_LABELS[nextMaintenance.statusInfo.status] }}
-                          </v-chip>
-                          <span 
-                            v-if="nextMaintenance.statusInfo.kmRemaining !== null && nextMaintenance.statusInfo.kmRemaining > 0"
-                            class="text-body-2 text-medium-emphasis"
-                          >
-                            باقي {{ nextMaintenance.statusInfo.kmRemaining.toLocaleString() }} كم
-                          </span>
-                          <span 
-                            v-else-if="nextMaintenance.statusInfo.kmRemaining === 0 && nextMaintenance.intervalKm"
-                            class="text-body-2 text-error font-weight-medium"
-                          >
-                            يجب التغيير الآن
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="d-flex gap-2" :class="{ 'w-100 mt-2': isMobile }">
-                      <v-btn
-                        color="success"
-                        variant="flat"
-                        prepend-icon="mdi-check"
-                        @click="recordMaintenance(nextMaintenance)"
-                        :class="{ 'flex-grow-1': isMobile }"
-                        :height="isMobile ? 48 : 40"
-                        rounded="xl"
-                      >
-                        تم
-                      </v-btn>
-                      <v-btn
-                        variant="tonal"
-                        prepend-icon="mdi-alarm-snooze"
-                        @click="snoozeTask(nextMaintenance)"
-                        :class="{ 'flex-grow-1': isMobile }"
-                        :height="isMobile ? 48 : 40"
-                        rounded="xl"
-                      >
-                        تأجيل
-                      </v-btn>
-                    </div>
+            <!-- Next maintenance uses the task store's existing status/forecast only. -->
+            <v-col v-if="nextMaintenance.state === 'ready' && dashboardActions.length" cols="12">
+              <v-card class="next-maintenance-card surface-card">
+                <v-card-text class="d-flex align-center justify-space-between flex-wrap ga-4 pa-5">
+                  <div>
+                    <div class="text-overline text-medium-emphasis">الصيانة القادمة</div>
+                    <h2 class="text-h6 font-weight-bold">{{ nextMaintenance.task.name }}</h2>
+                    <p v-if="nextMaintenance.expectedDate" class="text-body-2 text-medium-emphasis mb-0">
+                      موعد متوقع {{ formatDate(nextMaintenance.expectedDate) }}
+                    </p>
+                    <p v-else-if="nextMaintenance.task.statusInfo.kmRemaining !== null" class="text-body-2 text-medium-emphasis mb-0">
+                      المتبقي حسب الخطة {{ Number(nextMaintenance.task.statusInfo.kmRemaining).toLocaleString('ar-SA') }} كم
+                    </p>
+                    <p v-else class="text-body-2 text-medium-emphasis mb-0">تُحدّث مواعيدها حسب بيانات الصيانة والعداد.</p>
                   </div>
-                  <!-- Progress Bar -->
-                  <div class="mt-4 position-relative">
-                    <v-progress-linear
-                      :model-value="Math.min(nextMaintenance.statusInfo.progress, 100)"
-                      :color="getStatusColor(nextMaintenance.statusInfo.status)"
-                      height="6"
-                      rounded
-                    ></v-progress-linear>
-                    <div v-if="isMobile" class="progress-label-mobile">
-                      {{ Math.round(nextMaintenance.statusInfo.progress) }}%
-                    </div>
-                  </div>
+                  <v-btn color="primary" variant="tonal" :to="{ name: 'tasks' }">عرض المهمة</v-btn>
                 </v-card-text>
               </v-card>
             </v-col>
 
-            <!-- Stats Cards -->
-            <v-col v-for="(stat, i) in statsCards" :key="stat.title" cols="6" md="3">
-              <v-card :class="['animate-slide-up', isMobile ? 'surface-card' : 'stat-card glass-card h-100']" :style="{ animationDelay: `${0.1 * (i + 1)}s` }">
-                <v-card-text class="pa-4 text-center">
-                  <div class="stat-icon mx-auto mb-2" :class="`bg-${stat.color}`">
-                    <v-icon color="white" size="22">{{ stat.icon }}</v-icon>
-                  </div>
-                  <div :class="['font-weight-bold mb-1', `text-${stat.color}`]" :style="{ fontSize: isMobile ? '1.5rem' : '2.125rem' }">
-                    {{ stat.value }}
-                  </div>
-                  <div class="text-caption text-medium-emphasis">{{ stat.title }}</div>
-                </v-card-text>
-              </v-card>
-            </v-col>
-
-            <v-col v-if="needsSetupTasks.length" cols="12">
+            <v-col v-else-if="nextMaintenance.state === 'needs_setup'" cols="12">
               <v-card class="needs-setup-card" variant="tonal">
                 <v-card-text class="d-flex flex-column flex-sm-row align-start align-sm-center ga-4 pa-5">
-                  <div class="needs-setup-icon">
-                    <v-icon color="info" size="26">mdi-wrench-clock</v-icon>
-                  </div>
+                  <v-icon color="info" size="26" aria-hidden="true">mdi-wrench-clock</v-icon>
                   <div class="flex-grow-1">
-                    <div class="d-flex align-center flex-wrap ga-2 mb-1">
-                      <h2 class="text-subtitle-1 font-weight-bold">مهام تحتاج إعداد</h2>
-                      <v-chip size="small" color="info" variant="tonal">{{ tasksStore.taskStats.needsSetup }}</v-chip>
-                    </div>
-                    <p class="text-body-2 text-medium-emphasis mb-0">
-                      لا تتوفر معلومات كافية عن آخر صيانة لبعض المهام، لذلك لا نحسبها كمتأخرة.
-                    </p>
-                    <div class="text-caption text-medium-emphasis mt-2">
-                      {{ needsSetupTasks.slice(0, 3).map(task => task.name).join(' · ') }}
-                      <span v-if="needsSetupTasks.length > 3">…</span>
-                    </div>
+                    <h2 class="text-subtitle-1 font-weight-bold mb-1">أكمل إعداد خطة الصيانة لبدء المتابعة</h2>
+                    <p class="text-body-2 text-medium-emphasis mb-0">لن نعرض موعدًا قبل توفر بيانات الصيانة اللازمة.</p>
                   </div>
                   <v-btn color="primary" variant="tonal" prepend-icon="mdi-wrench-clock" :to="{ name: 'tasks', query: { filter: 'needs_setup' } }">
-                    إكمال إعداد الصيانة
+                    إعداد الصيانة
                   </v-btn>
                 </v-card-text>
               </v-card>
             </v-col>
 
-            <!-- Cost Chart (New Feature) -->
-            <v-col cols="12">
-              <CostChart :records="recordsStore.records" />
-            </v-col>
-
-            <!-- Alerts Section -->
-            <v-col cols="12">
-              <v-card class="glass-card">
+            <v-col cols="12" md="6">
+              <v-card class="glass-card h-100">
                 <v-card-title class="d-flex align-center pa-4">
-                  <div class="title-icon me-3">
-                    <v-icon color="warning">mdi-bell-ring</v-icon>
-                  </div>
-                  <div>
-                    <div class="text-subtitle-1 font-weight-bold">التنبيهات النشطة</div>
-                    <div class="text-caption text-medium-emphasis">المهام التي تحتاج اهتمامك</div>
-                  </div>
+                  <v-icon color="info" class="me-3" aria-hidden="true">mdi-file-document-multiple</v-icon>
+                  <h2 class="text-subtitle-1 font-weight-bold mb-0">الوثائق</h2>
                   <v-spacer></v-spacer>
-                  <v-btn variant="text" color="primary" size="small" to="/tasks">
-                    عرض الكل
-                    <v-icon end>mdi-chevron-left</v-icon>
-                  </v-btn>
+                  <v-btn variant="text" color="primary" size="small" :to="{ name: 'documents' }">عرض الوثائق</v-btn>
                 </v-card-title>
                 <v-divider></v-divider>
-                <v-card-text class="pa-0">
-                  <template v-if="alertTasks.length > 0">
-                    <v-list class="bg-transparent py-0">
-                      <v-list-item
-                        v-for="(task, index) in alertTasks.slice(0, 4)"
-                        :key="task.id"
-                        class="alert-item px-4 py-3"
-                        :class="{ 'border-b': index < alertTasks.slice(0, 4).length - 1 }"
-                      >
-                        <template #prepend>
-                          <div 
-                            class="alert-indicator"
-                            :class="`bg-${getStatusColor(task.statusInfo.status)}`"
-                          >
-                            <v-icon size="18" color="white">{{ getStatusIcon(task.statusInfo.status) }}</v-icon>
-                          </div>
-                        </template>
-                        <v-list-item-title class="font-weight-bold">
-                          {{ task.name }}
-                        </v-list-item-title>
-                        <v-list-item-subtitle class="d-flex align-center gap-2 mt-1">
-                          <v-chip 
-                            :color="getStatusColor(task.statusInfo.status)" 
-                            size="x-small"
-                            variant="tonal"
-                          >
-                            {{ tasksStore.STATUS_LABELS[task.statusInfo.status] }}
-                          </v-chip>
-                          <span>{{ Math.round(task.statusInfo.progress) }}%</span>
-                        </v-list-item-subtitle>
-                        <template #append>
-                          <div class="d-flex gap-1">
-                            <v-btn
-                              icon
-                              size="small"
-                              variant="text"
-                              color="success"
-                              :aria-label="`تسجيل صيانة: ${task.name}`"
-                              @click="recordMaintenance(task)"
-                            >
-                              <v-icon>mdi-check</v-icon>
-                            </v-btn>
-                          </div>
-                        </template>
-                      </v-list-item>
-                    </v-list>
-                  </template>
-                  <template v-else>
-                    <div class="text-center py-8">
-                      <div class="success-icon mx-auto mb-4">
-                        <v-icon size="48" color="white">mdi-check</v-icon>
-                      </div>
-                      <p class="text-subtitle-1 font-weight-bold mb-1">لا توجد تنبيهات!</p>
-                      <p class="text-body-2 text-medium-emphasis">
-                        {{ tasksStore.taskStats.needsSetup ? 'المهام الأخرى تحتاج إعدادًا قبل حساب مواعيدها.' : 'جميع المهام على ما يرام' }}
-                      </p>
-                    </div>
-                  </template>
+                <v-card-text>
+                  <div v-if="documentsSummary.state === 'loading'" role="status">جارٍ تحميل الوثائق…</div>
+                  <div v-else-if="documentsSummary.state === 'unavailable'" class="text-body-2 text-medium-emphasis">ملخص الوثائق غير متاح مؤقتًا.</div>
+                  <div v-else-if="documentsSummary.state === 'empty'" class="text-body-2 text-medium-emphasis">لا توجد وثائق مضافة بعد.</div>
+                  <div v-else-if="documentsSummary.attentionCount" class="d-flex align-center ga-2">
+                    <v-icon color="warning" aria-hidden="true">mdi-file-alert-outline</v-icon>
+                    <span class="font-weight-medium">{{ formatCount(documentsSummary.attentionCount) }} وثائق تحتاج انتباه</span>
+                  </div>
+                  <div v-else class="text-body-2 text-medium-emphasis">لا توجد وثائق تحتاج إجراء حاليًا.</div>
+                  <div v-if="documentsSummary.isDegraded" class="text-caption text-warning mt-2">نعرض آخر بيانات محمّلة؛ تعذر تحديثها الآن.</div>
                 </v-card-text>
               </v-card>
             </v-col>
@@ -407,6 +377,10 @@
                 </v-card-title>
                 <v-divider></v-divider>
                 <v-card-text>
+                  <v-alert v-if="recordsSourceState === 'unavailable' || recordsSourceState === 'degraded'" type="warning" variant="tonal" density="compact" class="mb-3" role="alert">
+                    تعذر تحديث سجل الصيانة.
+                    <v-btn size="small" variant="text" :loading="recordsStore.loading" :disabled="recordsStore.loading" @click="recordsStore.fetchRecords()">إعادة المحاولة</v-btn>
+                  </v-alert>
                   <template v-if="recentRecords.length > 0">
                     <div 
                       v-for="(record, i) in recentRecords.slice(0, 3)" 
@@ -419,13 +393,23 @@
                       </v-avatar>
                       <div class="flex-grow-1">
                         <div class="text-body-2 font-weight-medium">{{ record.taskName }}</div>
-                        <div class="text-caption text-medium-emphasis">{{ formatDate(record.date) }}</div>
+                        <div class="text-caption text-medium-emphasis">
+                          {{ formatDate(record.date) }} · {{ record.odometerReading == null ? 'العداد غير مسجل' : `${formatCount(record.odometerReading)} كم` }}
+                        </div>
                       </div>
-                      <v-chip size="small" color="success" variant="tonal">
-                        {{ record.cost?.toLocaleString() || 0 }} ر.س
+                      <v-chip v-if="normalizeKnownCostV1(record.cost) !== null" size="small" color="success" variant="tonal">
+                        {{ formatMoney(normalizeKnownCostV1(record.cost)) }} ر.س
                       </v-chip>
+                      <span v-else class="text-caption text-medium-emphasis">التكلفة غير مسجلة</span>
                     </div>
                   </template>
+                  <div v-else-if="recordsSourceState === 'loading'" class="py-4" role="status" aria-live="polite">
+                    <v-skeleton-loader type="list-item-avatar-two-line, list-item-avatar-two-line"></v-skeleton-loader>
+                    <span class="sr-only">جارٍ تحميل سجل الصيانة</span>
+                  </div>
+                  <div v-else-if="recordsSourceState === 'unavailable'" class="text-body-2 text-medium-emphasis py-4">
+                    سجل الصيانة غير متاح مؤقتًا.
+                  </div>
                   <template v-else>
                     <div class="text-center py-4">
                       <v-icon size="40" color="grey-lighten-1" class="mb-2">mdi-clipboard-plus-outline</v-icon>
@@ -450,29 +434,25 @@
             <v-col cols="12" md="6">
               <v-card :class="['cost-card h-100 animate-slide-up', isMobile ? 'surface-card' : '']">
                 <v-card-text class="pa-6 text-white text-center text-md-start">
-                  <div class="d-flex align-center justify-space-between mb-4 flex-column flex-md-row">
-                    <div>
-                      <div class="text-overline opacity-80 mb-2">تكاليف هذا الشهر</div>
-                      <div :class="['font-weight-bold mb-1', isMobile ? 'stat-value-large' : 'text-h3']">
-                        {{ recordsStore.thisMonthCost.toLocaleString() }}
-                      </div>
-                      <div class="text-body-2 opacity-80">ريال سعودي</div>
-                    </div>
-                    <div class="cost-icon mt-4 mt-md-0" v-if="!isMobile">
-                      <v-icon size="32" color="white">mdi-cash-multiple</v-icon>
-                    </div>
+                  <div class="text-overline opacity-80 mb-2">مصاريف الصيانة هذا العام</div>
+                  <div v-if="costSummary.state === 'loading'" class="text-body-2" role="status">جارٍ تحميل التكاليف…</div>
+                  <div v-else-if="costSummary.state === 'unavailable'" class="text-body-2" role="alert">
+                    تعذر تحميل ملخص التكاليف.
+                    <v-btn size="small" variant="text" color="white" :loading="recordsStore.loading" :disabled="recordsStore.loading" @click="recordsStore.fetchRecords()">إعادة المحاولة</v-btn>
                   </div>
-                  <v-divider class="my-3 opacity-20"></v-divider>
-                  <div class="d-flex justify-space-around justify-md-between">
-                    <div class="text-center">
-                      <div class="text-h5 font-weight-bold">{{ recordsStore.stats.totalRecords }}</div>
-                      <div class="text-caption opacity-80">إجمالي الصيانات</div>
+                  <template v-else>
+                    <div v-if="costSummary.yearTotal !== null" :class="['font-weight-bold mb-1', isMobile ? 'stat-value-large' : 'text-h3']">
+                      {{ formatMoney(costSummary.yearTotal) }}
                     </div>
-                    <div class="text-center">
-                      <div class="text-h5 font-weight-bold">{{ recordsStore.stats.averageCost.toLocaleString() }}</div>
-                      <div class="text-caption opacity-80">متوسط التكلفة</div>
+                    <div v-else class="text-body-1 font-weight-medium">{{ costSummary.message }}</div>
+                    <div v-if="costSummary.yearTotal !== null" class="text-body-2 opacity-80">ريال سعودي</div>
+                    <div v-if="costSummary.lastMaintenanceCost !== null" class="text-body-2 mt-3">
+                      آخر صيانة: {{ formatMoney(costSummary.lastMaintenanceCost) }} ر.س
                     </div>
-                  </div>
+                    <div v-else-if="recentRecords.length" class="text-body-2 mt-3">تكلفة آخر صيانة غير مسجلة</div>
+                    <div v-if="costSummary.isDegraded" class="text-caption text-warning mt-2">بيانات التكلفة المعروضة لم يتأكد تحديثها.</div>
+                    <v-btn variant="text" color="white" class="mt-2 px-0" :to="{ name: 'records' }">عرض سجل الصيانة</v-btn>
+                  </template>
                 </v-card-text>
               </v-card>
             </v-col>
@@ -610,7 +590,7 @@
           <div class="current-reading pa-4 rounded-lg mb-4 text-center">
             <div class="text-caption text-medium-emphasis">القراءة الحالية</div>
             <div class="text-h4 font-weight-bold text-primary">
-              {{ carStore.car?.currentOdometer?.toLocaleString() || 0 }} كم
+              {{ formattedOdometer }} كم
             </div>
           </div>
           <v-text-field
@@ -635,9 +615,19 @@
           <v-divider class="my-3"></v-divider>
           <div class="d-flex align-center justify-space-between mb-1">
             <div class="text-subtitle-2 font-weight-bold">آخر القراءات</div>
-            <span class="text-caption text-medium-emphasis">{{ odometerHistory.length }}</span>
+            <span v-if="odometerSourceState === 'loading'" class="text-caption text-medium-emphasis">جارٍ التحميل</span>
+            <span v-else-if="odometerSourceState === 'unavailable'" class="text-caption text-medium-emphasis">غير متاح</span>
+            <span v-else class="text-caption text-medium-emphasis">{{ odometerHistory.length }}</span>
           </div>
-          <v-list v-if="odometerHistory.length" density="compact" class="odometer-history-list pa-0">
+          <div v-if="odometerSourceState === 'loading'" class="py-2" role="status" aria-live="polite">
+            <v-skeleton-loader type="list-item-two-line, list-item-two-line"></v-skeleton-loader>
+            <span class="sr-only">جارٍ تحميل سجل العداد</span>
+          </div>
+          <v-alert v-else-if="odometerSourceState === 'unavailable'" type="warning" variant="tonal" density="compact" role="alert">
+            تعذر تحميل سجل العداد.
+            <v-btn size="small" variant="text" :loading="odometerStore.loading" :disabled="odometerStore.loading" @click="odometerStore.fetchReadings()">إعادة المحاولة</v-btn>
+          </v-alert>
+          <v-list v-else-if="odometerHistory.length" density="compact" class="odometer-history-list pa-0">
             <v-list-item v-for="reading in odometerHistory" :key="reading.id" class="px-0">
               <v-list-item-title class="text-body-2 font-weight-medium">
                 {{ formatOdometerRate(reading.reading) }} كم
@@ -676,98 +666,11 @@
       </v-card>
     </v-dialog>
 
-    <!-- Snooze Dialog -->
-    <v-dialog v-model="showSnoozeDialog" max-width="400" :persistent="snoozingTask">
-      <v-card class="rounded-xl">
-        <v-card-title class="pa-5">
-          <v-icon color="warning" class="me-2">mdi-alarm-snooze</v-icon>
-          تأجيل التنبيه
-        </v-card-title>
-        <v-divider></v-divider>
-        <v-card-text class="pa-5">
-          <p class="mb-4">اختر مدة التأجيل لمهمة: <strong>{{ selectedTask?.name }}</strong></p>
-          <v-alert v-if="snoozeError" type="error" variant="tonal" class="mb-4" role="alert">
-            {{ snoozeError }}
-          </v-alert>
-          <div class="snooze-options d-flex flex-wrap gap-2">
-            <v-btn
-              v-for="opt in snoozeOptions"
-              :key="opt.value"
-              :variant="snoozeDuration === opt.value ? 'flat' : 'tonal'"
-              :color="snoozeDuration === opt.value ? 'primary' : undefined"
-              :disabled="snoozingTask"
-              @click="snoozeDuration = opt.value"
-            >
-              {{ opt.label }}
-            </v-btn>
-          </div>
-        </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions class="pa-4">
-          <v-spacer></v-spacer>
-          <v-btn variant="text" :disabled="snoozingTask" @click="showSnoozeDialog = false">إلغاء</v-btn>
-          <v-btn color="warning" :loading="snoozingTask" :disabled="snoozingTask || !selectedTask" @click="confirmSnooze">تأجيل</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Record Maintenance Dialog -->
-    <v-dialog v-model="showRecordDialog" max-width="500" persistent>
-      <v-card class="rounded-xl">
-        <v-card-title class="pa-5">
-          <v-icon color="success" class="me-2">mdi-wrench-check</v-icon>
-          تسجيل صيانة
-        </v-card-title>
-        <v-divider></v-divider>
-        <v-card-text class="pa-5">
-          <v-alert v-if="recordSaveError" type="error" variant="tonal" class="mb-4" role="alert">{{ recordSaveError }}</v-alert>
-          <div class="task-badge pa-4 rounded-lg mb-4">
-            <div class="text-caption text-medium-emphasis">المهمة</div>
-            <div class="text-h6 font-weight-bold">{{ selectedTask?.name }}</div>
-          </div>
-          <v-text-field
-            v-model.number="recordFormData.odometerReading"
-            label="قراءة العداد"
-            type="number"
-            suffix="كم"
-            prepend-inner-icon="mdi-speedometer"
-            class="mb-3"
-          ></v-text-field>
-          <v-text-field
-            v-model.number="recordFormData.cost"
-            label="التكلفة"
-            type="number"
-            suffix="ر.س"
-            prepend-inner-icon="mdi-cash"
-            class="mb-3"
-          ></v-text-field>
-          <v-text-field
-            v-model="recordFormData.serviceCenter"
-            label="مركز الصيانة"
-            prepend-inner-icon="mdi-map-marker"
-            class="mb-3"
-          ></v-text-field>
-          <v-textarea
-            v-model="recordFormData.notes"
-            label="ملاحظات"
-            rows="2"
-            prepend-inner-icon="mdi-note-text"
-          ></v-textarea>
-        </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions class="pa-4">
-          <v-spacer></v-spacer>
-          <v-btn variant="text" :disabled="savingRecord" @click="showRecordDialog = false">إلغاء</v-btn>
-          <v-btn color="success" :loading="savingRecord" :disabled="savingRecord" @click="confirmRecord">تسجيل</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
   </div>
 </template>
 
 <script setup>
-import { ref, computed, inject, defineAsyncComponent, onMounted } from 'vue'
+import { ref, computed, inject, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCarStore } from '@/stores/car'
 import { useOdometerStore } from '@/stores/odometer'
@@ -775,14 +678,22 @@ import { useTasksStore } from '@/stores/tasks'
 import { useRecordsStore } from '@/stores/records'
 import { useDocumentsStore } from '@/stores/documents'
 import { useProfileStore } from '@/stores/profile'
-const CostChart = defineAsyncComponent(() => import('@/components/CostChart.vue'))
-import confetti from 'canvas-confetti'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ar'
 import { readFileAsDataUrl, validateDataUrlFile } from '@/lib/data-url-upload'
-import { completeMaintenanceV1 } from '@/services/maintenance-completion-v1'
-import { runSingleFlight } from '@/lib/single-flight'
-import { ODOMETER_CONFIDENCE_V1 } from '@/lib/odometer-insights-v1'
+import { normalizeKnownCostV1 } from '@/lib/maintenance-cost-insights-v1'
+import {
+  DASHBOARD_QUICK_ACTIONS_V1,
+  buildDashboardActionsV1,
+  getDashboardActionCenterStateV1,
+  getDashboardCostSummaryV1,
+  getDashboardDocumentsSummaryV1,
+  getDashboardNextMaintenanceV1,
+  getDashboardOdometerSummaryV1,
+  getDashboardPrimaryStateV1,
+  getDashboardSourceStateV1,
+  getVisibleDashboardActionsV1
+} from '@/lib/dashboard-actions-v1'
 
 dayjs.locale('ar')
 
@@ -801,13 +712,9 @@ onMounted(async () => {
   if (!profileStore.hasProfile) {
     await profileStore.fetchProfile()
   }
-  // Ensure documents are fetched for regulatory check
+  // Ensure the Dashboard has document status data for its action center.
   if (documentsStore.documents.length === 0) await documentsStore.fetchDocuments()
 })
-
-function retryDashboardData() {
-  return Promise.all([tasksStore.fetchTasks(), recordsStore.fetchRecords(), documentsStore.fetchDocuments()])
-}
 
 // Greeting with first name
 const greeting = computed(() => {
@@ -827,19 +734,30 @@ const features = [
   { icon: 'mdi-history', color: 'success', title: 'سجل كامل', desc: 'أرشفة جميع الصيانات' }
 ]
 
-// Snooze options
-const snoozeOptions = [
-  { label: 'يوم', value: 'day' },
-  { label: 'أسبوع', value: 'week' },
-  { label: 'أسبوعين', value: 'twoWeeks' },
-  { label: 'شهر', value: 'month' }
-]
-
 // Computed
 const formattedDate = computed(() => dayjs().format('DD MMMM YYYY'))
-const formattedOdometer = computed(() => (carStore.car?.currentOdometer || 0).toLocaleString())
-const hasReliableOdometerUsage = computed(() => odometerStore.insights.confidence !== ODOMETER_CONFIDENCE_V1.INSUFFICIENT)
+const formattedOdometer = computed(() => {
+  const value = carStore.car?.currentOdometer
+  if (value === null || value === undefined || value === '') return '—'
+  const number = Number(value)
+  return Number.isFinite(number) ? number.toLocaleString('ar-SA') : '—'
+})
+const dashboardPrimaryState = computed(() => getDashboardPrimaryStateV1({
+  hasCar: carStore.hasCar,
+  loading: carStore.loading,
+  error: carStore.error
+}))
+const carSourceState = computed(() => getDashboardSourceStateV1({
+  loading: carStore.loading,
+  error: carStore.error,
+  hasData: carStore.hasCar
+}))
 const odometerHistory = computed(() => odometerStore.readingsWithDistance.slice(0, 5))
+const odometerSourceState = computed(() => getDashboardSourceStateV1({
+  loading: odometerStore.loading,
+  error: odometerStore.error,
+  hasData: odometerStore.readings.length > 0
+}))
 const lastOdometerUpdate = computed(() => {
   const date = odometerStore.latestReading?.date
   if (!date || !dayjs(date).isValid()) return null
@@ -848,39 +766,82 @@ const lastOdometerUpdate = computed(() => {
   if (days === 1) return 'أمس'
   return `منذ ${days.toLocaleString('ar-SA')} يومًا`
 })
-const alertTasks = computed(() => tasksStore.alertTasks)
-const needsSetupTasks = computed(() => tasksStore.needsSetupTasks)
-const recentRecords = computed(() => recordsStore.recentRecords)
-const regulatoryStatus = computed(() => documentsStore.regulatoryStatus)
-
-function formatOdometerRate(value) {
-  const number = Number(value)
-  return Number.isFinite(number)
-    ? number.toLocaleString('ar-SA', { maximumFractionDigits: 1 })
-    : '—'
-}
-
-function formatSampleDays(value) {
-  const number = Number(value)
-  return Number.isFinite(number) ? Math.round(number).toLocaleString('ar-SA') : '—'
-}
-
-function formatOdometerDate(value) {
-  return dayjs(value).isValid() ? dayjs(value).format('DD MMM YYYY') : 'تاريخ غير متاح'
-}
-
-const nextMaintenance = computed(() => {
-  const alerts = tasksStore.alertTasks
-  if (alerts.length > 0) return alerts[0]
-  return tasksStore.sortedTasks.find(task => !task.statusInfo.needsSetup) || null
+const maintenanceSourceState = computed(() => getDashboardSourceStateV1({
+  loading: tasksStore.loading,
+  error: tasksStore.error,
+  hasData: tasksStore.tasks.length > 0
+}))
+const documentsSourceState = computed(() => getDashboardSourceStateV1({
+  loading: documentsStore.loading,
+  error: documentsStore.error,
+  hasData: documentsStore.documents.length > 0
+}))
+const recordsSourceState = computed(() => getDashboardSourceStateV1({
+  loading: recordsStore.loading,
+  error: recordsStore.error,
+  hasData: recordsStore.records.length > 0
+}))
+const dashboardActions = computed(() => buildDashboardActionsV1({
+  tasks: tasksStore.tasksWithStatus,
+  documents: documentsStore.documentsWithStatus,
+  maintenanceState: maintenanceSourceState.value,
+  documentsState: documentsSourceState.value,
+  odometerInsights: odometerStore.insights,
+  latestOdometerDate: odometerStore.latestReading?.date
+}))
+const visibleDashboardActions = computed(() => getVisibleDashboardActionsV1(
+  dashboardActions.value,
+  showAllDashboardActions.value
+))
+const actionCenterState = computed(() => getDashboardActionCenterStateV1({
+  actions: dashboardActions.value,
+  maintenanceState: maintenanceSourceState.value,
+  documentsState: documentsSourceState.value
+}))
+const quickActions = DASHBOARD_QUICK_ACTIONS_V1
+const showAllDashboardActions = ref(false)
+const odometerSummary = computed(() => {
+  if (odometerSourceState.value === 'loading') return { state: 'loading', message: '' }
+  if (odometerSourceState.value === 'unavailable') {
+    return { state: 'unavailable', message: 'تعذر تحميل تفاصيل استخدام السيارة.' }
+  }
+  return getDashboardOdometerSummaryV1(odometerStore.insights)
 })
+const recentRecords = computed(() => recordsStore.recentRecords)
+const documentsSummary = computed(() => getDashboardDocumentsSummaryV1({
+  documents: documentsStore.documentsWithStatus,
+  state: documentsSourceState.value
+}))
+const regulatoryStatus = computed(() => documentsStore.regulatoryStatus)
+const nextMaintenance = computed(() => getDashboardNextMaintenanceV1({
+  tasks: tasksStore.sortedTasks,
+  state: maintenanceSourceState.value
+}))
+const costSummary = computed(() => getDashboardCostSummaryV1({
+  insights: recordsStore.costInsights,
+  latestRecord: recentRecords.value[0] || null,
+  state: recordsSourceState.value
+}))
 
-const statsCards = computed(() => [
-  { title: 'متأخر', value: tasksStore.taskStats.late, icon: 'mdi-alert-circle', color: 'error' },
-  { title: 'مستحق', value: tasksStore.taskStats.due, icon: 'mdi-clock-alert', color: 'warning' },
-  { title: 'قريب', value: tasksStore.taskStats.soon, icon: 'mdi-clock-outline', color: 'amber-darken-2' },
-  { title: 'على ما يرام', value: tasksStore.taskStats.good, icon: 'mdi-check-circle', color: 'success' }
-])
+function formatCount(value) {
+  return Number(value).toLocaleString('ar-SA')
+}
+
+function actionSeverityColor(severity) {
+  return { critical: 'error', warning: 'warning', info: 'info' }[severity] || 'primary'
+}
+
+function actionSourceIcon(source) {
+  return { maintenance: 'mdi-wrench-clock', document: 'mdi-file-alert-outline', odometer: 'mdi-speedometer' }[source] || 'mdi-information-outline'
+}
+
+function formatDate(date) {
+  return date && dayjs(date).isValid() ? dayjs(date).format('DD/MM/YYYY') : '—'
+}
+
+function formatMoney(value) {
+  return Number(value).toLocaleString('ar-SA', { maximumFractionDigits: 2 })
+}
 
 // Car Dialog
 const showCarDialog = ref(false)
@@ -972,68 +933,6 @@ async function saveOdometerReading() {
   }
 }
 
-// Snooze Dialog
-const showSnoozeDialog = ref(false)
-const selectedTask = ref(null)
-const snoozeDuration = ref('week')
-const snoozingTask = ref(false)
-const snoozeError = ref('')
-
-function snoozeTask(task) {
-  snoozeError.value = ''
-  selectedTask.value = task
-  showSnoozeDialog.value = true
-}
-
-async function confirmSnooze() {
-  if (!selectedTask.value || snoozingTask.value) return
-  snoozingTask.value = true
-  snoozeError.value = ''
-  try {
-    await tasksStore.snoozeTask(selectedTask.value.id, snoozeDuration.value)
-    showSnoozeDialog.value = false
-    showSnackbar('تم تأجيل التنبيه')
-  } catch {
-    snoozeError.value = 'تعذر تأجيل التنبيه. لم يتغير موعد المهمة؛ أعد المحاولة.'
-  } finally {
-    snoozingTask.value = false
-  }
-}
-
-// Record Dialog
-const showRecordDialog = ref(false)
-const recordFormData = ref({ odometerReading: 0, cost: 0, serviceCenter: '', notes: '' })
-const savingRecord = ref(false)
-const recordSaveError = ref('')
-
-function recordMaintenance(task) {
-  selectedTask.value = task
-  recordSaveError.value = ''
-  recordFormData.value = {
-    odometerReading: carStore.car?.currentOdometer || 0,
-    cost: 0, serviceCenter: '', notes: ''
-  }
-  showRecordDialog.value = true
-}
-
-async function confirmRecord() {
-  if (!selectedTask.value) return
-  recordSaveError.value = ''
-  await runSingleFlight(savingRecord, async () => {
-    try {
-      await completeMaintenanceV1(selectedTask.value, recordFormData.value)
-      showRecordDialog.value = false
-      showSnackbar('تم تسجيل الصيانة بنجاح', 'success')
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
-    } catch (error) {
-      console.error('Maintenance completion failed:', error)
-      recordSaveError.value = /[\u0600-\u06FF]/.test(error.message || '')
-        ? error.message
-        : 'تعذر تسجيل الصيانة. بقيت البيانات كما هي؛ أعد المحاولة.'
-    }
-  })
-}
-
 // Navigation
 const router = useRouter()
 
@@ -1041,16 +940,15 @@ function goToAddMaintenance() {
   router.push('/tasks')
 }
 
-// Helpers
-function getStatusColor(status) {
-  return { late: 'error', due: 'warning', soon: 'amber-darken-2', needs_setup: 'info', good: 'success' }[status] || 'grey'
+function formatOdometerRate(value) {
+  if (value === null || value === undefined || value === '') return '—'
+  const number = Number(value)
+  return Number.isFinite(number) ? number.toLocaleString('ar-SA', { maximumFractionDigits: 1 }) : '—'
 }
 
-function getStatusIcon(status) {
-  return { late: 'mdi-alert-circle', due: 'mdi-clock-alert', soon: 'mdi-clock-outline', needs_setup: 'mdi-wrench-clock', good: 'mdi-check-circle' }[status] || 'mdi-help-circle'
+function formatOdometerDate(value) {
+  return value && dayjs(value).isValid() ? dayjs(value).format('DD/MM/YYYY') : 'تاريخ غير متاح'
 }
-
-function formatDate(date) { return dayjs(date).format('DD/MM/YYYY') }
 </script>
 
 <style scoped>
@@ -1310,6 +1208,17 @@ function formatDate(date) { return dayjs(date).format('DD/MM/YYYY') }
   animation-delay: 0.15s;
 }
 
+.dashboard-action-item :deep(.v-list-item__content) {
+  min-width: 0;
+}
+
+.dashboard-action-cta {
+  max-width: 132px;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
+}
+
 .glass-card {
   animation: fadeInUp 0.6s ease-out forwards;
   animation-delay: 0.2s;
@@ -1346,6 +1255,20 @@ function formatDate(date) { return dayjs(date).format('DD/MM/YYYY') }
   .action-btn-mobile :deep(.v-btn__content) {
     font-size: 16px;
     font-weight: 700;
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboard-action-item :deep(.v-list-item__append) {
+    max-width: 104px;
+    margin-inline-start: 4px;
+  }
+
+  .dashboard-action-cta {
+    max-width: 100px;
+    min-width: 0;
+    padding-inline: 6px;
+    font-size: 0.75rem;
   }
 }
 </style>

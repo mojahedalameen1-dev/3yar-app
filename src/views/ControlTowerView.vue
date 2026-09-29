@@ -450,8 +450,8 @@
                   </template>
 
                   <template #item.cost="{ item }">
-                    <span class="text-green-accent-3 font-weight-bold">
-                      {{ (item.cost || 0).toLocaleString() }} SAR
+                    <span :class="[normalizeKnownCostV1(item.cost) === null ? 'text-medium-emphasis' : 'text-green-accent-3', 'font-weight-bold']">
+                      {{ formatRecordCost(item.cost) }}
                     </span>
                   </template>
 
@@ -492,8 +492,9 @@
                              </div>
                           </div>
                           <div class="text-end">
-                             <div class="text-h6 font-weight-bold text-green-accent-3">{{ (item.raw.cost || 0).toLocaleString() }}</div>
-                             <div class="text-caption text-medium-emphasis">SAR</div>
+                             <div :class="['font-weight-bold', normalizeKnownCostV1(item.raw.cost) === null ? 'text-caption text-medium-emphasis' : 'text-h6 text-green-accent-3']">
+                               {{ formatRecordCost(item.raw.cost) }}
+                             </div>
                           </div>
                         </div>
                         
@@ -793,7 +794,17 @@
 
                 <v-text-field v-model="recordDialog.data.task_name" label="اسم المهمة" class="mb-2"></v-text-field>
                 <v-row dense>
-                   <v-col cols="6"><v-text-field v-model="recordDialog.data.cost" label="التكلفة" type="number"></v-text-field></v-col>
+                   <v-col cols="6">
+                     <v-text-field
+                       v-model="recordDialog.data.cost"
+                       label="التكلفة"
+                       type="number"
+                       min="0"
+                       step="any"
+                       hint="فارغ = غير مسجلة، و0 = مجانية"
+                       persistent-hint
+                     ></v-text-field>
+                   </v-col>
                    <v-col cols="6"><v-text-field v-model="recordDialog.data.date" label="التاريخ" type="date"></v-text-field></v-col>
                 </v-row>
                 <v-text-field v-model="recordDialog.data.service_center" label="مركز الخدمة" class="mb-2"></v-text-field>
@@ -915,6 +926,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
+import { normalizeKnownCostV1 } from '@/lib/maintenance-cost-insights-v1'
 import V1BlobSource from '@/components/V1BlobSource.vue'
 import { useThemeStore } from '@/stores/theme'
 import { Doughnut, Line } from 'vue-chartjs'
@@ -1097,7 +1109,9 @@ const kpiStats = computed(() => [
   },
   { 
     title: 'إجمالي التكاليف', 
-    value: adminStore.analytics.totalCost.toLocaleString() + ' ر.س', 
+    value: adminStore.costInsights.knownCostRecords > 0
+      ? `${formatRecordCost(adminStore.costInsights.totalKnownCost)}`
+      : 'لا توجد تكاليف مسجلة',
     icon: 'mdi-cash', 
     colorClass: 'bg-green-gradient',
     trend: 5 
@@ -1158,6 +1172,11 @@ function getUserName(userId) {
 
 function formatDate(date) {
   return dayjs(date).format('DD/MM/YYYY')
+}
+
+function formatRecordCost(value) {
+  const cost = normalizeKnownCostV1(value)
+  return cost === null ? 'التكلفة غير مسجلة' : `${cost.toLocaleString('ar-SA', { maximumFractionDigits: 2 })} ر.س`
 }
 
 // --- Unified Open Create Dialog ---

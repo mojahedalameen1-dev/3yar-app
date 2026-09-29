@@ -317,19 +317,23 @@ async function initializeData() {
     await profileStore.fetchProfile()
     
     await carStore.fetchCar()
-    // Only fetch other data if user has a car
-    // This ensures new users start with a clean slate
+    const dataRequests = [
+      notificationsStore.fetchAnnouncements(),
+      notificationsStore.fetchReadHistory()
+    ]
+
+    // Announcements belong to the account, not a car. Keep them available even
+    // when the user has not added a vehicle yet.
     if (carStore.hasCar) {
-      await Promise.all([
+      dataRequests.push(
         tasksStore.fetchTasks(),
         documentsStore.fetchDocuments(),
         recordsStore.fetchRecords(),
-        odometerStore.fetchReadings(),
-        notificationsStore.fetchAnnouncements(),
-        notificationsStore.fetchReadHistory()
-      ])
-      notificationsStore.subscribeToAnnouncements()
+        odometerStore.fetchReadings()
+      )
     }
+    await Promise.all(dataRequests)
+    notificationsStore.subscribeToAnnouncements()
   } catch (error) {
     console.error('Error initializing data:', error)
   } finally {
@@ -378,11 +382,11 @@ const navItems = computed(() => [
     badge: 0
   },
   {
-    title: 'الإشعارات',
+    title: 'التنبيهات',
     icon: 'mdi-bell',
     route: '/notifications',
     name: 'notifications',
-    badge: notificationsStore.unreadCount
+    badge: notificationsStore.totalNotificationCount
   },
   { 
     title: 'وثائق السيارة', 
@@ -402,7 +406,7 @@ const navItems = computed(() => [
 
 const mobileNavItems = computed(() => [
   ...navItems.value.filter(item => ['dashboard', 'tasks', 'records', 'documents'].includes(item.name)),
-  { title: 'المزيد', icon: 'mdi-dots-horizontal', route: null, name: 'more', badge: notificationsStore.unreadCount }
+  { title: 'المزيد', icon: 'mdi-dots-horizontal', route: null, name: 'more', badge: notificationsStore.totalNotificationCount }
 ])
 
 const moreNavItems = computed(() => navItems.value.filter(item => ['notifications', 'settings'].includes(item.name)))

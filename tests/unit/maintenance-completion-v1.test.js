@@ -49,6 +49,27 @@ describe('atomic V1 maintenance completion', () => {
         expect(state.writes.map(write => write.collection)).toEqual(['maintenance_records', 'odometer_readings', 'maintenance_tasks'])
     })
 
+    it('stores an empty cost as unknown and propagates an optional invoice number', async () => {
+        const result = await commitMaintenanceCompletionV1({
+            taskId: 'task-1',
+            record: { odometerReading: 12500, cost: '', invoiceNumber: 'INV-2026-1' }
+        })
+
+        expect(result.record.cost).toBeNull()
+        expect(result.record.invoice_number).toBe('INV-2026-1')
+        expect(state.writes.filter(write => write.operation === 'set')).toHaveLength(2)
+    })
+
+    it('preserves an explicit zero cost as a real recorded cost', async () => {
+        const result = await commitMaintenanceCompletionV1({
+            taskId: 'task-1',
+            record: { odometerReading: 12500, cost: 0 }
+        })
+
+        expect(result.record.cost).toBe(0)
+        expect(state.writes.filter(write => write.operation === 'set')).toHaveLength(2)
+    })
+
     it('rejects a task not owned by the current user before any write', async () => {
         state.task = { ...state.task, user_id: 'other-1' }
         await expect(commitMaintenanceCompletionV1({ taskId: 'task-1', record: { odometerReading: 12500 } })).rejects.toThrow('لا تملك صلاحية')
@@ -63,6 +84,13 @@ describe('atomic V1 maintenance completion', () => {
 
     it('rejects invalid numeric input before commit', async () => {
         await expect(commitMaintenanceCompletionV1({ taskId: 'task-1', record: { odometerReading: -1 } })).rejects.toThrow('غير صالح')
+        expect(state.writes).toEqual([])
+    })
+
+    it.each([-1, 'not-a-number', NaN, Infinity])('rejects invalid cost %s before commit', async cost => {
+        await expect(commitMaintenanceCompletionV1({
+            taskId: 'task-1', record: { odometerReading: 12500, cost }
+        })).rejects.toThrow('التكلفة غير صالحة')
         expect(state.writes).toEqual([])
     })
 })

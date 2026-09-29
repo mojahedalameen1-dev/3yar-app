@@ -3,6 +3,12 @@ import { ref, computed } from 'vue'
 import { supabase } from '../lib/firebase'
 import { useCarStore } from './car'
 import dayjs from 'dayjs'
+import {
+    computeMaintenanceCostInsightsV1,
+    normalizeKnownCostV1,
+    normalizeMaintenanceCostInputV1,
+    parseMaintenanceRecordDateV1
+} from '../lib/maintenance-cost-insights-v1'
 
 export const useRecordsStore = defineStore('records', () => {
     // State
@@ -25,47 +31,49 @@ export const useRecordsStore = defineStore('records', () => {
 
     // Getters
     const sortedRecords = computed(() => {
-        return [...records.value].sort((a, b) =>
-            new Date(b.date) - new Date(a.date)
-        )
+        return [...records.value].sort((a, b) => {
+            const left = parseMaintenanceRecordDateV1(a.date)?.getTime() ?? null
+            const right = parseMaintenanceRecordDateV1(b.date)?.getTime() ?? null
+            if (left === null && right === null) return 0
+            if (left === null) return 1
+            if (right === null) return -1
+            return right - left
+        })
     })
 
-    const totalCost = computed(() => {
-        return records.value.reduce((sum, record) => sum + (record.cost || 0), 0)
-    })
-
-    const thisMonthCost = computed(() => {
-        const startOfMonth = dayjs().startOf('month')
-        return records.value
-            .filter(r => dayjs(r.date).isAfter(startOfMonth))
-            .reduce((sum, r) => sum + (r.cost || 0), 0)
-    })
-
-    const thisYearCost = computed(() => {
-        const startOfYear = dayjs().startOf('year')
-        return records.value
-            .filter(r => dayjs(r.date).isAfter(startOfYear))
-            .reduce((sum, r) => sum + (r.cost || 0), 0)
-    })
+    const costInsights = computed(() => computeMaintenanceCostInsightsV1(records.value))
+    const totalCost = computed(() => costInsights.value.totalKnownCost)
+    const thisMonthCost = computed(() => costInsights.value.thisMonthCost)
+    const thisYearCost = computed(() => costInsights.value.thisYearCost)
 
     const recordsByMonth = computed(() => {
         const grouped = {}
         records.value.forEach(record => {
-            const monthKey = dayjs(record.date).format('YYYY-MM')
+            const date = parseMaintenanceRecordDateV1(record.date)
+            const monthKey = date ? dayjs(date).format('YYYY-MM') : 'invalid-date'
             if (!grouped[monthKey]) {
                 grouped[monthKey] = {
-                    month: dayjs(record.date).format('MMMM YYYY'),
+                    month: date ? dayjs(date).format('MMMM YYYY') : 'تاريخ غير صالح',
                     records: [],
-                    totalCost: 0
+                    totalCost: 0,
+                    knownCostRecords: 0
                 }
             }
             grouped[monthKey].records.push(record)
-            grouped[monthKey].totalCost += record.cost || 0
+            const cost = normalizeKnownCostV1(record.cost)
+            if (cost !== null) {
+                grouped[monthKey].totalCost += cost
+                grouped[monthKey].knownCostRecords += 1
+            }
         })
 
-        return Object.values(grouped).sort((a, b) =>
-            new Date(b.records[0].date) - new Date(a.records[0].date)
-        )
+        return Object.entries(grouped)
+            .sort(([leftKey], [rightKey]) => {
+                if (leftKey === 'invalid-date') return 1
+                if (rightKey === 'invalid-date') return -1
+                return rightKey.localeCompare(leftKey)
+            })
+            .map(([, group]) => group)
     })
 
     const recentRecords = computed(() => {
@@ -73,8 +81,7 @@ export const useRecordsStore = defineStore('records', () => {
     })
 
     const averageMaintenanceCost = computed(() => {
-        if (records.value.length === 0) return 0
-        return Math.round(totalCost.value / records.value.length)
+        return costInsights.value.averageKnownCost
     })
 
     const stats = computed(() => ({
@@ -82,7 +89,11 @@ export const useRecordsStore = defineStore('records', () => {
         totalCost: totalCost.value,
         thisMonthCost: thisMonthCost.value,
         thisYearCost: thisYearCost.value,
-        averageCost: averageMaintenanceCost.value
+        averageCost: averageMaintenanceCost.value,
+        knownCostRecords: costInsights.value.knownCostRecords,
+        unknownCostRecords: costInsights.value.unknownCostRecords,
+        thisMonthKnownCostRecords: costInsights.value.thisMonthKnownCostRecords,
+        thisYearKnownCostRecords: costInsights.value.thisYearKnownCostRecords
     }))
 
     // Database mapping
@@ -108,7 +119,7 @@ export const useRecordsStore = defineStore('records', () => {
             task_name: record.taskName,
             date: record.date || new Date().toISOString(),
             odometer_reading: record.odometerReading || 0,
-            cost: record.cost || 0,
+            cost: normalizeMaintenanceCostInputV1(record.cost),
             service_center: record.serviceCenter || '',
             invoice_number: record.invoiceNumber || '',
             invoice_image: record.invoiceImage || null,
@@ -187,7 +198,7 @@ export const useRecordsStore = defineStore('records', () => {
             if (updates.taskName !== undefined) dbUpdates.task_name = updates.taskName
             if (updates.date !== undefined) dbUpdates.date = updates.date
             if (updates.odometerReading !== undefined) dbUpdates.odometer_reading = updates.odometerReading
-            if (updates.cost !== undefined) dbUpdates.cost = updates.cost
+            if (updates.cost !== undefined) dbUpdates.cost = normalizeMaintenanceCostInputV1(updates.cost)
             if (updates.serviceCenter !== undefined) dbUpdates.service_center = updates.serviceCenter
             if (updates.invoiceNumber !== undefined) dbUpdates.invoice_number = updates.invoiceNumber
             if (updates.invoiceImage !== undefined) dbUpdates.invoice_image = updates.invoiceImage
@@ -257,8 +268,12 @@ export const useRecordsStore = defineStore('records', () => {
             if (startDate && dayjs(record.date).isBefore(startDate)) return false
             if (endDate && dayjs(record.date).isAfter(endDate)) return false
             if (taskName && !record.taskName.includes(taskName)) return false
-            if (minCost !== undefined && record.cost < minCost) return false
-            if (maxCost !== undefined && record.cost > maxCost) return false
+            if (minCost !== undefined || maxCost !== undefined) {
+                const cost = normalizeKnownCostV1(record.cost)
+                if (cost === null) return false
+                if (minCost !== undefined && cost < minCost) return false
+                if (maxCost !== undefined && cost > maxCost) return false
+            }
             return true
         })
     }
@@ -292,6 +307,7 @@ export const useRecordsStore = defineStore('records', () => {
         loading,
         error,
         $reset,
+        costInsights,
         sortedRecords,
         totalCost,
         thisMonthCost,

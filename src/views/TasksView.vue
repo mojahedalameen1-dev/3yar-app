@@ -422,8 +422,18 @@
             v-model.number="recordData.cost"
             label="التكلفة"
             type="number"
+            min="0"
+            step="any"
             suffix="ر.س"
             prepend-inner-icon="mdi-cash"
+            hint="اتركه فارغًا إذا لم تُسجّل التكلفة، أو أدخل 0 إذا كانت مجانية"
+            persistent-hint
+            class="mb-3"
+          ></v-text-field>
+          <v-text-field
+            v-model="recordData.invoiceNumber"
+            label="رقم الفاتورة (اختياري)"
+            prepend-inner-icon="mdi-receipt-text-outline"
             class="mb-3"
           ></v-text-field>
           <v-text-field
@@ -647,8 +657,9 @@ async function cancelSnooze(task) {
 const showRecordDialog = ref(false)
 const recordData = ref({
   odometerReading: 0,
-  cost: 0,
+  cost: null,
   serviceCenter: '',
+  invoiceNumber: '',
   notes: ''
 })
 const savingRecord = ref(false)
@@ -682,8 +693,9 @@ function openRecordDialog(task) {
   recordSaveError.value = ''
   recordData.value = {
     odometerReading: carStore.car?.currentOdometer || 0,
-    cost: 0,
+    cost: null,
     serviceCenter: '',
+    invoiceNumber: '',
     notes: ''
   }
   showRecordDialog.value = true
