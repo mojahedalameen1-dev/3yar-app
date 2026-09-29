@@ -28,6 +28,16 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletion_requested', 'updated_at']))
       );
     }
+    // Share tokens are issued/revoked by the authenticated server API only.
+    // Unrelated client updates may preserve existing legacy sharing fields.
+    function clientCarShareCreateSafe() {
+      return request.resource.data.get('public_share_enabled', false) == false
+        && request.resource.data.get('share_token', null) == null;
+    }
+    function clientCarShareFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['public_share_enabled', 'share_token']);
+    }
 
     match /profiles/{profileId} {
       allow read: if admin() || owner();
@@ -42,8 +52,9 @@ service cloud.firestore {
 
     match /cars/{carId} {
       allow read: if admin() || owner();
-      allow create: if admin() || (incomingOwner() && request.resource.data.deletion_requested != true);
-      allow update: if admin() || carOwnerCanUpdate();
+      allow create: if clientCarShareCreateSafe()
+        && (admin() || (incomingOwner() && request.resource.data.deletion_requested != true));
+      allow update: if clientCarShareFieldsUnchanged() && (admin() || carOwnerCanUpdate());
       allow delete: if admin() || owner();
     }
 

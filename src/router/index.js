@@ -28,10 +28,16 @@ const routes = [
         meta: { title: 'تأكيد البريد الإلكتروني', requiresAuth: true, allowUnverified: true }
     },
     {
-        path: '/status/:token',
+        path: '/status',
         name: 'status',
         component: () => import('@/views/StatusView.vue'),
-        meta: { title: 'المشاركة العامة غير متاحة', public: true }
+        meta: { title: 'جواز السيارة', public: true, publicPassport: true }
+    },
+    {
+        path: '/status/:token',
+        name: 'legacy-status',
+        component: () => import('@/views/StatusView.vue'),
+        meta: { title: 'رابط مشاركة غير متاح', public: true, publicPassport: true, legacyShare: true }
     },
 
     // Onboarding route (auth required, no car required)
@@ -43,6 +49,12 @@ const routes = [
     },
 
     // Protected routes (auth required + car required)
+    {
+        path: '/passport',
+        name: 'passport',
+        component: () => import('@/views/PassportView.vue'),
+        meta: { title: 'جواز السيارة', requiresAuth: true, requiresCar: true }
+    },
     {
         path: '/dashboard',
         name: 'dashboard',
@@ -106,6 +118,8 @@ const router = createRouter({
     history: createWebHistory(),
     routes,
     scrollBehavior(to, from, savedPosition) {
+        // A bearer fragment is not a DOM selector and must never enter scroll diagnostics.
+        if (to.meta.publicPassport) return { top: 0 }
         if (savedPosition) return savedPosition
         if (to.hash) return { el: to.hash, behavior: 'smooth' }
         return { top: 0 }
@@ -116,6 +130,12 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
     // Update page title
     document.title = to.meta.title ? `${to.meta.title} | عيار` : 'عيار'
+
+    // Public and legacy passports must not read Firestore or require an auth session.
+    if (to.meta.publicPassport) {
+        next()
+        return
+    }
 
     // Check if user is authenticated using Firebase
     const { data: { session } } = await supabase.auth.getSession()

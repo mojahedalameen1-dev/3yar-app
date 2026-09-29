@@ -1,6 +1,6 @@
 <template>
   <v-app :theme="themeStore.currentTheme">
-    <ProfileSetup />
+    <ProfileSetup v-if="!route.meta.publicPassport" />
     <!-- Show navigation only for authenticated routes -->
     <template v-if="showNavigation">
       <!-- Mobile App Bar (Premium Style) -->
@@ -227,7 +227,7 @@
 
 <script setup>
 import { ref, computed, provide, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTasksStore } from '@/stores/tasks'
 import { useCarStore } from '@/stores/car'
@@ -243,6 +243,7 @@ import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import ayarLogo from '@/assets/ayar-logo.png'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const tasksStore = useTasksStore()
 const carStore = useCarStore()
@@ -281,7 +282,7 @@ const showMoreMenu = ref(false)
 const activeNav = ref('dashboard')
 
 watch(() => route.name, (val) => {
-  activeNav.value = ['notifications', 'settings'].includes(val) ? 'more' : (val || 'dashboard')
+  activeNav.value = ['notifications', 'settings', 'passport'].includes(val) ? 'more' : (val || 'dashboard')
 }, { immediate: true })
 
 function checkMobile() {
@@ -299,11 +300,15 @@ async function initialize() {
   // Initialize theme
   themeStore.initialize()
 
+  // Initial lazy navigation may still be pending when a cached Firebase session
+  // resolves. Determine the public route before any private-data initialization.
+  await router.isReady()
+
   // Initialize auth first
   await authStore.initialize()
   
   // If authenticated, fetch data
-  if (authStore.isAuthenticated) {
+  if (authStore.isAuthenticated && !route.meta.publicPassport) {
     await initializeData()
   } else {
     appLoading.value = false
@@ -343,7 +348,16 @@ async function initializeData() {
 
 // Watch for auth changes to reload data
 watch(() => authStore.isAuthenticated, async (isAuth) => {
-  if (isAuth) {
+  if (isAuth && !route.meta.publicPassport) {
+    appLoading.value = true
+    await initializeData()
+  }
+})
+
+// Loading a shared page must not fetch the visitor's private data. Restore normal
+// initialization only when that authenticated visitor returns to the private app.
+watch(() => route.meta.publicPassport, async (isPublicPassport, wasPublicPassport) => {
+  if (wasPublicPassport && !isPublicPassport && authStore.isAuthenticated) {
     appLoading.value = true
     await initializeData()
   }
@@ -395,6 +409,13 @@ const navItems = computed(() => [
     name: 'documents',
     badge: documentsStore.alertDocuments.length
   },
+  {
+    title: 'جواز السيارة',
+    icon: 'mdi-card-account-details-outline',
+    route: '/passport',
+    name: 'passport',
+    badge: 0
+  },
   {  
     title: 'الإعدادات', 
     icon: 'mdi-cog', 
@@ -409,7 +430,7 @@ const mobileNavItems = computed(() => [
   { title: 'المزيد', icon: 'mdi-dots-horizontal', route: null, name: 'more', badge: notificationsStore.totalNotificationCount }
 ])
 
-const moreNavItems = computed(() => navItems.value.filter(item => ['notifications', 'settings'].includes(item.name)))
+const moreNavItems = computed(() => navItems.value.filter(item => ['passport', 'notifications', 'settings'].includes(item.name)))
 
 function handleMobileNavItem(item) {
   if (item.name === 'more') {
