@@ -9,6 +9,7 @@ import { createPassportShareHandler } from '../../api/passport-share.js'
 import { createPublicPassportHandler } from '../../api/public-passport.js'
 import { buildPublicPassport } from '../../api/_passport-projection.js'
 import { createPassportToken, isPassportToken } from '../../api/_passport-security.js'
+import { markPassportDiagnosticStage } from '../../api/_passport-diagnostics.js'
 
 const token = Buffer.alloc(32, 7).toString('base64url')
 const ownerId = 'synthetic-owner'
@@ -188,6 +189,127 @@ describe('passport token and owner lifecycle APIs', () => {
         const response = await call(handler, { carId, operation: 'enable' })
         expect(response.statusCode).toBe(401)
         expect(JSON.stringify(response.body)).not.toContain('PRIVATE-ID-TOKEN-MESSAGE')
+    })
+
+    it.each([
+        {
+            name: 'Admin initialization',
+            getDb: () => { throw Object.assign(new Error('PRIVATE-ADMIN-DETAILS'), { code: 'PRIVATE-ADMIN-CODE' }) },
+            operation: 'getStatus',
+            expectedStage: 'firebase_admin_initialization'
+        },
+        {
+            name: 'token verification',
+            authenticate: async () => { throw Object.assign(new Error('PRIVATE-TOKEN-DETAILS'), { code: 'auth/internal-error' }) },
+            operation: 'getStatus',
+            expectedStage: 'firebase_token_verification',
+            expectedCode: 'auth/internal-error'
+        },
+        {
+            name: 'WIF acquisition',
+            getDb: () => {
+                const error = Object.assign(new Error('PRIVATE-WIF-TOKEN-DETAILS'), { code: 'PERMISSION_DENIED' })
+                markPassportDiagnosticStage(error, 'oidc_wif_credential_acquisition')
+                throw error
+            },
+            operation: 'getStatus',
+            expectedStage: 'oidc_wif_credential_acquisition',
+            expectedCode: 'PERMISSION_DENIED'
+        }
+    ])('logs safe stage metadata for $name failures without leaking error data', async ({ getDb, authenticate, operation, expectedStage, expectedCode, expectedOperation }) => {
+        const logs = vi.spyOn(console, 'error').mockImplementation(() => {})
+        try {
+            const handler = createPassportShareHandler({
+                getDb,
+                authenticate: authenticate || (async () => ({ uid: ownerId }))
+            })
+            const response = await call(handler, { carId, operation, secret: 'PRIVATE-BODY-TOKEN' })
+
+            expect(response.statusCode).toBe(500)
+            expect(response.body).toEqual({ error: 'Passport temporarily unavailable' })
+            expect(logs).toHaveBeenCalledTimes(1)
+            expect(logs).toHaveBeenCalledWith('passport_share_failure', expect.objectContaining({
+                operation: expectedOperation || operation,
+                stage: expectedStage,
+                errorClass: 'Error',
+                errorCode: expectedCode || 'UNCLASSIFIED'
+            }))
+            const loggedText = JSON.stringify(logs.mock.calls)
+            expect(loggedText).not.toContain('PRIVATE-')
+            expect(loggedText).not.toContain(ownerId)
+            expect(loggedText).not.toContain(carId)
+            expect(loggedText).not.toContain(token)
+        } finally { logs.mockRestore() }
+    })
+
+    it('classifies Firestore transaction reads and writes without logging private errors', async () => {
+        const logs = vi.spyOn(console, 'error').mockImplementation(() => {})
+        try {
+            const readError = Object.assign(new Error('PRIVATE-READ-DETAILS'), { code: 'permission-denied' })
+            const readDb = {
+                collection: () => ({ doc: id => ({ id }) }),
+                runTransaction: async callback => callback({ get: async () => { throw readError } })
+            }
+            const readResponse = await call(shareHandler(readDb), { carId, operation: 'getStatus' })
+            expect(readResponse.statusCode).toBe(500)
+            expect(logs).toHaveBeenLastCalledWith('passport_share_failure', expect.objectContaining({
+                stage: 'firestore_transaction_read', errorCode: 'permission-denied'
+            }))
+
+            const writeError = Object.assign(new Error('PRIVATE-WRITE-DETAILS'), { code: 'failed-precondition' })
+            const writeDb = {
+                collection: () => ({ doc: id => ({ id }) }),
+                runTransaction: async callback => callback({
+                    get: async () => ({ exists: true, data: () => ({ user_id: ownerId }) }),
+                    update: () => { throw writeError }
+                })
+            }
+            const writeResponse = await call(shareHandler(writeDb), { carId, operation: 'disable' })
+            expect(writeResponse.statusCode).toBe(500)
+            expect(logs).toHaveBeenLastCalledWith('passport_share_failure', expect.objectContaining({
+                stage: 'firestore_transaction_write', errorCode: 'failed-precondition'
+            }))
+            expect(JSON.stringify(logs.mock.calls)).not.toContain('PRIVATE-')
+        } finally { logs.mockRestore() }
+    })
+
+    it('classifies response serialization failures and keeps the generic client response', async () => {
+        const logs = vi.spyOn(console, 'error').mockImplementation(() => {})
+        try {
+            const db = fakeDb(seed())
+            const handler = shareHandler(db)
+            const response = {
+                headers: {}, statusCode: null, body: null, failedOnce: false,
+                setHeader(name, value) { this.headers[name] = value },
+                status(code) { this.statusCode = code; return this },
+                json(body) {
+                    if (this.statusCode === 200 && !this.failedOnce) {
+                        this.failedOnce = true
+                        throw Object.assign(new Error('PRIVATE-SERIALIZATION-DETAILS'), { code: 'ERR_BAD_RESPONSE' })
+                    }
+                    this.body = body
+                    return this
+                }
+            }
+            await handler({ method: 'POST', body: { carId, operation: 'getStatus' }, headers: { authorization: `Bearer ${ownerId}` } }, response)
+
+            expect(response.statusCode).toBe(500)
+            expect(response.body).toEqual({ error: 'Passport temporarily unavailable' })
+            expect(logs).toHaveBeenCalledWith('passport_share_failure', expect.objectContaining({
+                stage: 'response_serialization', errorCode: 'ERR_BAD_RESPONSE'
+            }))
+            expect(JSON.stringify(logs.mock.calls)).not.toContain('PRIVATE-')
+        } finally { logs.mockRestore() }
+    })
+
+    it('does not emit diagnostic logs for expected anonymous or non-owner denials', async () => {
+        const logs = vi.spyOn(console, 'error').mockImplementation(() => {})
+        try {
+            const handler = shareHandler(fakeDb(seed()))
+            expect((await call(handler, { carId, operation: 'getStatus' }, null)).statusCode).toBe(401)
+            expect((await call(handler, { carId, operation: 'getStatus' }, 'synthetic-other-owner')).statusCode).toBe(403)
+            expect(logs).not.toHaveBeenCalled()
+        } finally { logs.mockRestore() }
     })
 
     it('rejects deleting/missing cars and malformed requests without writes', async () => {
