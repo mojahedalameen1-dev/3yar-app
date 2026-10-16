@@ -97,6 +97,93 @@ describe('owner access', () => {
     })
 })
 
+const CHILD_COLLECTIONS = ['maintenance_tasks', 'maintenance_records', 'documents', 'odometer_readings']
+const DELETION_FLAG_CASES = [
+    ['absent', {}],
+    ['false', { deletion_requested: false }],
+    ['true', { deletion_requested: true }]
+]
+
+describe.each(DELETION_FLAG_CASES)('car deletion flag %s', (_label, deletionFields) => {
+    const carId = 'car-deletion-flag'
+    const deleting = deletionFields.deletion_requested === true
+
+    beforeEach(async () => {
+        await environment.withSecurityRulesDisabled(async context => {
+            const db = context.firestore()
+            await setDoc(doc(db, 'cars', carId), {
+                user_id: 'owner-1', public_share_enabled: true, share_token: 'synthetic-legacy-token', ...deletionFields
+            })
+            await Promise.all(CHILD_COLLECTIONS.map(collectionName => setDoc(doc(db, collectionName, 'flag-child'), {
+                user_id: 'owner-1', car_id: carId, notes: 'Synthetic fixture'
+            })))
+        })
+    })
+
+    it('allows V1 car creation unless explicitly tombstoned, without permitting client sharing', async () => {
+        const db = environment.authenticatedContext('owner-1').firestore()
+        const car = { user_id: 'owner-1', ...deletionFields }
+        const create = setDoc(doc(db, 'cars/new-flag-car'), car)
+        if (deleting) await assertFails(create)
+        else await assertSucceeds(create)
+        await assertFails(setDoc(doc(db, 'cars/forged-flag-car'), { ...car, public_share_enabled: true, share_token: 'client-token' }))
+        await assertFails(setDoc(doc(db, 'cars/foreign-flag-car'), { ...car, user_id: 'other-1' }))
+    })
+
+    it('allows active-car edits while preserving ownership and server-owned share fields', async () => {
+        const db = environment.authenticatedContext('owner-1').firestore()
+        const car = doc(db, 'cars', carId)
+        const edit = updateDoc(car, { make: 'Synthetic updated' })
+        if (deleting) await assertFails(edit)
+        else await assertSucceeds(edit)
+        await assertFails(updateDoc(car, { user_id: 'other-1' }))
+        await assertFails(updateDoc(car, { public_share_enabled: false }))
+        await assertFails(updateDoc(car, { share_token: null }))
+    })
+
+    it.each(CHILD_COLLECTIONS)('keeps owner %s reads and cleanup available while gating mutations', async collectionName => {
+        const db = environment.authenticatedContext('owner-1').firestore()
+        const existing = doc(db, collectionName, 'flag-child')
+        await assertSucceeds(getDoc(existing))
+        await assertSucceeds(getDocs(query(collection(db, collectionName), where('user_id', '==', 'owner-1'), where('car_id', '==', carId))))
+
+        const create = setDoc(doc(db, collectionName, 'new-flag-child'), { user_id: 'owner-1', car_id: carId })
+        if (deleting) await assertFails(create)
+        else await assertSucceeds(create)
+        const update = updateDoc(existing, { notes: 'Synthetic updated' })
+        if (deleting) await assertFails(update)
+        else await assertSucceeds(update)
+        await assertSucceeds(deleteDoc(existing))
+    })
+
+    it.each(CHILD_COLLECTIONS)('denies another user access to %s for every deletion flag', async collectionName => {
+        const db = environment.authenticatedContext('other-1').firestore()
+        const existing = doc(db, collectionName, 'flag-child')
+        await assertFails(getDoc(existing))
+        await assertFails(getDocs(query(collection(db, collectionName), where('user_id', '==', 'owner-1'), where('car_id', '==', carId))))
+        await assertFails(setDoc(doc(db, collectionName, 'forged-flag-child'), { user_id: 'other-1', car_id: carId }))
+        await assertFails(updateDoc(existing, { notes: 'Forged' }))
+        await assertFails(deleteDoc(existing))
+    })
+})
+
+it('enforces and safely resets a tombstone on a car whose deletion flag was absent', async () => {
+    await environment.withSecurityRulesDisabled(async context => {
+        await setDoc(doc(context.firestore(), 'cars/legacy-flag-car'), { user_id: 'owner-1' })
+    })
+    const db = environment.authenticatedContext('owner-1').firestore()
+    const car = doc(db, 'cars/legacy-flag-car')
+    await assertSucceeds(updateDoc(car, { deletion_requested: true }))
+    for (const collectionName of CHILD_COLLECTIONS) {
+        await assertFails(setDoc(doc(db, collectionName, 'blocked-legacy-child'), { user_id: 'owner-1', car_id: car.id }))
+    }
+    await assertFails(updateDoc(car, { deletion_requested: false, make: 'Unrelated change' }))
+    await assertSucceeds(updateDoc(car, { deletion_requested: false, updated_at: 'synthetic' }))
+    for (const collectionName of CHILD_COLLECTIONS) {
+        await assertSucceeds(setDoc(doc(db, collectionName, 'restored-legacy-child'), { user_id: 'owner-1', car_id: car.id }))
+    }
+})
+
 describe('other authenticated user', () => {
     it.each(PRIVATE_DOCUMENTS)('cannot read or change another owner %s', async (collectionName, documentId) => {
         const db = environment.authenticatedContext('other-1').firestore()
