@@ -13,7 +13,13 @@ export default defineConfig({
       // bundle with stale Firebase configuration (especially after auth changes).
       registerType: 'autoUpdate',
       workbox: {
-        cleanupOutdatedCaches: true
+        cleanupOutdatedCaches: true,
+        // Sharing always re-authorizes on the server; never reuse a revoked DTO.
+        runtimeCaching: [{
+          urlPattern: /\/api\/public-passport(?:\?|$)/,
+          method: 'POST',
+          handler: 'NetworkOnly'
+        }]
       },
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {

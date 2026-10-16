@@ -1,4 +1,22 @@
 {
+    "headers": [
+        {
+            "source": "/status",
+            "headers": [
+                { "key": "Cache-Control", "value": "no-store" },
+                { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+                { "key": "Referrer-Policy", "value": "no-referrer" }
+            ]
+        },
+        {
+            "source": "/status/:path*",
+            "headers": [
+                { "key": "Cache-Control", "value": "no-store" },
+                { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+                { "key": "Referrer-Policy", "value": "no-referrer" }
+            ]
+        }
+    ],
     "rewrites": [
         {
             "source": "/(.*)",
