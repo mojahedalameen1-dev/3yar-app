@@ -3,6 +3,7 @@ import { ExternalAccountClient } from 'google-auth-library'
 import { cert, getApps, initializeApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
+import { markPassportDiagnosticStage } from './_passport-diagnostics.js'
 
 function localServiceAccount() {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
@@ -44,13 +45,18 @@ export function createVercelFederatedCredential(env = process.env) {
 
     return {
         async getAccessToken() {
-            const { token } = await externalAccount.getAccessToken()
-            if (!token) throw new Error('Google Cloud did not return an access token')
-            const expiryDate = externalAccount.credentials.expiry_date
-            const expiresIn = expiryDate
-                ? Math.max(1, Math.floor((expiryDate - Date.now()) / 1000))
-                : 3600
-            return { access_token: token, expires_in: expiresIn }
+            try {
+                const { token } = await externalAccount.getAccessToken()
+                if (!token) throw new Error('Google Cloud did not return an access token')
+                const expiryDate = externalAccount.credentials.expiry_date
+                const expiresIn = expiryDate
+                    ? Math.max(1, Math.floor((expiryDate - Date.now()) / 1000))
+                    : 3600
+                return { access_token: token, expires_in: expiresIn }
+            } catch (error) {
+                markPassportDiagnosticStage(error, 'oidc_wif_credential_acquisition')
+                throw error
+            }
         }
     }
 }
@@ -64,10 +70,23 @@ export function adminApp() {
     if (existing) return existing
 
     if (process.env.VERCEL_ENV === 'production') {
-        return initializeApp({
-            credential: createVercelFederatedCredential(),
-            projectId: process.env.FIREBASE_PROJECT_ID
-        })
+        let credential
+        try {
+            credential = createVercelFederatedCredential()
+        } catch (error) {
+            markPassportDiagnosticStage(error, 'oidc_wif_configuration')
+            throw error
+        }
+
+        try {
+            return initializeApp({
+                credential,
+                projectId: process.env.FIREBASE_PROJECT_ID
+            })
+        } catch (error) {
+            markPassportDiagnosticStage(error, 'firebase_admin_initialization')
+            throw error
+        }
     }
 
     const serviceAccount = localServiceAccount()
@@ -88,7 +107,22 @@ export function adminDb() {
 export async function requireUser(request, { admin = false } = {}) {
     const header = request.headers.authorization || ''
     if (!header.startsWith('Bearer ')) throw Object.assign(new Error('Authentication required'), { status: 401 })
-    const decoded = await adminAuth().verifyIdToken(header.slice(7))
+    let auth
+    try {
+        auth = adminAuth()
+    } catch (error) {
+        markPassportDiagnosticStage(error, 'firebase_admin_initialization')
+        throw error
+    }
+
+    let decoded
+    try {
+        decoded = await auth.verifyIdToken(header.slice(7))
+    } catch (error) {
+        markPassportDiagnosticStage(error, 'firebase_token_verification')
+        throw error
+    }
+
     if (admin && decoded.admin !== true) throw Object.assign(new Error('Admin access required'), { status: 403 })
     return decoded
 }
