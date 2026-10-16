@@ -37,12 +37,12 @@ export function createPassportShareHandler({ getDb = adminDb, authenticate = req
             if (!body || !isPassportCarId(body.carId) || !OPERATIONS.has(body.operation)) throw new PassportRequestError(400)
             operation = body.operation
 
-            stage = 'firebase_admin_initialization'
+            stage = 'firestore_client_create'
             let db
             try {
                 db = getDb()
             } catch (error) {
-                markPassportDiagnosticStage(error, 'firebase_admin_initialization')
+                markPassportDiagnosticStage(error, 'firestore_client_create')
                 throw error
             }
 

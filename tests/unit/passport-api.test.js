@@ -193,10 +193,10 @@ describe('passport token and owner lifecycle APIs', () => {
 
     it.each([
         {
-            name: 'Admin initialization',
+            name: 'Firestore client creation',
             getDb: () => { throw Object.assign(new Error('PRIVATE-ADMIN-DETAILS'), { code: 'PRIVATE-ADMIN-CODE' }) },
             operation: 'getStatus',
-            expectedStage: 'firebase_admin_initialization'
+            expectedStage: 'firestore_client_create'
         },
         {
             name: 'token verification',

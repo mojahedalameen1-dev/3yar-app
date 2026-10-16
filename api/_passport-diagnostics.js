@@ -1,8 +1,12 @@
 const PASSPORT_DIAGNOSTIC_STAGES = new Set([
-    'firebase_admin_initialization',
-    'firebase_token_verification',
+    'firebase_app_lookup',
     'oidc_wif_configuration',
+    'firebase_app_initialize',
+    'firebase_auth_client_create',
+    'firebase_token_verification',
     'oidc_wif_credential_acquisition',
+    'firebase_local_credential_configuration',
+    'firestore_client_create',
     'firestore_transaction_read',
     'firestore_transaction_write',
     'response_serialization',
@@ -100,12 +104,6 @@ function safeErrorClass(error) {
 function safeErrorCode(error) {
     const code = error?.code
     if (typeof code === 'string' && SAFE_ERROR_CODES.has(code)) return code
-
-    const status = Number.isInteger(error?.status)
-        ? error.status
-        : Number.isInteger(error?.response?.status) ? error.response.status : null
-    if (status !== null && status >= 400 && status <= 599) return `HTTP_${status}`
-
     return 'UNCLASSIFIED'
 }
 
